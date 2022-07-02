@@ -1,0 +1,6 @@
+int a;
+
+if (true) {
+    a = 1;
+    int b = sqrt(0);
+}

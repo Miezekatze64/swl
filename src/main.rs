@@ -39,6 +39,7 @@ struct Lexer {
 const KEYWORDS: &[&str] = &[
     "if",
     "else",
+    "func"
 ];
 
 /// default type list
@@ -47,6 +48,7 @@ const TYPES: &[&str] = &[
     "float",
     "char",
     "string",
+    "void",
 ];
 
 /// return an error string in the following format:
@@ -195,6 +197,9 @@ impl Lexer {
                         if ttype == TokenType::Undef || ttype == TokenType::Operator {
                             ttype = TokenType::Operator;
                             val.push(ch);
+                        } else if ttype == TokenType::Special && val == "<" && ch == '-' {
+                            val.push(ch);
+                            ttype = TokenType::Special;
                         } else {
                             return Ok(Token {
                                 pos: token_pos,
@@ -203,10 +208,13 @@ impl Lexer {
                             });
                         }
                     },
-                    ';' | '(' | ')' | ',' | '{' | '}' => {
+                    ';' | '(' | ')' | ',' | '{' | '}'|'<'|'>' => {
                         if ttype == TokenType::Undef {
                             ttype = TokenType::Special;
                             val.push(ch);
+                        } else if ttype == TokenType::Operator && val == "-" && ch == '>' {
+                            val.push(ch);
+                            ttype = TokenType::Special;
                         } else {
                             return Ok(Token {
                                 pos: token_pos,
@@ -294,6 +302,8 @@ enum ASTNode {
     VarInit(String, Expression),
     FunctionCall(String, Vec<Expression>),
     If(Expression, Box<ASTNode>),
+    FunctionDecl(String, Vec<(String, String)>, String, Box<ASTNode>),
+    Return(Expression),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -340,15 +350,19 @@ impl Parser {
     }
 
     fn parse(&mut self) -> Result<ASTNode, Error> {
-        self.parse_block()
+        self.parse_block_(true)
     }
 
     fn parse_block(&mut self) -> Result<ASTNode, Error> {
+        self.parse_block_(false)
+    }
+    
+    fn parse_block_(&mut self, is_root: bool) -> Result<ASTNode, Error> {
         let mut block: ASTNode = ASTNode::Block(vec![]);
         loop {
             match block {
                 ASTNode::Block(ref mut vec) => {
-                    let bs = self.parse_block_statement()?;
+                    let bs = self.parse_block_statement(is_root)?;
                     if bs.is_none() {
                         break;
                     }
@@ -435,7 +449,7 @@ impl Parser {
         }
     }
 
-    fn parse_block_statement(&mut self) -> Result<Option<ASTNode>, Error> {
+    fn parse_block_statement(&mut self, is_root: bool) -> Result<Option<ASTNode>, Error> {
         let token = self.lexer.next_token()?;
         let val = token.value;
         match token.ttype {
@@ -457,6 +471,11 @@ impl Parser {
                     Expression::Val(..) => unreachable!(),
                     Expression::T(..) => unreachable!(),
                     Expression::F(name, args) => {
+                        // function call: only permitted inside of function
+                        if is_root {
+                            return Err(Error::Syntax(error!(self.lexer, token.pos, "function calls are not allowed at top level", ErrorLevel::Err)));
+                        }
+                        
                         // expect semicolon
                         let stoken = self.lexer.next_token()?;
                         let sval = stoken.value;
@@ -475,9 +494,24 @@ impl Parser {
             TokenType::Eof => return Ok(None),
             TokenType::Special => match val.as_str() {
                 "}" => {
-                    return Ok(None);
+                    if is_root {
+                        return Err(Error::Syntax(error!(self.lexer, token.pos, "unexprected  token '}}'", ErrorLevel::Err)));
+                    }
+                    return Ok(None)
                 },
-                _ => {}
+                "<-" => {
+                    if is_root {
+                        return Err(Error::Syntax(error!(self.lexer, token.pos, "returns are not allowed at top level", ErrorLevel::Err)));
+                    }
+                    // parse expression
+                    let expression = self.parse_expr(&[";"])?.0;
+                    return Ok(Some(ASTNode::Return(expression)));
+                },
+                ";" => {
+                    // ignore
+                    return self.parse_block_statement(is_root);
+                }
+                _ => {},
             },
             TokenType::Operator => {},
             TokenType::Type => {
@@ -519,6 +553,9 @@ impl Parser {
             },
             TokenType::Keyword => match val.as_str() {
                 "if" => {
+                    if is_root {
+                        return Err(Error::Syntax(error!(self.lexer, token.pos, "`if` not allowed at top level", ErrorLevel::Err)));
+                    }
                     // next token: '('
                     let next_token = self.lexer.next_token()?;
                     if next_token.ttype != TokenType::Special || next_token.value != "(" {
@@ -540,9 +577,93 @@ impl Parser {
                     return Ok(Some(ASTNode::If(predicate, Box::new(block))));
                     
                 },
+                "func" => {
+                    if ! is_root {
+                        return Err(Error::Syntax(error!(self.lexer, token.pos, "functions are only allowed at top level", ErrorLevel::Err)));
+                    }
+                    
+                    // parse function name
+                    let ident_token = self.lexer.next_token()?;
+                    let name = ident_token.value;
+                    if ident_token.ttype != TokenType::Ident {
+                        return Err(Error::Syntax(error!(self.lexer, ident_token.pos, "unexpected token `{name}`", ErrorLevel::Err)));
+                    }
+
+                    // expect '('
+                    let next_token = self.lexer.next_token()?;
+                    if next_token.ttype != TokenType::Special || next_token.value != "(" {
+                        let ntv = next_token.value;
+                        return Err(Error::Syntax(error!(self.lexer, next_token.pos, "unexpected token `{ntv}`", ErrorLevel::Err)));
+                    }
+                    // parse args
+                    let mut args: Vec<(String, String)> = vec![];
+                    
+                    let check = self.lexer.peek_token()?;
+                    if check.ttype != TokenType::Special || check.value != ")" {
+                        loop {
+                            let t = self.lexer.next_token()?;
+                            let tval = t.value;
+                            if t.ttype != TokenType::Type {
+                                return Err(Error::Syntax(error!(self.lexer, t.pos, "unexpected token `{tval}`, type expected", ErrorLevel::Err)));
+                            }
+                            
+                            let n = self.lexer.next_token()?;
+                            let nval = n.value;
+                            if n.ttype != TokenType::Ident {
+                                return Err(Error::Syntax(error!(self.lexer, n.pos, "unexpected token `{nval}`, identifier expected", ErrorLevel::Err)));
+                            }
+                            args.insert(args.len(), (tval, nval));
+
+                            let token = self.lexer.next_token()?;
+                            let val = token.value;
+                            if token.ttype != TokenType::Special {
+                                return Err(Error::Syntax(error!(self.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expected", ErrorLevel::Err)));
+                            }
+                            
+                            if val == "," {
+                                continue;
+                            } else if val == ")" {
+                                break;
+                            } else {
+                                return Err(Error::Syntax(error!(self.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expected", ErrorLevel::Err)));
+                            }
+                        }
+                    } else {
+                        self.lexer.next_token()?;
+                    }
+
+                    // optional return type (-> type)
+                    // else {
+                    let mut ret_type = "void".into();
+                    
+                    let mut next_token = self.lexer.next_token()?;
+                    if next_token.ttype == TokenType::Special && next_token.value == "->" {
+                        // expect return type
+                        let type_token = self.lexer.next_token()?;
+                        if type_token.ttype != TokenType::Type {
+                            return Err(Error::Syntax(error!(self.lexer, token.pos, "unexpected token `{val}`, return type expected", ErrorLevel::Err)));
+                        }
+                        ret_type = type_token.value;
+                        next_token = self.lexer.next_token()?;
+                    }
+                    
+                    
+                    // expect {
+                    if next_token.ttype != TokenType::Special || next_token.value != "{" {
+                        let ntv = next_token.value;
+                        return Err(Error::Syntax(error!(self.lexer, next_token.pos, "unexpected token `{ntv}`", ErrorLevel::Err)));
+                    }
+
+                    // parse block
+                    let block = self.parse_block()?;
+
+                    return Ok(Some(ASTNode::FunctionDecl(name, args, ret_type, Box::new(block))));
+
+//                    let func_expr: Expression = Expression::F(ident, args);
+                }
                 _ => {}
             },
-            TokenType::Undef => return self.parse_block_statement(),
+            TokenType::Undef => return self.parse_block_statement(is_root),
         }
         Err(Error::Syntax(error!(self.lexer, token.pos, "not implemented", ErrorLevel::Fatal)))
     }

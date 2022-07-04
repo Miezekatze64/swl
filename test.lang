@@ -1,4 +1,6 @@
-func main() -> int {
-    print("Hello, World!");
-    <- 0;
+alias string = [char];
+
+func main([string] args) -> int {
+    int a = 34 + 35;
+    <- a;
 }

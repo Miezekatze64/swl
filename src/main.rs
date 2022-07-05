@@ -35,7 +35,8 @@ const KEYWORDS: &[&str] = &[
     "else",
     "func",
     "alias",
-    "intrinsic"
+    "intrinsic",
+    "as"
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -111,7 +112,7 @@ impl Type {
         }
     }
 
-    fn size(&self) -> usize {
+    fn size(&self, aliases: &HashMap<String, Type>) -> usize {
         match self {
             Type::Primitive(a) => match a {
                 PrimitiveType::Int => 8,
@@ -120,7 +121,12 @@ impl Type {
                 PrimitiveType::Void => 0,
                 PrimitiveType::Bool => 1,
             },
-            Type::Custom(s) => unimplemented!("{s} shouldn't be a type"),
+            Type::Custom(s) => {
+                if aliases.contains_key(s) {
+                    return aliases.get(s).unwrap().size(aliases);
+                }
+                unimplemented!("{s} shouldn't be a type")
+            },
             Type::Array(_) => 8,             // 4 <- size, 4 <- pointer
             Type::Pointer(_) => 4,
             Type::Invalid => 0,
@@ -295,6 +301,9 @@ impl Lexer {
                 TokenType::String => {
                     if ch == '"' {
                         self.pos += 1;
+
+//                        let ret_val = val.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r").replace("\\\\", "\\").replace("\\\"", "\"").replace("\\'", "\'");
+                        
                         return Ok(Token {
                             pos: token_pos,
                             ttype,
@@ -375,6 +384,15 @@ impl Lexer {
                         if ttype == TokenType::Type && ch == '*' {
                             val.push(ch);
                             ttype = TokenType::Type;
+                        } else if ttype == TokenType::Operator && val == "/" {
+                            // comment
+                            loop {
+                                if self.source[self.pos] == '\n' {
+                                    break;
+                                }
+                                self.pos += 1;
+                            }
+                            return self.next_token();
                         } else if ttype == TokenType::Undef || ttype == TokenType::Operator {
                             ttype = TokenType::Operator;
                             val.push(ch);
@@ -491,6 +509,7 @@ enum ASTNodeR {
     FunctionDecl(String, Vec<(Type, String)>, Type, Box<ASTNode>),
     Return(Expression),
     TypeAlias(String, Type),
+    Intrinsic(String, String, Vec<(Type, String)>, Type),
 }
 
 type Expression = (usize, ExpressionR);
@@ -601,13 +620,14 @@ macro_rules! err_break {
 
 #[allow(unused)]
 macro_rules! err_add {
-    ($a:expr, $errors:ident) => {
+    ($a:expr, $errors:expr) => {
         match $a {
             Ok(a) => a,
             Err(e) => {
                 for err in e {
                     $errors.push(err);
                 }
+                return Err($errors);
             }
         }
     }
@@ -808,6 +828,66 @@ impl Parser {
         if token.ttype == TokenType::Ident && self.lexer.peek_token().unwrap().ttype == TokenType::Ident {
             token.ttype = TokenType::Type;
         }
+
+        fn parse_function_decl(parser: &mut Parser, errors: &mut Vec<(ErrorLevel, String)>) -> Result<(Vec<(Type, String)>, Type), Vec<Error>> {
+            // parse args
+            let mut args: Vec<(Type, String)> = vec![];
+            
+            let check = get_peek_token!(parser.lexer, errors);
+            if check.ttype != TokenType::Special || check.value != ")" {
+                loop {
+                    let t = match parser.parse_type() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            errors.push(e);
+                            return Err(errors.clone());
+                        },
+                    };
+
+                    let nval = err_break!(parser.expect(Some(TokenType::Ident), None), errors).value;
+                    args.insert(args.len(), (t, nval));
+
+                    let token = get_token!(parser.lexer, errors);
+                    let val = token.value;
+                    if token.ttype != TokenType::Special {
+                        errors.push((ErrorLevel::Err, error!(parser.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
+                        return Err(errors.clone());
+                    }
+                    
+                    if val == "," {
+                        continue;
+                    } else if val == ")" {
+                        break;
+                    } else {
+                        errors.push((ErrorLevel::Err, error!(parser.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
+                        return Err(errors.clone());
+                    }
+                }
+            } else {
+                get_token!(parser.lexer, errors);
+            }
+
+            // optional return type (-> type)
+            // else {
+            let mut ret_type = Type::Primitive(PrimitiveType::Void);
+            
+            let next_token = get_peek_token!(parser.lexer, errors);
+            if next_token.ttype == TokenType::Special && next_token.value == "->" {
+                parser.lexer.next_token().unwrap();
+                // expect return type
+
+                let tp = match parser.parse_type() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        errors.push(e);
+                        return Err(errors.clone());
+                    },
+                };
+                ret_type = tp;//parse_type(val);
+            }
+
+            Ok((args, ret_type))
+        }
         
         match token.ttype {
             TokenType::Int | TokenType::Float | TokenType::Char | TokenType::String | TokenType::Bool => {
@@ -953,61 +1033,7 @@ impl Parser {
 
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
                     
-                    // parse args
-                    let mut args: Vec<(Type, String)> = vec![];
-                    
-                    let check = get_peek_token!(self.lexer, errors);
-                    if check.ttype != TokenType::Special || check.value != ")" {
-                        loop {
-                            let t = match self.parse_type() {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    errors.push(e);
-                                    return Err(errors);
-                                },
-                            };
-
-                            let nval = err_break!(self.expect(Some(TokenType::Ident), None), errors).value;
-                            args.insert(args.len(), (t, nval));
-
-                            let token = get_token!(self.lexer, errors);
-                            let val = token.value;
-                            if token.ttype != TokenType::Special {
-                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
-                                return Err(errors);
-                            }
-                            
-                            if val == "," {
-                                continue;
-                            } else if val == ")" {
-                                break;
-                            } else {
-                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
-                                return Err(errors);
-                            }
-                        }
-                    } else {
-                        get_token!(self.lexer, errors);
-                    }
-
-                    // optional return type (-> type)
-                    // else {
-                    let mut ret_type = Type::Primitive(PrimitiveType::Void);
-                    
-                    let next_token = get_peek_token!(self.lexer, errors);
-                    if next_token.ttype == TokenType::Special && next_token.value == "->" {
-                        self.lexer.next_token().unwrap();
-                        // expect return type
-
-                        let tp = match self.parse_type() {
-                            Ok(a) => a,
-                            Err(e) => {
-                                errors.push(e);
-                                return Err(errors);
-                            },
-                        };
-                        ret_type = tp;//parse_type(val);
-                    }
+                    let (args, ret_type) = err_add!(parse_function_decl(self, &mut errors), errors);
                     
                     // expect {
                     err_ret!(self.expect(Some(TokenType::Special), None), errors);
@@ -1047,6 +1073,28 @@ impl Parser {
                     return Ok(Some((token.pos, ASTNodeR::TypeAlias(ident, typ))));
                     
                 },
+                "intrinsic" => {
+                    if ! is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "intrinsics only allowed at top-level")));
+                        return Err(errors);
+                    }
+                    
+                    // expect identifier
+                    let intr_name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+
+                    // expect `as`
+                    err_ret!(self.expect(Some(TokenType::Keyword), Some("as".into())), errors);
+                    
+                    // expect identifier
+                    let intr_func = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                    
+                    // expect `(`
+                    err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+
+                    let (args, ret_val) = err_add!(parse_function_decl(self, &mut errors), errors);
+
+                    return Ok(Some((token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
+                }
                 _ => {}
             },
             TokenType::Undef => return self.parse_block_statement(is_root),
@@ -1241,7 +1289,7 @@ impl Parser {
     }
 }
 
-fn check(ast: ASTNode, mut lexer: Lexer) -> Result<(), Vec<Error>> {
+fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Error>> {
     let mut errors: Vec<Error> = vec![];
     
     // collect all aliases + functions
@@ -1260,6 +1308,9 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<(), Vec<Error>> {
                 },
                 (_, ASTNodeR::VarDec(tp, name)) => {
                     vars.insert(name, tp);
+                },
+                (_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
+                    functions.insert(fname, (args.into_iter().map(|(a, _)|a).collect(), rt));
                 }
                 _ => {}
             }
@@ -1341,7 +1392,9 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<(), Vec<Error>> {
                     (pos, ASTNodeR::FunctionCall(name, args)) => {
                         if ! functions.contains_key(name) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to function `{name}`")));
+                            continue;
                         }
+                        
                         let func_args = &functions.get(name).unwrap().0;
                         let mut index = 0;
 
@@ -1401,17 +1454,55 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<(), Vec<Error>> {
                     (_, ASTNodeR::VarDec(tp, name)) => {
                         vars_sub.insert(name.clone(), tp.clone());
                     },
-                    (_, ASTNodeR::TypeAlias(_, _)) => {}
+                    (_, ASTNodeR::TypeAlias(_, _)) => {},
+                    (pos, ASTNodeR::Intrinsic(iname, ..)) => {
+                        if ! intrinsics().contains_key(iname.as_str()) {
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to compiler intrinsic `{iname}`")));
+                        }
+                    }
                 }
             };
         }
     }
 
+    fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) {
+        match ast {
+            ASTNodeR::Block(ref vec) => {
+                for a in vec {
+                    if let ASTNodeR::FunctionDecl(_, _, rt, block) = &a.1 {
+                        if *rt == Type::Primitive(PrimitiveType::Void) {
+                            continue;
+                        }
+                        let mut rs: bool = false;
+                        if let ASTNodeR::Block(blk_vec) = &block.1 {
+                            for statement in blk_vec {
+                                match &statement.1 {
+                                    ASTNodeR::If(_, _sub) => {
+                                        // TODO: implement here, if else is implemented
+                                    },
+                                    ASTNodeR::Return(_) => {
+                                        rs = true;
+                                    },
+                                    _ => {}
+                                }
+                            }
+                        }
+                        if ! rs {
+                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "not all paths lead to a return statement")));
+                        }
+                    }
+                }
+            },
+            _ => unreachable!()
+        }
+    }
+
     check_references(&ast, &functions, &vars, &type_aliases, &mut errors, "".into(), &mut lexer);
+    check_function_ret_paths(&ast.1, &mut errors, &mut lexer);
 
     // type checking
     if errors.is_empty() {
-        Ok(())
+        Ok(type_aliases)
     } else {
         Err(errors)
     }
@@ -1419,7 +1510,7 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<(), Vec<Error>> {
 
 #[derive(Debug, Clone, PartialEq)]
 enum Inst {
-    Func(String),
+    Func(String, HashMap<String, usize>),
     VarSet(usize, usize),
     If(usize),
     Endif,
@@ -1428,7 +1519,10 @@ enum Inst {
     Op((usize, usize), Op),
     Val(usize, Type, String),
     Var(usize, usize),
-    RetVal(usize, String)
+    RetVal(usize),
+    Intrinsic(String, String),
+    Push(usize),
+    Pop(usize),
 }
 
 fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<String, usize>) -> Vec<Inst> {
@@ -1436,7 +1530,9 @@ fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<Str
     match expr {
         ExpressionR::T(fst, op, snd, _) => {
             ret.append(&mut intermediate_expr(fst.1, index+0, indicies));
+            ret.push(Inst::Push(index+0));
             ret.append(&mut intermediate_expr(snd.1, index+1, indicies));
+            ret.push(Inst::Pop(index+0));
             ret.push(Inst::Op((index+0, index+1), op));
         },
         ExpressionR::Val(tp, val) => {
@@ -1446,13 +1542,20 @@ fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<Str
             ret.push(Inst::Var(index, *indicies.get(&name).unwrap()))
         },
         ExpressionR::F(name, args) => {
-            let mut index = 4;
-            for a in args {
-                ret.append(&mut intermediate_expr(a.1, index, indicies));
-                index += 1;
+            let mut ind = 0;
+            for a in args.clone() {
+                ret.append(&mut intermediate_expr(a.1, ind, indicies));
+                ret.push(Inst::Push(ind));
+                ind += 1;
             }
+
+            for _ in args.clone().iter().rev() {
+                ind -= 1;
+                ret.push(Inst::Pop(ind));
+            }
+            
             ret.push(Inst::Call(name.clone()));
-            ret.push(Inst::RetVal(index, name));
+            ret.push(Inst::RetVal(index));
         },
         ExpressionR::Arr(_) => {
             todo!();
@@ -1471,51 +1574,75 @@ fn last_ptr(offsets: &HashMap<String, usize>) -> usize {
     last
 }
 
-fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>) -> Vec<Inst> {
+fn intrinsics() -> HashMap<&'static str, &'static str> {
+    [("syscall","\tsyscall\n\tret"),
+     ("convert", "\tret\n"),
+     ("str_to_ptr", "\tadd rax, 8\n\tret\n"),
+     ("dereference", "\tmov rax, [rax]\n\tret\n")
+    ]
+        .iter()
+        .cloned()
+        .collect()
+}
+
+fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: HashMap<String, Type>) -> Vec<Inst> {
     let mut ret = vec![];
     
     match ast {
         ASTNodeR::Block(a) => {
             for i in a {
-                ret.append(&mut intermediate(i.1, offsets));
+                ret.append(&mut intermediate(i.1, offsets, aliases.clone()));
             }
         },
         ASTNodeR::VarDec(tp, ref name) => {
-            offsets.insert(name.clone(), last_ptr(offsets) + tp.size());
+            offsets.insert(name.clone(), last_ptr(offsets) + tp.size(&aliases));
         },
         ASTNodeR::VarInit(ref name, expr) => {
             ret.append(&mut intermediate_expr(expr.1, 0, offsets));
             ret.push(Inst::VarSet(0, *offsets.get(name).unwrap()))
         },
         ASTNodeR::FunctionCall(name, args) => {
-            let mut index = 4;
-            for a in args {
-                ret.append(&mut intermediate_expr(a.1, index, offsets));
-                index += 1;
+            for a in args.clone() {
+                ret.append(&mut intermediate_expr(a.1, 0, offsets));
+                ret.push(Inst::Push(0));
             }
+
+            let mut index = args.len();
+            for _ in args.clone().iter().rev() {
+                index -= 1;
+                ret.push(Inst::Pop(index));
+            }
+            
             ret.push(Inst::Call(name));
         },
         ASTNodeR::If(expr, block) => {
             ret.append(&mut intermediate_expr(expr.1, 0, offsets));
             ret.push(Inst::If(0));
-            ret.append(&mut intermediate(block.1, offsets));
+            ret.append(&mut intermediate(block.1, offsets, aliases));
             ret.push(Inst::Endif);
         },
-        ASTNodeR::FunctionDecl(name, a, _, block) => {
+        ASTNodeR::FunctionDecl(name, a, rt, block) => {
             let mut offsets: HashMap<String, usize> = HashMap::new();
-            for arg in a {
-                offsets.insert(arg.1, last_ptr(&offsets) + arg.0.size());
+            for arg in a.clone() {
+                offsets.insert(arg.1, last_ptr(&offsets) + arg.0.size(&aliases));
             }
             
-            ret.push(Inst::Func(name));
-            ret.append(&mut intermediate(block.1, &mut offsets));
+            ret.push(Inst::Func(name, offsets.clone()));
+            ret.append(&mut intermediate(block.1, &mut offsets, aliases));
+            if rt == Type::Primitive(PrimitiveType::Void) {
+                ret.push(Inst::Ret(0));
+            }
         },
         ASTNodeR::Return(expr) => {
             ret.append(&mut intermediate_expr(expr.1, 0, offsets));
             ret.push(Inst::Ret(0));
         },
+        ASTNodeR::Intrinsic(iname, fname, _, _) => {
+            ret.push(Inst::Intrinsic(iname, fname));
+        },
         // ignore
         ASTNodeR::TypeAlias(..) => {},
+        
     }
     ret
 }
@@ -1523,9 +1650,12 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>) -> Vec<Inst
 fn gnereate(insts: Vec<Inst>) -> String {
 
     let register = |reg| match reg {
-        0 => "rdx",
-        1 => "rax",
-        _ => unimplemented!()
+        0 => "rax",
+        1 => "rdi",
+        2 => "rsi",
+        3 => "rdx",
+        4 => "rcx",
+        a => unimplemented!("index: {a}")
     };
 
     let mut global_strings: Vec<String> = vec![];
@@ -1539,10 +1669,14 @@ fn gnereate(insts: Vec<Inst>) -> String {
     \tcall main\n\
     \tjmp _end\n\
     ".into();
+
+    let mut intrinsic_labels: Vec<String> = vec![];
+    
     for a in insts {
         ret.push_str(match a {
-            Inst::Func(name) => {
-                format!("{name}:\n\tpush rbp\n\tmov rbp,rsp\n")
+            Inst::Func(name, offsets) => {
+                let string = (0..offsets.len()).map(|a| format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(a), ind = offsets.iter().nth(a).unwrap().1)).collect::<String>();
+                format!("{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
             },
             Inst::Call(name) => {
                 format!("\tcall {name}\n")
@@ -1552,6 +1686,12 @@ fn gnereate(insts: Vec<Inst>) -> String {
             },
             Inst::Endif => {
                 format!(".l2:\n")
+            },
+            Inst::Push(reg) => {
+                format!("\tpush {}\n", register(reg))
+            },
+            Inst::Pop(reg) => {
+                format!("\tpop {}\n", register(reg))
             },
             Inst::Val(reg, tp, val) => {
                 let str_val = match tp {
@@ -1576,7 +1716,7 @@ fn gnereate(insts: Vec<Inst>) -> String {
                         match **bx {
                             Type::Primitive(PrimitiveType::Char) => {
                                 global_strings.push(val.clone());
-                                format!("{}", val.replace(" ", "_"))
+                                format!("str_{}", val.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>())
                             },
                             _ => unreachable!()
                         }
@@ -1590,7 +1730,11 @@ fn gnereate(insts: Vec<Inst>) -> String {
             },
             Inst::Ret(reg) => {
                 let register = register(reg);
-                format!("\tmov rax, {register}\n\tpop rbp\n\tret\n")
+                if register != "rax" {
+                    format!("\tmov rax, {register}\n\tleave\n\tret\n")
+                } else {
+                    format!("\tleave\n\tret\n")
+                }
             },
             Inst::Op(reg, op) => {
                 match op {
@@ -1601,18 +1745,32 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 }
             },
             Inst::VarSet(reg, index) => {
-                format!("\tmov [rbp-{}], {}\n", index, register(reg))
+                format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(reg), ind = index)
             },
             Inst::Var(reg, index) => {
                 format!("\tmov {}, [rbp-{}]\n", register(reg), index)
+            },
+            Inst::Intrinsic(iname, fname) => {
+                if ! intrinsic_labels.contains(&iname) {
+                    intrinsic_labels.push(iname.clone());
+                    format!("{fname}: \n\tjmp {iname}\n{iname}: \n{}\n", intrinsics().get(iname.as_str()).unwrap())
+                } else {
+                    format!("{fname}: \n\tjmp {iname}\n")
+                }
+            },
+            Inst::RetVal(reg) => {
+                if reg != 0 {
+                    format!("\tmov {}, rax\n", register(reg))
+                } else {
+                    format!("")
+                }
             }
-            _ => format!("")
         }.as_str())
     }
-    ret.push_str("_end:\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .bss\n");
+    ret.push_str("_end:\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n");
 
     for a in global_strings {
-        ret.push_str(format!("{}:\n\tdq {}\n\tdd \"{a}\"\n", a.replace(" ", "_"), a.len()).as_str());
+        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len()).as_str());
     }
     
     ret
@@ -1654,6 +1812,8 @@ fn main() {
     }
 
     let checked: bool;
+
+    let mut aliases: HashMap<String, Type> = HashMap::new();
     
     if let Ok(ast) = a.clone() {
         eprintln!("--- END PARSING ---\nAST NODE: \n{:#?}", ast);
@@ -1667,7 +1827,10 @@ fn main() {
                 checked = false;
                 error = true;
             },
-            Ok(_) => checked = true,
+            Ok(a) => {
+                aliases = a;
+                checked = true
+            },
         };
     } else {
         checked = false;
@@ -1676,7 +1839,7 @@ fn main() {
     if checked {
         eprintln!("--- END CHECKING ---\n");
         if let Ok(ast) = a.clone() {
-            let intermediate = intermediate(ast.1, &mut HashMap::new());
+            let intermediate = intermediate(ast.1, &mut HashMap::new(), aliases);
             println!("--- START INTERMEDIATE REPRESANTATION ---");
             println!("{:#?}", intermediate);
             println!("--- END INTERMEDIATE REPRESANTATION ---");

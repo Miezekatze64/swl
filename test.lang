@@ -1,6 +1,5 @@
-alias string = [char];
+func main([[char]] args) -> int {
+    [char] a = "this is a string";
 
-func main([string] args) -> int {
-    int a = 34 + 35;
-    <- a;
+    <- 69;
 }

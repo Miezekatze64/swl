@@ -95,20 +95,16 @@ impl Type {
         let a = self.dealias(aliases);
         let b = type_r.dealias(aliases);
         
-        if a == b {
+        if a == b || a == Type::Primitive(PrimitiveType::Float) && b == Type::Primitive(PrimitiveType::Int) {
             true
-        } else {
-            if a == Type::Primitive(PrimitiveType::Float) && b == Type::Primitive(PrimitiveType::Int) {
-                true
-            } else if let Type::Array(aa) = a {
-                if let Type::Array(bb) = b {
-                    aa.is_compatible(&bb, aliases)
-                } else {
-                    false
-                }
+        } else if let Type::Array(aa) = a {
+            if let Type::Array(bb) = b {
+                aa.is_compatible(&bb, aliases)
             } else {
                 false
             }
+        } else {
+            false
         }
     }
 
@@ -141,6 +137,7 @@ impl std::fmt::Display for Op {
             Op::Sub => "-",
             Op::Mul => "*",
             Op::Div => "/",
+            Op::Eq => "==",
         })
     }
 }
@@ -152,12 +149,12 @@ impl Op {
                 match a {
                     Type::Primitive(ref v) => {
                         match v {
-                            PrimitiveType::Int => if a.is_compatible(&b, aliases) {
+                            PrimitiveType::Int => if a.is_compatible(b, aliases) {
                                 a.clone()
                             } else {
                                 Type::Invalid
                             },
-                            PrimitiveType::Float => if a.is_compatible(&b, aliases) {
+                            PrimitiveType::Float => if a.is_compatible(b, aliases) {
                                 a.clone()
                             } else {
                                 Type::Invalid
@@ -173,21 +170,22 @@ impl Op {
                     Type::Invalid => Type::Invalid,
                 }
             },
+            Op::Eq => if a == b {
+                Type::Primitive(PrimitiveType::Bool)
+            } else {
+                Type::Invalid
+            },
         }
     }
 }
 
 fn is_valid_type(val: &str) -> bool {
-    if val == "int" || val == "float" || val == "char" || val == "void" {
-        true
-    } else {
-        // check for custom types
-        false
-    }
+    // TODO: check for custom types
+    val == "int" || val == "float" || val == "char" || val == "void"
 }
 
 fn parse_type(string: String) -> Option<Type> {
-    if string.len() <= 0 || !string.chars().next().unwrap().is_alphabetic() {
+    if string.is_empty() || !string.chars().next().unwrap().is_alphabetic() {
         return None;
     }
     match string.as_str() {
@@ -196,7 +194,7 @@ fn parse_type(string: String) -> Option<Type> {
         "char"   => Some(Type::Primitive(PrimitiveType::Char)),
         "void"   => Some(Type::Primitive(PrimitiveType::Void)),
         _ => {
-            if string.ends_with("*") {
+            if string.ends_with('*') {
                 Some(Type::Pointer(Box::new(parse_type(string.as_str()[0..string.len()-1].into())?)))
             } else {
                 Some(Type::Custom(string))
@@ -270,7 +268,7 @@ impl Lexer {
                 ttype = TokenType::Keyword;
             }
 
-            if is_valid_type(&val) {
+            if is_valid_type(val) {
                 ttype = TokenType::Type;
             }
 
@@ -302,8 +300,6 @@ impl Lexer {
                     if ch == '"' {
                         self.pos += 1;
 
-//                        let ret_val = val.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r").replace("\\\\", "\\").replace("\\\"", "\"").replace("\\'", "\'");
-                        
                         return Ok(Token {
                             pos: token_pos,
                             ttype,
@@ -396,13 +392,13 @@ impl Lexer {
                         } else if ttype == TokenType::Undef || ttype == TokenType::Operator {
                             ttype = TokenType::Operator;
                             val.push(ch);
-                        } else if ttype == TokenType::Special && val.starts_with("<") && ch == '-' {
+                        } else if ttype == TokenType::Special && val.starts_with('<') && ch == '-' {
                             val.push(ch);
                             ttype = TokenType::Special;
                         } else {
                             // check for keywords / types
                             ttype = check_keywords_and_types(val.as_str(), ttype);
-                            
+
                             return Ok(Token {
                                 pos: token_pos,
                                 ttype,
@@ -417,7 +413,7 @@ impl Lexer {
                         } else if ttype == TokenType::Operator && val == "-" && ch == '>' {
                             val.push(ch);
                             ttype = TokenType::Special;
-                        } else if ttype == TokenType::Special && !val.contains(")") && !val.contains("(") && !val.contains("[") && !val.contains("]") && !val.contains("}") && !val.contains("{") && !(ch == ';') {
+                        } else if ttype == TokenType::Special && !val.contains(')') && !val.contains('(') && !val.contains('[') && !val.contains(']') && !val.contains('}') && !val.contains('{') && ch != ';' {
                             val.push(ch);
                         } else {
                             // check for keywords / types
@@ -530,6 +526,7 @@ enum Op {
     Sub,
     Mul,
     Div,
+    Eq,
 }
 
 impl std::fmt::Display for TokenType {
@@ -552,18 +549,20 @@ impl std::fmt::Display for TokenType {
 }
 
 impl Op {
-    fn from_char(c: char) -> Result<Self, Error> {
-        match c {
-            '+' => Ok(Self::Add),
-            '-' => Ok(Self::Sub),
-            '*' => Ok(Self::Mul),
-            '/' => Ok(Self::Div),
-            _ => Err((ErrorLevel::Fatal, format!("FATAL: invalid operator `{c}` set from lexer"))),
+    fn from_str(s: String) -> Result<Self, Error> {
+        match s.as_str() {
+            "+" =>  Ok(Self::Add),
+            "-" =>  Ok(Self::Sub),
+            "*" =>  Ok(Self::Mul),
+            "/" =>  Ok(Self::Div),
+            "==" => Ok(Self::Eq),
+            _ => Err((ErrorLevel::Fatal, format!("FATAL: invalid operator `{s}` set from lexer"))),
         }
     }
     
     fn get_precedence(op: Op) -> u32 {
         match op {
+            Op::Eq => 0,
             Op::Add | Op::Sub => 1,
             Op::Mul | Op::Div => 2,
         }
@@ -705,16 +704,15 @@ impl Parser {
         let mut errors: Vec<Error> = vec![];
         let check_precedence_and_update = |op: Op, right_expr: Box<Expression>, working_expr: &Expression| -> Box<Expression> {
             let ret: Box<Expression>;
-            let is_first: bool = match working_expr {
-                (_, exp) => match exp {
-                    ExpressionR::T(_, _, _, precedence) => {
-                        Op::get_precedence(op) <= *precedence
-                    },
-                    ExpressionR::Val(..) | ExpressionR::Arr(..) | ExpressionR::F(..) | ExpressionR::Var(..) => {
-                        true
-                    },
-                    ExpressionR::Undef => unreachable!(),
-                }
+            let (_, exp) = working_expr;
+            let is_first: bool = match exp {
+                ExpressionR::T(_, _, _, precedence) => {
+                    Op::get_precedence(op) <= *precedence
+                },
+                ExpressionR::Val(..) | ExpressionR::Arr(..) | ExpressionR::F(..) | ExpressionR::Var(..) => {
+                    true
+                },
+                ExpressionR::Undef => unreachable!(),
             };
 
             if is_first {
@@ -754,11 +752,12 @@ impl Parser {
             
             // parse operation
             let tk_op = get_peek_token!(self.lexer, errors);
-            let op = if tk_op.ttype == TokenType::Operator && tk_op.value.len() == 1 {
-                match Op::from_char(tk_op.value.chars().next().unwrap()) {
+            let op = if tk_op.ttype == TokenType::Operator {
+                match Op::from_str(tk_op.value) {
                     Ok(a) => a,
                     Err(e) => {
                         errors.push(e);
+                        self.lexer.next_token().unwrap();
                         continue;
                     },
                 }
@@ -820,7 +819,7 @@ impl Parser {
                 _ => return Err((ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))),
             }
             
-            return Ok(Some((pos, ASTNodeR::VarDec(typ, ident))));
+            Ok(Some((pos, ASTNodeR::VarDec(typ, ident))))
         }
 
 
@@ -829,9 +828,11 @@ impl Parser {
             token.ttype = TokenType::Type;
         }
 
-        fn parse_function_decl(parser: &mut Parser, errors: &mut Vec<(ErrorLevel, String)>) -> Result<(Vec<(Type, String)>, Type), Vec<Error>> {
+        type Args = Vec<(Type, String)>;
+
+        fn parse_function_decl(parser: &mut Parser, errors: &mut Vec<(ErrorLevel, String)>) -> Result<(Args, Type), Vec<Error>> {
             // parse args
-            let mut args: Vec<(Type, String)> = vec![];
+            let mut args: Args = vec![];
             
             let check = get_peek_token!(parser.lexer, errors);
             if check.ttype != TokenType::Special || check.value != ")" {
@@ -896,35 +897,34 @@ impl Parser {
             },
             TokenType::Ident => {
                 let expr = self.parse_ident_expr(val.clone(), token.pos,  &[";"])?;
-                match *expr {
-                    (_, exp) => match exp {
-                        ExpressionR::Var(..) => {
-                            let var_token = get_token!(self.lexer, errors);
-                            let var_val = var_token.value;
-                            
-                            if var_token.ttype == TokenType::Operator && var_val == "=" {
-                                let expr = self.parse_expr(&[";"])?.0;
-                                return Ok(Some((token.pos, ASTNodeR::VarInit(val, expr))));
-                            } else {
-                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
-                            }
+                let (_, exp) = *expr;
+                match exp {
+                    ExpressionR::Var(..) => {
+                        let var_token = get_token!(self.lexer, errors);
+                        let var_val = var_token.value;
+                        
+                        if var_token.ttype == TokenType::Operator && var_val == "=" {
+                            let expr = self.parse_expr(&[";"])?.0;
+                            return Ok(Some((token.pos, ASTNodeR::VarInit(val, expr))));
+                        } else {
+                            errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
                         }
-                        ExpressionR::Val(..) => unreachable!(),
-                        ExpressionR::T(..) => unreachable!(),
-                        ExpressionR::Arr(..) => unreachable!(),
-                        ExpressionR::F(name, args) => {
-                            // function call: only permitted inside of function
-                            if is_root {
-                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "function calls are not allowed at top level")));
-                            }
-
-                            // expect semicolon
-                            err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
-
-                            return Ok(Some((token.pos, ASTNodeR::FunctionCall(name, args))));
-                        },
-                        ExpressionR::Undef => unreachable!(),
                     }
+                    ExpressionR::Val(..) => unreachable!(),
+                    ExpressionR::T(..) => unreachable!(),
+                    ExpressionR::Arr(..) => unreachable!(),
+                    ExpressionR::F(name, args) => {
+                        // function call: only permitted inside of function
+                        if is_root {
+                            errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "function calls are not allowed at top level")));
+                        }
+                        
+                        // expect semicolon
+                        err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
+                        
+                        return Ok(Some((token.pos, ASTNodeR::FunctionCall(name, args))));
+                    },
+                    ExpressionR::Undef => unreachable!(),
                 }
             },
             TokenType::Eof => return Ok(None),
@@ -1261,24 +1261,24 @@ impl Parser {
     fn expect(&mut self, typ: Option<TokenType>, val: Option<String>) -> Result<Token, Error> {
         let token = self.lexer.next_token()?;
 
-        if val.is_some() {
-            let mut is_valid: bool = val.as_ref().unwrap() == &token.value;
-            if typ.is_some() {
-                is_valid &= token.ttype == typ.unwrap();
+        if let Some(ival) = val {
+            let mut is_valid: bool = ival == token.value;
+            if let Some(t) = typ {
+                is_valid &= token.ttype == t;
             }
 
             if ! is_valid {
-                let exp_val = val.unwrap();
+                let exp_val = ival;
                 let val = token.value;
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, `{exp_val}` expected")))
           } else {
                 Ok(token)
             }
-        } else if typ.is_some() {
-            let is_valid: bool = token.ttype == typ.unwrap();
+        } else if let Some(t) = typ {
+            let is_valid: bool = token.ttype == t;
             if ! is_valid {
                 let val = token.value;
-                let ttype = typ.unwrap().to_string();
+                let ttype = t.to_string();
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, {ttype} expected")))
           } else {
                 Ok(token)
@@ -1320,58 +1320,57 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
     }
 
     fn check_references_expr(expr: &Expression, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
-        match expr {
-            (pos, e) => match e {
-                ExpressionR::T(left, op, right, _) => {
-                    let left = check_references_expr(left, functions, vars, aliases, errors, lexer);
-                    let right = check_references_expr(right, functions, vars, aliases, errors, lexer);
-
-                    return match op.combine_type(&left, &right, aliases) {
-                        Type::Invalid => {
-                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{left}` and `{right}` for operation `{op}`")));
-                            Type::Invalid
-                        },
-                        a => a,
-                    };
-                },
-                ExpressionR::Val(tp, _) => {
-                    return tp.clone();
-                },
-                ExpressionR::Var(name) => {
-                    if ! vars.contains_key(name) {
-                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to variable `{name}`")));
-                        return Type::Invalid;
+        let (pos, e) = expr;
+        match e {
+            ExpressionR::T(left, op, right, _) => {
+                let left = check_references_expr(left, functions, vars, aliases, errors, lexer);
+                let right = check_references_expr(right, functions, vars, aliases, errors, lexer);
+                
+                return match op.combine_type(&left, &right, aliases) {
+                    Type::Invalid => {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{left}` and `{right}` for operation `{op}`")));
+                        Type::Invalid
+                    },
+                    a => a,
+                };
+            },
+            ExpressionR::Val(tp, _) => {
+                return tp.clone();
+            },
+            ExpressionR::Var(name) => {
+                if ! vars.contains_key(name) {
+                    errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to variable `{name}`")));
+                    return Type::Invalid;
+                }
+                return vars.get(name).unwrap().clone();
+            },
+            ExpressionR::F(name, vec) => {
+                if ! functions.contains_key(name) {
+                    errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to function `{name}`")));
+                    return Type::Invalid;
+                }
+                for a in vec {
+                    check_references_expr(a, functions, vars, aliases, errors, lexer);
+                }
+                return functions.get(name).unwrap().1.clone();
+            },
+            ExpressionR::Arr(vec) => {
+                let mut last_tp = Type::Invalid;
+                for a in vec {
+                    let tp = check_references_expr(a, functions, vars, aliases, errors, lexer);
+                    if last_tp == Type::Invalid {
+                        last_tp = tp.clone();
                     }
-                    return vars.get(name).unwrap().clone();
-                },
-                ExpressionR::F(name, vec) => {
-                    if ! functions.contains_key(name) {
-                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to function `{name}`")));
-                        return Type::Invalid;
+                    if ! last_tp.is_compatible(&tp, aliases) {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{last_tp}` and `{tp}` in array literal")));
+                        last_tp = Type::Invalid;
+                        break;
                     }
-                    for a in vec {
-                        check_references_expr(a, functions, vars, aliases, errors, lexer);
-                    }
-                    return functions.get(name).unwrap().1.clone();
-                },
-                ExpressionR::Arr(vec) => {
-                    let mut last_tp = Type::Invalid;
-                    for a in vec {
-                        let tp = check_references_expr(a, functions, vars, aliases, errors, lexer);
-                        if last_tp == Type::Invalid {
-                            last_tp = tp.clone();
-                        }
-                        if ! last_tp.is_compatible(&tp, aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{last_tp}` and `{tp}` in array literal")));
-                            last_tp = Type::Invalid;
-                            break;
-                        }
-                        last_tp = tp;
-                    }
-                    return Type::Array(Box::new(last_tp));
-                },
-                ExpressionR::Undef => {},
-            }
+                    last_tp = tp;
+                }
+                return Type::Array(Box::new(last_tp));
+            },
+            ExpressionR::Undef => {},
         }
 
         Type::Invalid
@@ -1396,7 +1395,6 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                         }
                         
                         let func_args = &functions.get(name).unwrap().0;
-                        let mut index = 0;
 
                         let len_a = func_args.len();
                         let len_b = args.len();
@@ -1404,16 +1402,14 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "expected `{len_a}` arguments, got `{len_b}`")));
                         };
                         
-                        for a in args {
+                        for (index, a) in args.iter().enumerate() {
                             let typa = check_references_expr(a, functions, vars_sub, aliases, errors, lexer);
                             let typb = func_args.get(index).unwrap();
 
-                            if ! typa.is_compatible(&typb, aliases) {
+                            if ! typa.is_compatible(typb, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typb}`, found `{typa}`")));
                                 break;
                             }
-                            
-                            index += 1;
                         }
                     },
                     (_, ASTNodeR::Block(..)) => {
@@ -1421,10 +1417,8 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                     },
                     (pos, ASTNodeR::If(expr, block)) => {
                         let bool_type = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
-                        if bool_type != Type::Invalid {
-                            if ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
+                        if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
-                            }
                         }
                         check_references(block, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
@@ -1529,11 +1523,11 @@ fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<Str
     let mut ret = vec![];
     match expr {
         ExpressionR::T(fst, op, snd, _) => {
-            ret.append(&mut intermediate_expr(fst.1, index+0, indicies));
-            ret.push(Inst::Push(index+0));
+            ret.append(&mut intermediate_expr(fst.1, index, indicies));
+            ret.push(Inst::Push(index));
             ret.append(&mut intermediate_expr(snd.1, index+1, indicies));
-            ret.push(Inst::Pop(index+0));
-            ret.push(Inst::Op((index+0, index+1), op));
+            ret.push(Inst::Pop(index));
+            ret.push(Inst::Op((index, index+1), op));
         },
         ExpressionR::Val(tp, val) => {
             ret.push(Inst::Val(index, tp, val));
@@ -1549,12 +1543,12 @@ fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<Str
                 ind += 1;
             }
 
-            for _ in args.clone().iter().rev() {
+            for _ in args.iter().rev() {
                 ind -= 1;
                 ret.push(Inst::Pop(ind));
             }
             
-            ret.push(Inst::Call(name.clone()));
+            ret.push(Inst::Call(name));
             ret.push(Inst::RetVal(index));
         },
         ExpressionR::Arr(_) => {
@@ -1608,7 +1602,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
             }
 
             let mut index = args.len();
-            for _ in args.clone().iter().rev() {
+            for _ in args.iter().rev() {
                 index -= 1;
                 ret.push(Inst::Pop(index));
             }
@@ -1623,7 +1617,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
         },
         ASTNodeR::FunctionDecl(name, a, rt, block) => {
             let mut offsets: HashMap<String, usize> = HashMap::new();
-            for arg in a.clone() {
+            for arg in a {
                 offsets.insert(arg.1, last_ptr(&offsets) + arg.0.size(&aliases));
             }
             
@@ -1685,7 +1679,7 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 format!("\tcmp {}, 1\n\tjne .l2\n.l1:\n", register(reg))
             },
             Inst::Endif => {
-                format!(".l2:\n")
+                ".l2:\n".into()
             },
             Inst::Push(reg) => {
                 format!("\tpush {}\n", register(reg))
@@ -1733,7 +1727,7 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 if register != "rax" {
                     format!("\tmov rax, {register}\n\tleave\n\tret\n")
                 } else {
-                    format!("\tleave\n\tret\n")
+                    "\tleave\n\tret\n".into()
                 }
             },
             Inst::Op(reg, op) => {
@@ -1742,6 +1736,7 @@ fn gnereate(insts: Vec<Inst>) -> String {
                     Op::Sub => format!("\tsub {}, {}\n",  register(reg.0), register(reg.1)),
                     Op::Mul => format!("\timul {}, {}\n", register(reg.0), register(reg.1)),
                     Op::Div => format!("\tidiv {}, {}\n", register(reg.0), register(reg.1)),
+                    Op::Eq => format!("\tcmp {r0}, {r1}\n\tsete al\n\tmovzx {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
                 }
             },
             Inst::VarSet(reg, index) => {
@@ -1762,7 +1757,7 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 if reg != 0 {
                     format!("\tmov {}, rax\n", register(reg))
                 } else {
-                    format!("")
+                    "".into()
                 }
             }
         }.as_str())
@@ -1800,15 +1795,12 @@ fn main() {
     eprintln!("---  START PARSING ---");
 
     let a = parser.parse();
-    match a {
-        Err(ref e) => {
-            for a in e {
-                let (t, v) = a;
-                eprintln!("{}: {}", t, v);
-            }
-            error = true;
+    if let Err(ref e) = a {
+        for a in e {
+            let (t, v) = a;
+            eprintln!("{}: {}", t, v);
         }
-        Ok(_) => {}
+        error = true;
     }
 
     let checked: bool;
@@ -1838,7 +1830,7 @@ fn main() {
 
     if checked {
         eprintln!("--- END CHECKING ---\n");
-        if let Ok(ast) = a.clone() {
+        if let Ok(ast) = a {
             let intermediate = intermediate(ast.1, &mut HashMap::new(), aliases);
             println!("--- START INTERMEDIATE REPRESANTATION ---");
             println!("{:#?}", intermediate);
@@ -1864,7 +1856,7 @@ fn main() {
                 error = true;
             }
 
-            let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg("tmp.o").output().unwrap();
+            let ld = Command::new("ld").arg("-o").arg(outfile).arg("tmp.o").output().unwrap();
             if ! ld.status.success() {
                 eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
                 error = true;
@@ -1877,5 +1869,4 @@ fn main() {
         exit(1);
     }
 }
-
 

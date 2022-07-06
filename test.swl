@@ -1,0 +1,24 @@
+intrinsic syscall     as syscall3(int index, int val, int val2, int val3);
+intrinsic str_to_ptr  as str2addr(string str) -> int;
+intrinsic dereference as strlen(string str)   -> int;
+intrinsic convert     as int2char(int i)      -> char;
+
+alias string = [char];
+
+func write([char] str) {
+    syscall3(1, 1, str2addr(str), strlen(str));
+}
+
+func f(int a) -> int {
+     if (a == 0) {
+        <- 0;
+     }
+     write("HI\n");
+     <- f(a);
+}
+
+func main() -> int {
+     f(1000);
+     <- 0;
+}
+

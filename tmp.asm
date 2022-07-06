@@ -53,16 +53,43 @@ write:
 	call syscall3
 	leave
 	ret
-main:
+f:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
-	mov rax, str_hello__world__n
+	mov rax, [rbp-8]
+	push rax
+	mov rdi, 0
+	pop rax
+	cmp rax, rdi
+	sete al
+	movzx rax, al
+	cmp rax, 1
+	jne .l2
+.l1:
+	mov rax, 0
+	leave
+	ret
+.l2:
+	mov rax, str_hi_n
 	push rax
 	pop rax
 	call write
-	mov rax, 69
+	mov rax, [rbp-8]
+	push rax
+	pop rax
+	call f
+	leave
+	ret
+main:
+	push rbp
+	mov rbp,rsp
+	mov rax, 1000
+	push rax
+	pop rax
+	call f
+	mov rax, 0
 	leave
 	ret
 _end:
@@ -70,6 +97,6 @@ _end:
 	mov rax, 60
 	syscall
 section .data
-str_hello__world__n:
-	dq 15
-	db `Hello, World!\n`
+str_hi_n:
+	dq 4
+	db `HI\n`

@@ -36,7 +36,8 @@ const KEYWORDS: &[&str] = &[
     "func",
     "alias",
     "intrinsic",
-    "as"
+    "as",
+    "arr"
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -138,6 +139,9 @@ impl std::fmt::Display for Op {
             Op::Mul => "*",
             Op::Div => "/",
             Op::Eq => "==",
+            Op::Less => "<",
+            Op::Greater => ">",
+            Op::Mod => "%",
         })
     }
 }
@@ -145,7 +149,7 @@ impl std::fmt::Display for Op {
 impl Op {
     fn combine_type(&self, a: &Type, b: &Type, aliases: &HashMap<String, Type>) -> Type {
         match self {
-            Op::Add | Op::Sub | Op::Mul | Op::Div => {
+            Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod => {
                 match a {
                     Type::Primitive(ref v) => {
                         match v {
@@ -164,11 +168,19 @@ impl Op {
                             PrimitiveType::Bool => Type::Invalid,
                         }
                     },
-                    Type::Custom(_) => Type::Invalid,
-                    Type::Array(_) => Type::Invalid,
-                    Type::Pointer(_) => Type::Invalid,
-                    Type::Invalid => Type::Invalid,
+                    _ => Type::Invalid,
                 }
+            },
+            Op::Less | Op::Greater => match a {
+                Type::Primitive(ref p) => match p {
+                    PrimitiveType::Int | PrimitiveType::Float | PrimitiveType::Char => if a.is_compatible(b, aliases) {
+                        Type::Primitive(PrimitiveType::Bool)
+                    } else {
+                        Type::Invalid
+                    },
+                    _ => Type::Invalid,
+                },
+                _ => Type::Invalid,
             },
             Op::Eq => if a == b {
                 Type::Primitive(PrimitiveType::Bool)
@@ -376,11 +388,11 @@ impl Lexer {
                             });
                         }
                     },
-                    '='|'+'|'-'|'*'|'/' => {
+                    '='|'+'|'-'|'*'|'/'|'<'|'>'|'%' => {
                         if ttype == TokenType::Type && ch == '*' {
                             val.push(ch);
                             ttype = TokenType::Type;
-                        } else if ttype == TokenType::Operator && val == "/" {
+                        } else if ttype == TokenType::Operator && val == "/" && ch == '/' {
                             // comment
                             loop {
                                 if self.source[self.pos] == '\n' {
@@ -389,12 +401,29 @@ impl Lexer {
                                 self.pos += 1;
                             }
                             return self.next_token();
+                        } else if ttype == TokenType::Operator && val == "/" && ch == '*' {
+                            // multi-line comment
+                            loop {
+                                if self.pos < 2 {
+                                    self.pos += 1;
+                                    continue;
+                                }
+                                if self.source[self.pos-1] == '*' && self.source[self.pos] == '/' {
+                                    self.pos += 1;
+                                    break;
+                                }
+                                self.pos += 1;
+                            }
+                            return self.next_token();
+                        } else if ttype == TokenType::Operator && val == "-" && ch == '>' {
+                            val.push(ch);
+                            ttype = TokenType::Special;
+                        } else if ttype == TokenType::Operator && val.starts_with('<') && ch == '-' {
+                            val.push(ch);
+                            ttype = TokenType::Special;
                         } else if ttype == TokenType::Undef || ttype == TokenType::Operator {
                             ttype = TokenType::Operator;
                             val.push(ch);
-                        } else if ttype == TokenType::Special && val.starts_with('<') && ch == '-' {
-                            val.push(ch);
-                            ttype = TokenType::Special;
                         } else {
                             // check for keywords / types
                             ttype = check_keywords_and_types(val.as_str(), ttype);
@@ -406,13 +435,10 @@ impl Lexer {
                             });
                         }
                     },
-                    ';' | '(' | ')' | ',' | '{' | '}'|'<'|'>'|'['|']' => {
+                    ';' | '(' | ')' | ',' | '{' | '}'|'['|']' => {
                         if ttype == TokenType::Undef {
                             ttype = TokenType::Special;
                             val.push(ch);
-                        } else if ttype == TokenType::Operator && val == "-" && ch == '>' {
-                            val.push(ch);
-                            ttype = TokenType::Special;
                         } else if ttype == TokenType::Special && !val.contains(')') && !val.contains('(') && !val.contains('[') && !val.contains(']') && !val.contains('}') && !val.contains('{') && ch != ';' {
                             val.push(ch);
                         } else {
@@ -440,7 +466,10 @@ impl Lexer {
                             token_pos = self.pos+1;
                         }
                     }
-                    _ => return Err((ErrorLevel::Err, error!(self, self.pos, "invalid character `{ch}`")))
+                    _ => {
+                        self.pos += 1;
+                        return Err((ErrorLevel::Err, error!(self, self.pos, "invalid character `{ch}`")))
+                    }
                 };
             }
 
@@ -506,9 +535,10 @@ enum ASTNodeR {
     Return(Expression),
     TypeAlias(String, Type),
     Intrinsic(String, String, Vec<(Type, String)>, Type),
+    ArrIndexInit(String, Expression, Expression),
 }
 
-type Expression = (usize, ExpressionR);
+type Expression = (usize, ExpressionR, Option<Type>);
 
 #[derive(Debug, Clone, PartialEq)]
 enum ExpressionR {
@@ -518,6 +548,8 @@ enum ExpressionR {
     F(String, Vec<Expression>),
     Arr(Vec<Expression>),
     Undef,
+    ArrAlloc(Type, usize),
+    Index(String, Box<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -526,7 +558,10 @@ enum Op {
     Sub,
     Mul,
     Div,
+    Mod,
     Eq,
+    Less,
+    Greater,
 }
 
 impl std::fmt::Display for TokenType {
@@ -555,16 +590,19 @@ impl Op {
             "-" =>  Ok(Self::Sub),
             "*" =>  Ok(Self::Mul),
             "/" =>  Ok(Self::Div),
+            "%" => Ok(Self::Mod),
             "==" => Ok(Self::Eq),
+            "<" => Ok(Self::Less),
+            ">" => Ok(Self::Greater),
             _ => Err((ErrorLevel::Fatal, format!("FATAL: invalid operator `{s}` set from lexer"))),
         }
     }
     
     fn get_precedence(op: Op) -> u32 {
         match op {
-            Op::Eq => 0,
+            Op::Eq | Op::Less | Op::Greater => 0,
             Op::Add | Op::Sub => 1,
-            Op::Mul | Op::Div => 2,
+            Op::Mul | Op::Div | Op::Mod => 2,
         }
     }
 }
@@ -586,7 +624,7 @@ macro_rules! get_peek_token {
         | | -> Token {
             while let Err(e) = $lexer.peek_token() {
                 $errors.push(e);
-                $lexer.next_token().unwrap();
+                _ = $lexer.next_token();
             }
             return $lexer.peek_token().unwrap()
         }()
@@ -704,12 +742,12 @@ impl Parser {
         let mut errors: Vec<Error> = vec![];
         let check_precedence_and_update = |op: Op, right_expr: Box<Expression>, working_expr: &Expression| -> Box<Expression> {
             let ret: Box<Expression>;
-            let (_, exp) = working_expr;
+            let (_, exp, _) = working_expr;
             let is_first: bool = match exp {
                 ExpressionR::T(_, _, _, precedence) => {
                     Op::get_precedence(op) <= *precedence
                 },
-                ExpressionR::Val(..) | ExpressionR::Arr(..) | ExpressionR::F(..) | ExpressionR::Var(..) => {
+                ExpressionR::Val(..) | ExpressionR::Arr(..) | ExpressionR::F(..) | ExpressionR::Var(..) | ExpressionR::ArrAlloc(..) | ExpressionR::Index(..) => {
                     true
                 },
                 ExpressionR::Undef => unreachable!(),
@@ -717,19 +755,19 @@ impl Parser {
 
             if is_first {
                 let tmp_expr = (working_expr.0, ExpressionR::T(Box::new(working_expr.clone()), op, right_expr
-                                             , Op::get_precedence(op)));
+                                             , Op::get_precedence(op)), None);
                 ret = Box::new(tmp_expr);
             } else {
-                assert!(matches!(*working_expr, (_, ExpressionR::T(..))));
+                assert!(matches!(*working_expr, (_, ExpressionR::T(..), _)));
                 let mut expr = working_expr.clone();
-                let tmp_expr = if let (pos, ExpressionR::T(_, _, right, _)) = &expr {
-                    (*pos, ExpressionR::T(right.clone(), op, right_expr, Op::get_precedence(op)))
+                let tmp_expr = if let (pos, ExpressionR::T(_, _, right, _), _) = &expr {
+                    (*pos, ExpressionR::T(right.clone(), op, right_expr, Op::get_precedence(op)), None)
                 } else {
                     unreachable!();
                 };
 
-                if let (pos, ExpressionR::T(a, b, _, d)) = expr {
-                    expr = (pos, ExpressionR::T(a, b, Box::new(tmp_expr), d));
+                if let (pos, ExpressionR::T(a, b, _, d), _) = expr {
+                    expr = (pos, ExpressionR::T(a, b, Box::new(tmp_expr), d), None);
                 }
                     
                 ret = Box::new(expr);
@@ -737,15 +775,14 @@ impl Parser {
 
             ret
         };
-
-        let mut left_expr = Box::new((0, ExpressionR::Undef));
+        let mut left_expr = Box::new((0, ExpressionR::Undef, None));
 
         // parse left side
         let subexpr = self.parse_subexpr(seperators)?;
         let mut nleft_expr = subexpr.0;
 
         loop {
-            if let (_, ExpressionR::Undef) = *nleft_expr {
+            if let (_, ExpressionR::Undef, _) = *nleft_expr {
                 return Ok((*left_expr, subexpr.1));
             }
             left_expr = nleft_expr.clone();
@@ -775,7 +812,7 @@ impl Parser {
             // parse right side
             let subexpr_r = self.parse_subexpr(seperators)?;
 
-            if let (_, ExpressionR::Undef) = *subexpr_r.0 {
+            if let (_, ExpressionR::Undef, _) = *subexpr_r.0 {
                 return Ok((*left_expr, subexpr.1));
             }
             
@@ -897,7 +934,7 @@ impl Parser {
             },
             TokenType::Ident => {
                 let expr = self.parse_ident_expr(val.clone(), token.pos,  &[";"])?;
-                let (_, exp) = *expr;
+                let (_, exp, _) = *expr;
                 match exp {
                     ExpressionR::Var(..) => {
                         let var_token = get_token!(self.lexer, errors);
@@ -913,6 +950,17 @@ impl Parser {
                     ExpressionR::Val(..) => unreachable!(),
                     ExpressionR::T(..) => unreachable!(),
                     ExpressionR::Arr(..) => unreachable!(),
+                    ExpressionR::Index(a, ind) => {
+                        let var_token = get_token!(self.lexer, errors);
+                        let var_val = var_token.value;
+                        
+                        if var_token.ttype == TokenType::Operator && var_val == "=" {
+                            let expr = self.parse_expr(&[";"])?.0;
+                            return Ok(Some((token.pos, ASTNodeR::ArrIndexInit(a, *ind, expr))));
+                        } else {
+                            errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
+                        }
+                    },
                     ExpressionR::F(name, args) => {
                         // function call: only permitted inside of function
                         if is_root {
@@ -925,6 +973,7 @@ impl Parser {
                         return Ok(Some((token.pos, ASTNodeR::FunctionCall(name, args))));
                     },
                     ExpressionR::Undef => unreachable!(),
+                    ExpressionR::ArrAlloc(..) => todo!(),
                 }
             },
             TokenType::Eof => return Ok(None),
@@ -959,7 +1008,7 @@ impl Parser {
                     return Ok(Some((token.pos, ASTNodeR::Return(expression))));
                 },
                 "[" => {
-                    // array declaration (e. g. [int, 2])
+                    // array declaration (e. g. [int])
 
                     let array_type = match self.parse_array() {
                         Ok(a) => a,
@@ -1094,7 +1143,7 @@ impl Parser {
                     let (args, ret_val) = err_add!(parse_function_decl(self, &mut errors), errors);
 
                     return Ok(Some((token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
-                }
+                },
                 _ => {}
             },
             TokenType::Undef => return self.parse_block_statement(is_root),
@@ -1126,7 +1175,7 @@ impl Parser {
                     loop {
                         let ret = self.parse_expr(&[")", ","])?;
                         let token: Token = ret.1;
-                        if let (_, ExpressionR::Undef) = ret.0 {
+                        if let (_, ExpressionR::Undef, _) = ret.0 {
                             break;
                         }
                         args.insert(args.len(), ret.0);
@@ -1134,18 +1183,24 @@ impl Parser {
                             break;
                         }
                     }
-                    let func_expr: Expression = (ident_pos, ExpressionR::F(ident, args));
+                    let func_expr: Expression = (ident_pos, ExpressionR::F(ident, args), None);
                     Ok(Box::new(func_expr))
                 },
+                "[" => {
+                    // array indexing
+                    self.lexer.next_token().unwrap();
+                    let index = self.parse_expr(&["]"])?;
+                    return Ok(Box::new((ident_pos, ExpressionR::Index(ident, Box::new(index.0)), None)));
+                }
                 a => if seperators.contains(&a) {
-                    Ok(Box::new((ident_pos, ExpressionR::Var(ident))))
+                    Ok(Box::new((ident_pos, ExpressionR::Var(ident), None)))
                 } else {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
                     Err(errors)
                 },
             },
             TokenType::Operator => {
-                Ok(Box::new((token.pos, ExpressionR::Var(ident))))
+                Ok(Box::new((token.pos, ExpressionR::Var(ident), None)))
             },
             TokenType::Undef => unreachable!(),
         }
@@ -1154,34 +1209,60 @@ impl Parser {
     fn parse_subexpr(&mut self, seperators: &[&'static str]) -> Result<(Box<Expression>, Token), Vec<Error>> {
         let inverse = |right_expr: &mut Box<Expression>| {
             let tmp_expr = right_expr.clone();
-            **right_expr = (tmp_expr.0, ExpressionR::T(Box::new((0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()))), Op::Mul, tmp_expr, Op::get_precedence(Op::Mul)));
+            **right_expr = (tmp_expr.0, ExpressionR::T(Box::new((0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()), None)), Op::Mul, tmp_expr, Op::get_precedence(Op::Mul)), None);
         };
 
         let mut errors: Vec<Error> = vec![];
-        
+
         let token = get_token!(self.lexer, errors);
         let val = token.clone().value;
         match token.ttype {
-            TokenType::Type | TokenType::Eof | TokenType::Undef | TokenType::Keyword => {
+            TokenType::Type | TokenType::Eof | TokenType::Undef => {
                 errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
                 Err(errors)
             },
+            TokenType::Keyword => match val.as_str() {
+                "arr" => {
+                    err_ret!(self.expect(Some(TokenType::Special), Some("[".into())), errors);
+
+                    // parse type
+                    let tp = err_ret!(self.parse_type(), errors);
+
+                    // comma
+                    err_ret!(self.expect(Some(TokenType::Special), Some(",".into())), errors);
+
+                    // parse size
+                    let size_tk = err_ret!(self.expect(Some(TokenType::Int), None), errors);
+                    let size: usize = size_tk.value.parse::<usize>().unwrap();
+
+                    err_ret!(self.expect(Some(TokenType::Special), Some("]".into())), errors);
+                    
+                    Ok((Box::new((token.pos, ExpressionR::ArrAlloc(tp, size), None)), token))
+                },
+                _ => {
+                    errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected keyword `{val}`")));
+                    Err(errors)
+                }
+            },
             TokenType::Int => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val))), token))
+                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None)), token))
             },
             TokenType::Bool => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val))), token))
+                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val), None)), token))
             },
             TokenType::Float => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val))), token))
+                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val), None)), token))
             },
             TokenType::Char => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val))), token))
+                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val), None)), token))
             },
             TokenType::String => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val))), token))
+                Ok((Box::new((token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val), None)), token))
             },
-          TokenType::Ident => Ok((self.parse_ident_expr(val, token.pos, seperators)?, token)),
+            TokenType::Ident => {
+                let ident = self.parse_ident_expr(val, token.pos, seperators)?;
+                Ok((ident, token))
+            },
             TokenType::Special => match val.as_str() {
                 "(" => {
                     Ok((Box::new(self.parse_expr(&[")"])?.0), token))
@@ -1196,14 +1277,14 @@ impl Parser {
                             break;
                         }
                     };
-                    Ok((Box::new((token.pos, ExpressionR::Arr(arr))), Token {
+                    Ok((Box::new((token.pos, ExpressionR::Arr(arr), None)), Token {
                         pos: 0,
                         ttype: TokenType::Undef,
                         value: "".into(),
                     }))
-                },
+                }
                 _ => if seperators.contains(&val.as_str()) {
-                    Ok((Box::new((0, ExpressionR::Undef)), token))
+                    Ok((Box::new((0, ExpressionR::Undef, None)), token))
                 } else {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected symbol `{val}`")));
                     Err(errors)
@@ -1289,7 +1370,7 @@ impl Parser {
     }
 }
 
-fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Error>> {
+fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Error>> {
     let mut errors: Vec<Error> = vec![];
     
     // collect all aliases + functions
@@ -1319,9 +1400,9 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
         unreachable!();
     }
 
-    fn check_references_expr(expr: &Expression, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
-        let (pos, e) = expr;
-        match e {
+    fn check_references_expr(expr: &mut Expression, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
+        let (pos, e, _) = expr;
+        let tp = || -> Type {match e {
             ExpressionR::T(left, op, right, _) => {
                 let left = check_references_expr(left, functions, vars, aliases, errors, lexer);
                 let right = check_references_expr(right, functions, vars, aliases, errors, lexer);
@@ -1370,15 +1451,35 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                 }
                 return Type::Array(Box::new(last_tp));
             },
-            ExpressionR::Undef => {},
-        }
-
-        Type::Invalid
+            ExpressionR::Undef => {
+                return Type::Primitive(PrimitiveType::Void);
+            },
+            ExpressionR::ArrAlloc(tp, _) => {
+                return Type::Array(Box::new(tp.clone()));
+            },
+            ExpressionR::Index(ident, a) => {
+                let inner_type = check_references_expr(a, functions, vars, aliases, errors, lexer);
+                if ! Type::Primitive(PrimitiveType::Int).is_compatible(&inner_type, aliases) {
+                    errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `int` and `{inner_type}` in array length definition")));
+                    return Type::Invalid;
+                } else {
+                    let ident_type = check_references_expr(&mut (*pos, ExpressionR::Var(ident.to_string()), None), functions, vars, aliases, errors, lexer);
+                    if let Type::Array(inner) = ident_type {
+                        return *inner;
+                    } else {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "`{ident_type}` is not an array type")));
+                        return Type::Invalid;
+                    }
+                }
+            }
+        }}();
+        expr.2 = Some(tp.clone());
+        tp
     }
     
     // check
-    fn check_references(node: &ASTNode, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, f: String, lexer: &mut Lexer) {
-        if let (_, ASTNodeR::Block(arr)) = node {
+    fn check_references(node: &mut ASTNode, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, f: String, lexer: &mut Lexer) {
+        if let (_, ASTNodeR::Block(ref mut arr)) = node {
             let vars_sub = &mut vars.clone();
             for a in arr {
                 match a {
@@ -1401,35 +1502,66 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                         if len_a != len_b {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "expected `{len_a}` arguments, got `{len_b}`")));
                         };
-                        
-                        for (index, a) in args.iter().enumerate() {
-                            let typa = check_references_expr(a, functions, vars_sub, aliases, errors, lexer);
+
+                        let mut index = 0;
+                        for mut a in args {
+                            let typa = check_references_expr(&mut a, functions, vars_sub, aliases, errors, lexer);
                             let typb = func_args.get(index).unwrap();
 
                             if ! typa.is_compatible(typb, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typb}`, found `{typa}`")));
                                 break;
                             }
+                            index += 1;
                         }
                     },
                     (_, ASTNodeR::Block(..)) => {
                         check_references(a, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
-                    (pos, ASTNodeR::If(expr, block)) => {
+                    (pos, ASTNodeR::If(ref mut expr, ref mut block)) => {
                         let bool_type = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                         }
                         check_references(block, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
-                    (pos, ASTNodeR::Return(expr)) => {
+                    (pos, ASTNodeR::Return(ref mut expr)) => {
                         let tp = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         let ret_type  = &functions.get(&f).unwrap().1;
                         if ! ret_type.is_compatible(&tp, aliases) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{ret_type}`, found `{tp}`, because of return type")));
                         }
                     },
-                    (_, ASTNodeR::VarInit(var, expr)) => {
+                    (_, ASTNodeR::ArrIndexInit(var, ref mut ind, ref mut expr)) => {
+                        if ! vars_sub.contains_key(var) {
+                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
+                        } else {
+                            let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
+                            if type_r == &Type::Invalid {
+                                continue;
+                            }
+
+                            let type_ind = &check_references_expr(ind, functions, vars_sub, aliases, errors, lexer);
+                            if type_ind == &Type::Invalid {
+                                continue;
+                            }
+                            
+                            let type_l = vars_sub.get(var).unwrap();
+                            if let Type::Array(_) = type_l {} else {
+                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                            }
+                            
+                            if ! type_l.is_compatible(&Type::Array(Box::new(type_r.clone())), aliases) {
+                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expeected `{type_l}`, found `{type_r}`")));
+                            }
+
+                            if ! Type::Primitive(PrimitiveType::Int).is_compatible(type_ind, aliases) {
+                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expeected int, found `{type_r}`")));
+                            }
+                            
+                        }
+                    },
+                    (_, ASTNodeR::VarInit(var, ref mut expr)) => {
                         if ! vars_sub.contains_key(var) {
                             errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
                         } else {
@@ -1453,7 +1585,7 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
                         if ! intrinsics().contains_key(iname.as_str()) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to compiler intrinsic `{iname}`")));
                         }
-                    }
+                    },
                 }
             };
         }
@@ -1491,7 +1623,7 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
         }
     }
 
-    check_references(&ast, &functions, &vars, &type_aliases, &mut errors, "".into(), &mut lexer);
+    check_references(ast, &functions, &vars, &type_aliases, &mut errors, "".into(), &mut lexer);
     check_function_ret_paths(&ast.1, &mut errors, &mut lexer);
 
     // type checking
@@ -1504,41 +1636,45 @@ fn check(ast: ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Er
 
 #[derive(Debug, Clone, PartialEq)]
 enum Inst {
-    Func(String, HashMap<String, usize>),
-    VarSet(usize, usize),
+    Func(String, HashMap<String, (usize, usize)>),
+    VarSet(usize, usize, usize),
     If(usize),
     Endif,
     Ret(usize),
     Call(String),
-    Op((usize, usize), Op),
+    Op((usize, usize), usize, Op),
     Val(usize, Type, String),
     Var(usize, usize),
     RetVal(usize),
     Intrinsic(String, String),
     Push(usize),
     Pop(usize),
+    Arr(usize, usize),
+    Index(usize, usize),
+    ArraySet(usize, usize, usize),
 }
 
-fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<String, usize>) -> Vec<Inst> {
+fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, aliases: &HashMap<String, Type>) -> Vec<Inst> {
     let mut ret = vec![];
+    let (_pos, expr, tp) = expr;
     match expr {
         ExpressionR::T(fst, op, snd, _) => {
-            ret.append(&mut intermediate_expr(fst.1, index, indicies));
+            ret.append(&mut intermediate_expr(*fst, index, indicies, aliases));
             ret.push(Inst::Push(index));
-            ret.append(&mut intermediate_expr(snd.1, index+1, indicies));
+            ret.append(&mut intermediate_expr(*snd, index+1, indicies, aliases));
             ret.push(Inst::Pop(index));
-            ret.push(Inst::Op((index, index+1), op));
+            ret.push(Inst::Op((index, index+1), tp.unwrap().size(aliases), op));
         },
         ExpressionR::Val(tp, val) => {
             ret.push(Inst::Val(index, tp, val));
         },
         ExpressionR::Var(name) => {
-            ret.push(Inst::Var(index, *indicies.get(&name).unwrap()))
+            ret.push(Inst::Var(index, indicies.get(&name).unwrap().0));
         },
         ExpressionR::F(name, args) => {
             let mut ind = 0;
             for a in args.clone() {
-                ret.append(&mut intermediate_expr(a.1, ind, indicies));
+                ret.append(&mut intermediate_expr(a, ind, indicies, aliases));
                 ret.push(Inst::Push(ind));
                 ind += 1;
             }
@@ -1554,22 +1690,32 @@ fn intermediate_expr(expr: ExpressionR, index: usize, indicies: &mut HashMap<Str
         ExpressionR::Arr(_) => {
             todo!();
         },
-        ExpressionR::Undef => todo!(),
+        ExpressionR::Undef => {
+            
+        },
+        ExpressionR::ArrAlloc(tp, sz) => {
+            ret.push(Inst::Arr(index, sz * tp.size(&aliases)));
+        },
+        ExpressionR::Index(var, expr) => {
+            ret.append(&mut intermediate_expr(*expr, index, indicies, aliases));
+            ret.push(Inst::Var(index+1, indicies.get(&var).unwrap().0));
+            ret.push(Inst::Index(index, index+1));
+        },
     }
     ret
 }
 
 
-fn last_ptr(offsets: &HashMap<String, usize>) -> usize {
+fn last_ptr(offsets: &HashMap<String, (usize, usize)>) -> usize {
     let mut last = 0;
     for el in offsets {
-        last = last.max(*el.1);
+        last = last.max(el.1.0);
     }
     last
 }
 
 fn intrinsics() -> HashMap<&'static str, &'static str> {
-    [("syscall","\tsyscall\n\tret"),
+    [("syscall","\tpush rax\n\tpush rbx\n\tpush rcx\n\tpush rdx\n\tpop rdx\n\tpop rsi\n\tpop rdi\n\tpop rax\n\tsyscall\n\tret"),
      ("convert", "\tret\n"),
      ("str_to_ptr", "\tadd rax, 8\n\tret\n"),
      ("dereference", "\tmov rax, [rax]\n\tret\n")
@@ -1579,7 +1725,7 @@ fn intrinsics() -> HashMap<&'static str, &'static str> {
         .collect()
 }
 
-fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: HashMap<String, Type>) -> Vec<Inst> {
+fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, aliases: HashMap<String, Type>) -> Vec<Inst> {
     let mut ret = vec![];
     
     match ast {
@@ -1589,15 +1735,21 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
             }
         },
         ASTNodeR::VarDec(tp, ref name) => {
-            offsets.insert(name.clone(), last_ptr(offsets) + tp.size(&aliases));
+            offsets.insert(name.clone(), (last_ptr(offsets) + tp.size(&aliases), tp.size(&aliases)));
+        },
+        ASTNodeR::ArrIndexInit(arr, ind, expr) => {
+            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
+            ret.append(&mut intermediate_expr(ind, 1, offsets, &aliases));
+            ret.push(Inst::ArraySet(0, 1, offsets.get(&arr).unwrap().0))
         },
         ASTNodeR::VarInit(ref name, expr) => {
-            ret.append(&mut intermediate_expr(expr.1, 0, offsets));
-            ret.push(Inst::VarSet(0, *offsets.get(name).unwrap()))
+            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
+            let vals = offsets.get(name).unwrap();
+            ret.push(Inst::VarSet(0, vals.1, vals.0))
         },
         ASTNodeR::FunctionCall(name, args) => {
             for a in args.clone() {
-                ret.append(&mut intermediate_expr(a.1, 0, offsets));
+                ret.append(&mut intermediate_expr(a, 0, offsets, &aliases));
                 ret.push(Inst::Push(0));
             }
 
@@ -1610,15 +1762,15 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
             ret.push(Inst::Call(name));
         },
         ASTNodeR::If(expr, block) => {
-            ret.append(&mut intermediate_expr(expr.1, 0, offsets));
+            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
             ret.push(Inst::If(0));
             ret.append(&mut intermediate(block.1, offsets, aliases));
             ret.push(Inst::Endif);
         },
         ASTNodeR::FunctionDecl(name, a, rt, block) => {
-            let mut offsets: HashMap<String, usize> = HashMap::new();
+            let mut offsets: HashMap<String, (usize, usize)> = HashMap::new();
             for arg in a {
-                offsets.insert(arg.1, last_ptr(&offsets) + arg.0.size(&aliases));
+                offsets.insert(arg.1, (last_ptr(&offsets) + arg.0.size(&aliases), arg.0.size(&aliases)));
             }
             
             ret.push(Inst::Func(name, offsets.clone()));
@@ -1628,7 +1780,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
             }
         },
         ASTNodeR::Return(expr) => {
-            ret.append(&mut intermediate_expr(expr.1, 0, offsets));
+            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
             ret.push(Inst::Ret(0));
         },
         ASTNodeR::Intrinsic(iname, fname, _, _) => {
@@ -1643,16 +1795,58 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, usize>, aliases: Ha
 
 fn gnereate(insts: Vec<Inst>) -> String {
 
+    let datatype = |a: usize| match a {
+        1 => "byte",
+        2 => "word",
+        4 => "dword",
+        8 => "qword",
+        _ => "__invalid__"
+    };
+
     let register = |reg| match reg {
         0 => "rax",
-        1 => "rdi",
-        2 => "rsi",
+        1 => "rbx",
+        2 => "rcx",
         3 => "rdx",
-        4 => "rcx",
+        4 => "rdi",
+        5 => "rsi",
         a => unimplemented!("index: {a}")
     };
 
+    let register_sz = |reg: usize, sz: usize| match register(reg) {
+        "rax" => match sz {
+            1 => "al",
+            2 => "ax",
+            4 => "eax",
+            8 => "rax",
+            _ => "__invalid__"
+        },
+        "rbx" => match sz {
+            1 => "bl",
+            2 => "bx",
+            4 => "ebx",
+            8 => "rbx",
+            _ => "__invalid__"
+        },
+        "rcx" => match sz {
+            1 => "cl",
+            2 => "cx",
+            4 => "ecx",
+            8 => "rcx",
+            _ => "__invalid__"
+        },
+        "rdx" => match sz {
+            1 => "dl",
+            2 => "dx",
+            4 => "edx",
+            8 => "rdx",
+            _ => "__invalid__"
+        },
+        _ => "__invalid__"
+    };
+
     let mut global_strings: Vec<String> = vec![];
+    let mut global_arrays: Vec<usize> = vec![];
     
     let mut ret: String = "\
     global _start\n\
@@ -1665,11 +1859,13 @@ fn gnereate(insts: Vec<Inst>) -> String {
     ".into();
 
     let mut intrinsic_labels: Vec<String> = vec![];
+
+    let mut arr_index: usize = 0;
     
     for a in insts {
         ret.push_str(match a {
             Inst::Func(name, offsets) => {
-                let string = (0..offsets.len()).map(|a| format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(a), ind = offsets.iter().nth(a).unwrap().1)).collect::<String>();
+                let string = (0..offsets.len()).map(|a| format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(a), ind = offsets.iter().nth(a).unwrap().1.0)).collect::<String>();
                 format!("{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
             },
             Inst::Call(name) => {
@@ -1730,17 +1926,20 @@ fn gnereate(insts: Vec<Inst>) -> String {
                     "\tleave\n\tret\n".into()
                 }
             },
-            Inst::Op(reg, op) => {
+            Inst::Op(reg, sz, op) => {
                 match op {
                     Op::Add => format!("\tadd {}, {}\n",  register(reg.0), register(reg.1)),
                     Op::Sub => format!("\tsub {}, {}\n",  register(reg.0), register(reg.1)),
                     Op::Mul => format!("\timul {}, {}\n", register(reg.0), register(reg.1)),
                     Op::Div => format!("\tidiv {}, {}\n", register(reg.0), register(reg.1)),
-                    Op::Eq => format!("\tcmp {r0}, {r1}\n\tsete al\n\tmovzx {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
+                    Op::Eq => format!("\tcmp {r0}, {r1}\n\tsete al\n\tmov {r0}, al\n", r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
+                    Op::Less => format!("\tcmp {r0}, {r1}\n\tsetl al\n\tmov {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
+                    Op::Greater => format!("\tcmp {r0}, {r1}\n\tsetg al\n\tmov {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
+                    Op::Mod => format!("\tmov rax, {r0}\n\tidiv {r1}\n\tmov {r0}, rdx\n", r0 = register(reg.0), r1 = register(reg.1)),
                 }
             },
-            Inst::VarSet(reg, index) => {
-                format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(reg), ind = index)
+            Inst::VarSet(reg, sz, index) => {
+                format!("\tsub rsp, {ind}\n\tmov {tp} [rbp-{ind}], {}\n", register_sz(reg, sz), ind = index, tp = datatype(sz))
             },
             Inst::Var(reg, index) => {
                 format!("\tmov {}, [rbp-{}]\n", register(reg), index)
@@ -1759,13 +1958,39 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 } else {
                     "".into()
                 }
-            }
+            },
+            Inst::Arr(reg, size) => {
+                global_arrays.push(size);
+                arr_index += 1;
+                format!("\tmov {r0}, arr_{}\n", arr_index -1, r0 = register(reg))
+            },
+            Inst::Index(reg0, reg1) => {
+                let r0 = register(reg0);
+                let r1 = register(reg1);
+                format!("\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {r0}, [{r1}]\n")
+            },
+            Inst::ArraySet(reg0, reg1, ind) => {
+                let r0 = register(reg0);
+                let r1 = register(reg1);
+                format!("\tpush {r0}\n\tmov {r0}, [rbp-{ind}]\n\tadd {r0}, 8\n\tadd {r0}, {r1}\n\tpop {r1}\n\tmov [{r0}], {r1}\n")
+//                format!("\tadd {r1}, rsp\n\tsub {r1}, {arr}\n\tmov [{r1}], {r0}\n")
+//                format!("\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {r0}, [{r1}]\n")
+            },
+            
         }.as_str())
     }
     ret.push_str("_end:\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n");
 
     for a in global_strings {
         ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len()).as_str());
+    }
+
+//    ret.push_str("section .bss\n");
+    
+    let mut ind = 0;
+    for a in global_arrays {
+        ret.push_str(format!("arr_{}:\n\tdq {a}\n\tresb {a}\n", ind).as_str());
+        ind += 1;
     }
     
     ret
@@ -1794,7 +2019,7 @@ fn main() {
     
     eprintln!("---  START PARSING ---");
 
-    let a = parser.parse();
+    let mut a = parser.parse();
     if let Err(ref e) = a {
         for a in e {
             let (t, v) = a;
@@ -1807,7 +2032,7 @@ fn main() {
 
     let mut aliases: HashMap<String, Type> = HashMap::new();
     
-    if let Ok(ast) = a.clone() {
+    if let Ok(ref mut ast) = a {
         eprintln!("--- END PARSING ---\nAST NODE: \n{:#?}", ast);
         eprintln!("---  START CHECKING ---: \n");
         match check(ast, parser.lexer) {

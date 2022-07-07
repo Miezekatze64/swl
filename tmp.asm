@@ -8,88 +8,65 @@ _start:
 syscall3: 
 	jmp syscall
 syscall: 
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	pop rdx
+	pop rsi
+	pop rdi
+	pop rax
 	syscall
 	ret
-str2addr: 
+arr2addr: 
 	jmp str_to_ptr
 str_to_ptr: 
 	add rax, 8
 	ret
 
-strlen: 
+arrlen: 
 	jmp dereference
 dereference: 
 	mov rax, [rax]
 	ret
 
-int2char: 
+char2int: 
 	jmp convert
 convert: 
 	ret
 
-write:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 8
-	mov [rbp-8], rax
-	mov rax, 1
-	push rax
-	mov rax, 1
-	push rax
-	mov rax, [rbp-8]
-	push rax
-	pop rax
-	call str2addr
-	push rax
-	mov rax, [rbp-8]
-	push rax
-	pop rax
-	call strlen
-	push rax
-	pop rdx
-	pop rsi
-	pop rdi
-	pop rax
-	call syscall3
-	leave
-	ret
-f:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 8
-	mov [rbp-8], rax
-	mov rax, [rbp-8]
-	push rax
-	mov rdi, 0
-	pop rax
-	cmp rax, rdi
-	sete al
-	movzx rax, al
-	cmp rax, 1
-	jne .l2
-.l1:
-	mov rax, 0
-	leave
-	ret
-.l2:
-	mov rax, str_hi_n
-	push rax
-	pop rax
-	call write
-	mov rax, [rbp-8]
-	push rax
-	pop rax
-	call f
-	leave
-	ret
+bool2int: 
+	jmp convert
+deref: 
+	jmp dereference
 main:
 	push rbp
 	mov rbp,rsp
-	mov rax, 1000
+	mov rax, arr_0
+	sub rsp, 8
+	mov qword [rbp-8], rax
+	mov rax, 98
+	mov rbx, 0
+	push rax
+	mov rax, [rbp-8]
+	add rax, 8
+	add rax, rbx
+	pop rbx
+	mov [rax], rbx
+	mov rax, 0
+	mov rbx, [rbp-8]
+	add rbx, 8
+	add rbx, rax
+	mov rax, [rbx]
+	push rax
+	mov rbx, 98
+	pop rax
+	cmp al, bl
+	sete al
+	mov al, al
 	push rax
 	pop rax
-	call f
-	mov rax, 0
+	call bool2int
 	leave
 	ret
 _end:
@@ -97,6 +74,6 @@ _end:
 	mov rax, 60
 	syscall
 section .data
-str_hi_n:
-	dq 4
-	db `HI\n`
+arr_0:
+	dq 3
+	resb 3

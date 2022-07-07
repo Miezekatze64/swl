@@ -1,24 +1,31 @@
-intrinsic syscall     as syscall3(int index, int val, int val2, int val3);
-intrinsic str_to_ptr  as str2addr(string str) -> int;
-intrinsic dereference as strlen(string str)   -> int;
-intrinsic convert     as int2char(int i)      -> char;
 
+// intrinsic syscall     as syscall1(int index, int val);
+intrinsic syscall     as syscall3(int index, int val, int val2, int val3);
+intrinsic str_to_ptr  as arr2addr(string str) -> int;
+intrinsic dereference as arrlen(string str)   -> int;
+// intrinsic convert     as int2char(int i)      -> char;
+intrinsic convert     as char2int(char c)     -> int;
+intrinsic convert     as bool2int(bool i)     -> int;
+intrinsic dereference    as deref(int i) -> int;
+/*
 alias string = [char];
 
 func write([char] str) {
-    syscall3(1, 1, str2addr(str), strlen(str));
+    syscall3(1, 1, arr2addr(str), arrlen(str));
 }
 
-func f(int a) -> int {
-     if (a == 0) {
-        <- 0;
-     }
-     write("HI\n");
-     <- f(a);
+func exit(int code) {
+     syscall1(60, code);
 }
 
+func read([char] str) {
+    syscall3(0, 0, arr2addr(str), arrlen(str));
+}
+*/
 func main() -> int {
-     f(1000);
-     <- 0;
+    [char] array = arr[char, 3];
+//    read(array);
+    array[0] = 'b';
+//    <- arra
+    <- bool2int(array[0] == 'b');
 }
-

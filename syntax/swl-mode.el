@@ -45,7 +45,7 @@
 
 (eval-and-compile
     (defconst swl-keywords
-        '("if" "else" "func" "alias" "intrinsic" "as")
+        '("if" "else" "func" "alias" "intrinsic" "as" "arr")
         ))
 
 (eval-and-compile

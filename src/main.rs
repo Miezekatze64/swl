@@ -95,7 +95,7 @@ impl Type {
     fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>) -> bool {
         let a = self.dealias(aliases);
         let b = type_r.dealias(aliases);
-        
+
         if a == b || a == Type::Primitive(PrimitiveType::Float) && b == Type::Primitive(PrimitiveType::Int) {
             true
         } else if let Type::Array(aa) = a {
@@ -193,7 +193,7 @@ impl Op {
 
 fn is_valid_type(val: &str) -> bool {
     // TODO: check for custom types
-    val == "int" || val == "float" || val == "char" || val == "void"
+    val == "int" || val == "float" || val == "char" || val == "void" || val == "bool"
 }
 
 fn parse_type(string: String) -> Option<Type> {
@@ -205,6 +205,7 @@ fn parse_type(string: String) -> Option<Type> {
         "float"  => Some(Type::Primitive(PrimitiveType::Float)),
         "char"   => Some(Type::Primitive(PrimitiveType::Char)),
         "void"   => Some(Type::Primitive(PrimitiveType::Void)),
+        "bool"   => Some(Type::Primitive(PrimitiveType::Bool)),
         _ => {
             if string.ends_with('*') {
                 Some(Type::Pointer(Box::new(parse_type(string.as_str()[0..string.len()-1].into())?)))
@@ -377,6 +378,9 @@ impl Lexer {
                         } else if ttype == TokenType::Ident {
                             ttype = TokenType::Ident;
                             val.push(ch);
+                        } else if ttype == TokenType::Operator && val == "-" {
+                            val.push(ch);
+                            ttype = TokenType::Int;
                         } else {
                             // check for keywords / types
                             ttype = check_keywords_and_types(val.as_str(), ttype);
@@ -415,10 +419,7 @@ impl Lexer {
                                 self.pos += 1;
                             }
                             return self.next_token();
-                        } else if ttype == TokenType::Operator && val == "-" && ch == '>' {
-                            val.push(ch);
-                            ttype = TokenType::Special;
-                        } else if ttype == TokenType::Operator && val.starts_with('<') && ch == '-' {
+                        } else if (ttype == TokenType::Operator && val == "-" && ch == '>')  ||  (ttype == TokenType::Operator && val.starts_with('<') && ch == '-') {
                             val.push(ch);
                             ttype = TokenType::Special;
                         } else if ttype == TokenType::Undef || ttype == TokenType::Operator {
@@ -522,13 +523,15 @@ struct Parser {
     lexer: Lexer,
 }
 
-type ASTNode = (usize, ASTNodeR);
+#[derive(Debug, Clone, PartialEq)]
+struct ASTNode(usize, ASTNodeR);
 
 #[derive(Debug, Clone, PartialEq)]
 enum ASTNodeR {
     Block(Vec<ASTNode>),
-    VarDec(Type, String),
+    VarDec(bool, Type, String),
     VarInit(String, Expression),
+    VarDecInit(bool, Type, String, Expression),
     FunctionCall(String, Vec<Expression>),
     If(Expression, Box<ASTNode>),
     FunctionDecl(String, Vec<(Type, String)>, Type, Box<ASTNode>),
@@ -538,7 +541,8 @@ enum ASTNodeR {
     ArrIndexInit(String, Expression, Expression),
 }
 
-type Expression = (usize, ExpressionR, Option<Type>);
+#[derive(Debug, Clone, PartialEq)]
+struct Expression(usize, ExpressionR, Option<Type>);
 
 #[derive(Debug, Clone, PartialEq)]
 enum ExpressionR {
@@ -562,6 +566,156 @@ enum Op {
     Eq,
     Less,
     Greater,
+}
+
+// indents a strinig by 4 spaces
+fn indent(string: String) -> String {
+    let mut ret = String::new();
+    for line in string.lines() {
+        ret.push_str("    ");
+        ret.push_str(line);
+        ret.push_str("\n");
+    }
+    ret
+}
+
+/// to_string implementation of AST
+impl std::fmt::Display for ASTNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.1)
+    }
+}
+
+impl std::fmt::Display for ASTNodeR {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ASTNodeR::Block(a) => {
+                for l in a {
+                    writeln!(f, "{}", l)?;
+                }
+                Ok(())
+            },
+            ASTNodeR::VarDec(_, typ, name) => {
+                write!(f, "{typ} {name};")
+            },
+            ASTNodeR::VarInit(name, expr) => {
+                write!(f, "{name} = {expr};")
+            },
+            ASTNodeR::FunctionCall(name, args) => {
+                write!(f, "{name}(")?;
+                for (index, arg) in args.iter().enumerate() {
+                    write!(f, "{arg}")?;
+                    if index < args.len()-1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ");")
+            },
+            ASTNodeR::If(pred, block) => {
+                write!(f, "if ({pred}) {{\n{}}}", indent(block.to_string()))
+            },
+            ASTNodeR::FunctionDecl(name, args, ret_type, block) => {
+                write!(f, "\nfunc {name}(")?;
+                for (index, (arg_type, arg_name)) in args.iter().enumerate() {
+                    write!(f, "{arg_type} {arg_name}")?;
+                    if index < args.len()-1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ") ")?;
+                if *ret_type != Type::Primitive(PrimitiveType::Void) {
+                    write!(f, "-> {ret_type} ")?;
+                }
+                write!(f, "{{\n{}}}", indent(block.to_string()))
+            },
+            ASTNodeR::Return(expr) => {
+                write!(f, "<- {expr};")
+            },
+            ASTNodeR::TypeAlias(name, typ) => {
+                write!(f, "alias {name} = {typ};")
+            },
+            ASTNodeR::Intrinsic(iname, fname, args, ret_type) => {
+                write!(f, "intrinsic {iname} as {fname}(")?;
+                for (index, (arg_type, arg_name)) in args.iter().enumerate() {
+                    write!(f, "{arg_type} {arg_name}")?;
+                    if index < args.len()-1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ") ")?;
+                if *ret_type != Type::Primitive(PrimitiveType::Void) {
+                    write!(f, "-> {ret_type} ")?;
+                }
+                write!(f, ";")
+            },
+            ASTNodeR::ArrIndexInit(array, index, value) => {
+                write!(f, "{array}[{index}] = {value};")
+            },
+            ASTNodeR::VarDecInit(_, typ, name, expr) => {
+                write!(f, "{typ} {name} = {expr};")
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.1)
+    }
+}
+
+impl std::fmt::Display for ExpressionR {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionR::T(left, op, right, _) => {
+                write!(f, "{left} {op} {right}")
+            },
+            ExpressionR::Val(tp, val) => {
+                match tp {
+                    Type::Primitive(_) => write!(f, "{val}"),
+                    Type::Custom(_) => write!(f, "{val}[INVALID]"),
+                    Type::Array(a) => match **a {
+                        Type::Primitive(PrimitiveType::Char) => write!(f, "\"{val}\""),
+                        _ => write!(f, "{{{val}}}[INVALID]"),
+                    },
+                    Type::Pointer(_) => write!(f, "{val}*[INVALID]"),
+                    Type::Invalid => write!(f, "[INVALID]"),
+                }
+            },
+            ExpressionR::Var(var) => {
+                write!(f, "{var}")
+            },
+            ExpressionR::F(name, args) => {
+                write!(f, "{name}(")?;
+                for (index, arg) in args.iter().enumerate() {
+                    write!(f, "{arg}")?;
+                    if index < args.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ")")
+            },
+            ExpressionR::Arr(vals) => {
+                write!(f, "{{")?;
+                for (index, arg) in vals.iter().enumerate() {
+                    write!(f, "{arg}")?;
+                    if index < vals.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            },
+            ExpressionR::Undef => {
+                write!(f, "")
+            },
+            ExpressionR::ArrAlloc(typ, sz) => {
+                write!(f, "arr[{typ}, {sz}]")
+            },
+            ExpressionR::Index(array, index) => {
+                write!(f, "{array}[{index}]")
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for TokenType {
@@ -686,11 +840,11 @@ impl Parser {
     }
     
     fn parse_block_(&mut self, is_root: bool, pos: usize) -> Result<ASTNode, Vec<Error>> {
-        let mut block: ASTNode = (pos, ASTNodeR::Block(vec![]));
+        let mut block: ASTNode = ASTNode(pos, ASTNodeR::Block(vec![]));
         let mut errors: Vec<Error> = vec![];
         loop {
             match block {
-                (_, ASTNodeR::Block(ref mut vec)) => {
+                ASTNode(_, ASTNodeR::Block(ref mut vec)) => {
                     let bs = match self.parse_block_statement(is_root) {
                         Ok(a) => a,
                         Err(e) => {
@@ -724,7 +878,7 @@ impl Parser {
                     }
                     vec.push(bs.unwrap());
                 },
-                _ => todo!(),
+                _ => unimplemented!(),
             }
             let token = get_peek_token!(self.lexer, errors);
             if token.ttype == TokenType::Eof {
@@ -742,7 +896,7 @@ impl Parser {
         let mut errors: Vec<Error> = vec![];
         let check_precedence_and_update = |op: Op, right_expr: Box<Expression>, working_expr: &Expression| -> Box<Expression> {
             let ret: Box<Expression>;
-            let (_, exp, _) = working_expr;
+            let Expression(_, exp, _) = working_expr;
             let is_first: bool = match exp {
                 ExpressionR::T(_, _, _, precedence) => {
                     Op::get_precedence(op) <= *precedence
@@ -754,20 +908,20 @@ impl Parser {
             };
 
             if is_first {
-                let tmp_expr = (working_expr.0, ExpressionR::T(Box::new(working_expr.clone()), op, right_expr
+                let tmp_expr = Expression(working_expr.0, ExpressionR::T(Box::new(working_expr.clone()), op, right_expr
                                              , Op::get_precedence(op)), None);
                 ret = Box::new(tmp_expr);
             } else {
-                assert!(matches!(*working_expr, (_, ExpressionR::T(..), _)));
-                let mut expr = working_expr.clone();
-                let tmp_expr = if let (pos, ExpressionR::T(_, _, right, _), _) = &expr {
-                    (*pos, ExpressionR::T(right.clone(), op, right_expr, Op::get_precedence(op)), None)
+                assert!(matches!(*working_expr, Expression(_, ExpressionR::T(..), _)));
+                let mut expr: Expression = working_expr.clone();
+                let tmp_expr = if let Expression(pos, ExpressionR::T(_, _, right, _), _) = &expr {
+                    Expression(*pos, ExpressionR::T(right.clone(), op, right_expr, Op::get_precedence(op)), None)
                 } else {
                     unreachable!();
                 };
 
-                if let (pos, ExpressionR::T(a, b, _, d), _) = expr {
-                    expr = (pos, ExpressionR::T(a, b, Box::new(tmp_expr), d), None);
+                if let Expression(pos, ExpressionR::T(a, b, _, d), _) = expr {
+                    expr = Expression(pos, ExpressionR::T(a, b, Box::new(tmp_expr), d), None);
                 }
                     
                 ret = Box::new(expr);
@@ -775,14 +929,14 @@ impl Parser {
 
             ret
         };
-        let mut left_expr = Box::new((0, ExpressionR::Undef, None));
+        let mut left_expr = Box::new(Expression(0, ExpressionR::Undef, None));
 
         // parse left side
         let subexpr = self.parse_subexpr(seperators)?;
         let mut nleft_expr = subexpr.0;
 
         loop {
-            if let (_, ExpressionR::Undef, _) = *nleft_expr {
+            if let Expression(_, ExpressionR::Undef, _) = *nleft_expr {
                 return Ok((*left_expr, subexpr.1));
             }
             left_expr = nleft_expr.clone();
@@ -812,7 +966,7 @@ impl Parser {
             // parse right side
             let subexpr_r = self.parse_subexpr(seperators)?;
 
-            if let (_, ExpressionR::Undef, _) = *subexpr_r.0 {
+            if let Expression(_, ExpressionR::Undef, _) = *subexpr_r.0 {
                 return Ok((*left_expr, subexpr.1));
             }
             
@@ -826,37 +980,36 @@ impl Parser {
         let mut token = get_token!(self.lexer, errors);
         let val = token.value;
 
-        fn parse_var_dec(parser: &mut Parser, typ: Type) -> Result<Option<ASTNode>, Error> {
+        fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool) -> Result<Option<ASTNode>, Vec<Error>> {
             // declare variable
             let pos = parser.lexer.pos;
+            let mut errors: Vec<Error> = vec![];
             
-            let next_token = parser.expect(Some(TokenType::Ident), None)?;
+            let next_token = err_ret!(parser.expect(Some(TokenType::Ident), None), errors);
             let ident = next_token.value;
-            let ident_pos = next_token.pos;
             
             // check next token
-            let next_token = parser.lexer.next_token()?;
+            let next_token = err_ret!(parser.lexer.next_token(), errors);
             let ntv = next_token.value.clone();
             match next_token.ttype {
                 TokenType::Special => {
-                        if next_token.value == ";" {
-                            // token ended, normal return
+                    if next_token.value == ";" {
+                        Ok(Some(ASTNode(pos, ASTNodeR::VarDec(is_root, typ, ident))))
                         } else {
-                            return Err((ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`")));
+                            return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]);
                         }
                 },
                 TokenType::Operator => {
                     if next_token.value == "=" {
-                        // variable initialization, reset position
-                        parser.lexer.pos = ident_pos;
+                        // variable initialization
+                        let expr = parser.parse_expr(&[";"])?;
+                        Ok(Some(ASTNode(pos, ASTNodeR::VarDecInit(is_root, typ, ident, expr.0))))
                     } else {
-                        return Err((ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`")));
+                        return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]);
                     }
                 },
-                _ => return Err((ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))),
+                _ => return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]),
             }
-            
-            Ok(Some((pos, ASTNodeR::VarDec(typ, ident))))
         }
 
 
@@ -934,7 +1087,7 @@ impl Parser {
             },
             TokenType::Ident => {
                 let expr = self.parse_ident_expr(val.clone(), token.pos,  &[";"])?;
-                let (_, exp, _) = *expr;
+                let Expression(_, exp, _) = *expr;
                 match exp {
                     ExpressionR::Var(..) => {
                         let var_token = get_token!(self.lexer, errors);
@@ -942,7 +1095,7 @@ impl Parser {
                         
                         if var_token.ttype == TokenType::Operator && var_val == "=" {
                             let expr = self.parse_expr(&[";"])?.0;
-                            return Ok(Some((token.pos, ASTNodeR::VarInit(val, expr))));
+                            return Ok(Some(ASTNode(token.pos, ASTNodeR::VarInit(val, expr))));
                         } else {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
                         }
@@ -956,7 +1109,7 @@ impl Parser {
                         
                         if var_token.ttype == TokenType::Operator && var_val == "=" {
                             let expr = self.parse_expr(&[";"])?.0;
-                            return Ok(Some((token.pos, ASTNodeR::ArrIndexInit(a, *ind, expr))));
+                            return Ok(Some(ASTNode(token.pos, ASTNodeR::ArrIndexInit(a, *ind, expr))));
                         } else {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
                         }
@@ -970,7 +1123,7 @@ impl Parser {
                         // expect semicolon
                         err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
                         
-                        return Ok(Some((token.pos, ASTNodeR::FunctionCall(name, args))));
+                        return Ok(Some(ASTNode(token.pos, ASTNodeR::FunctionCall(name, args))));
                     },
                     ExpressionR::Undef => unreachable!(),
                     ExpressionR::ArrAlloc(..) => todo!(),
@@ -1005,7 +1158,7 @@ impl Parser {
                     }
                     // parse expression
                     let expression = self.parse_expr(&[";"])?.0;
-                    return Ok(Some((token.pos, ASTNodeR::Return(expression))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Return(expression))));
                 },
                 "[" => {
                     // array declaration (e. g. [int])
@@ -1018,12 +1171,12 @@ impl Parser {
                         },
                     };
 
-                    return match parse_var_dec(self, array_type) {
+                    return match parse_var_dec(self, array_type, is_root) {
                         Ok(a) => {
                             Ok(a)
                         },
-                        Err(e) => {
-                            errors.push(e);
+                        Err(mut e) => {
+                            errors.append(&mut e);
                             Err(errors)
                         }
                     }
@@ -1043,10 +1196,10 @@ impl Parser {
                         return Err(errors);
                     },
                 };
-                return match parse_var_dec(self, typ) {
+                return match parse_var_dec(self, typ, is_root) {
                     Ok(a) => Ok(a),
-                    Err(e) => {
-                        errors.push(e);
+                    Err(mut e) => {
+                        errors.append(&mut e);
                         Err(errors)
                     },
                 };
@@ -1067,7 +1220,7 @@ impl Parser {
                     
                     let block = self.parse_block(token.pos)?;
 
-                    return Ok(Some((token.pos, ASTNodeR::If(predicate, Box::new(block)))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::If(predicate, Box::new(block)))));
                     
                 },
                 "func" => {
@@ -1078,7 +1231,6 @@ impl Parser {
                     
                     // parse function name
                     let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
-                    
 
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
                     
@@ -1090,7 +1242,7 @@ impl Parser {
                     // parse block
                     let block = self.parse_block(token.pos)?;
 
-                    return Ok(Some((token.pos, ASTNodeR::FunctionDecl(name, args, ret_type, Box::new(block)))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::FunctionDecl(name, args, ret_type, Box::new(block)))));
 
 //                    let func_expr: Expression = Expression::F(ident, args);
                 },
@@ -1119,7 +1271,7 @@ impl Parser {
                         },
                     };
 
-                    return Ok(Some((token.pos, ASTNodeR::TypeAlias(ident, typ))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::TypeAlias(ident, typ))));
                     
                 },
                 "intrinsic" => {
@@ -1142,7 +1294,7 @@ impl Parser {
 
                     let (args, ret_val) = err_add!(parse_function_decl(self, &mut errors), errors);
 
-                    return Ok(Some((token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
                 },
                 _ => {}
             },
@@ -1175,7 +1327,7 @@ impl Parser {
                     loop {
                         let ret = self.parse_expr(&[")", ","])?;
                         let token: Token = ret.1;
-                        if let (_, ExpressionR::Undef, _) = ret.0 {
+                        if let Expression(_, ExpressionR::Undef, _) = ret.0 {
                             break;
                         }
                         args.insert(args.len(), ret.0);
@@ -1183,24 +1335,24 @@ impl Parser {
                             break;
                         }
                     }
-                    let func_expr: Expression = (ident_pos, ExpressionR::F(ident, args), None);
+                    let func_expr: Expression = Expression(ident_pos, ExpressionR::F(ident, args), None);
                     Ok(Box::new(func_expr))
                 },
                 "[" => {
                     // array indexing
                     self.lexer.next_token().unwrap();
                     let index = self.parse_expr(&["]"])?;
-                    return Ok(Box::new((ident_pos, ExpressionR::Index(ident, Box::new(index.0)), None)));
+                    Ok(Box::new(Expression(ident_pos, ExpressionR::Index(ident, Box::new(index.0)), None)))
                 }
                 a => if seperators.contains(&a) {
-                    Ok(Box::new((ident_pos, ExpressionR::Var(ident), None)))
+                    Ok(Box::new(Expression(ident_pos, ExpressionR::Var(ident), None)))
                 } else {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
                     Err(errors)
                 },
             },
             TokenType::Operator => {
-                Ok(Box::new((token.pos, ExpressionR::Var(ident), None)))
+                Ok(Box::new(Expression(token.pos, ExpressionR::Var(ident), None)))
             },
             TokenType::Undef => unreachable!(),
         }
@@ -1209,7 +1361,7 @@ impl Parser {
     fn parse_subexpr(&mut self, seperators: &[&'static str]) -> Result<(Box<Expression>, Token), Vec<Error>> {
         let inverse = |right_expr: &mut Box<Expression>| {
             let tmp_expr = right_expr.clone();
-            **right_expr = (tmp_expr.0, ExpressionR::T(Box::new((0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()), None)), Op::Mul, tmp_expr, Op::get_precedence(Op::Mul)), None);
+            **right_expr = Expression(tmp_expr.0, ExpressionR::T(Box::new(Expression(0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()), None)), Op::Mul, tmp_expr, Op::get_precedence(Op::Mul)), None);
         };
 
         let mut errors: Vec<Error> = vec![];
@@ -1237,7 +1389,7 @@ impl Parser {
 
                     err_ret!(self.expect(Some(TokenType::Special), Some("]".into())), errors);
                     
-                    Ok((Box::new((token.pos, ExpressionR::ArrAlloc(tp, size), None)), token))
+                    Ok((Box::new(Expression(token.pos, ExpressionR::ArrAlloc(tp, size), None)), token))
                 },
                 _ => {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected keyword `{val}`")));
@@ -1245,19 +1397,19 @@ impl Parser {
                 }
             },
             TokenType::Int => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None)), token))
+                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None)), token))
             },
             TokenType::Bool => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val), None)), token))
+                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val), None)), token))
             },
             TokenType::Float => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val), None)), token))
+                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val), None)), token))
             },
             TokenType::Char => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val), None)), token))
+                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val), None)), token))
             },
             TokenType::String => {
-                Ok((Box::new((token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val), None)), token))
+                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val), None)), token))
             },
             TokenType::Ident => {
                 let ident = self.parse_ident_expr(val, token.pos, seperators)?;
@@ -1277,14 +1429,14 @@ impl Parser {
                             break;
                         }
                     };
-                    Ok((Box::new((token.pos, ExpressionR::Arr(arr), None)), Token {
+                    Ok((Box::new(Expression(token.pos, ExpressionR::Arr(arr), None)), Token {
                         pos: 0,
                         ttype: TokenType::Undef,
                         value: "".into(),
                     }))
                 }
                 _ => if seperators.contains(&val.as_str()) {
-                    Ok((Box::new((0, ExpressionR::Undef, None)), token))
+                    Ok((Box::new(Expression(0, ExpressionR::Undef, None)), token))
                 } else {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected symbol `{val}`")));
                     Err(errors)
@@ -1370,29 +1522,36 @@ impl Parser {
     }
 }
 
-fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, Vec<Error>> {
+fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>, HashMap<String, Type>,), Vec<Error>> {
     let mut errors: Vec<Error> = vec![];
     
     // collect all aliases + functions
     let mut type_aliases: HashMap<String, Type> = HashMap::new();
     let mut functions: HashMap<String, (Vec<Type>, Type)> = HashMap::new();
     let mut vars: HashMap<String, Type> = HashMap::new();
+    let mut globals: HashMap<String, usize> = HashMap::new();
     
-    if let (_, ASTNodeR::Block(arr)) = ast.clone() {
-        for a in arr {
+    if let ASTNode(_, ASTNodeR::Block(arr)) = ast.clone() {
+        for a in arr.clone() {
             match a {
-                (_, ASTNodeR::TypeAlias(alias, typ)) => {
+                ASTNode(_, ASTNodeR::TypeAlias(alias, typ)) => {
                     type_aliases.insert(alias, typ);
                 },
-                (_, ASTNodeR::FunctionDecl(name, args, ret_type, _)) => {
+                ASTNode(_, ASTNodeR::FunctionDecl(name, args, ret_type, _)) => {
                     functions.insert(name, (args.into_iter().map(|(a, _)| a).collect(), ret_type));
                 },
-                (_, ASTNodeR::VarDec(tp, name)) => {
-                    vars.insert(name, tp);
-                },
-                (_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
+                ASTNode(_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
                     functions.insert(fname, (args.into_iter().map(|(a, _)|a).collect(), rt));
                 }
+                _ => {}
+            }
+        }
+        for a in arr {
+            match a {
+                ASTNode(_, ASTNodeR::VarDec(_, tp, name)) => {
+                    vars.insert(name.clone(), tp.clone());
+                    globals.insert(name, tp.size(&type_aliases));
+                },
                 _ => {}
             }
         }
@@ -1401,29 +1560,29 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
     }
 
     fn check_references_expr(expr: &mut Expression, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
-        let (pos, e, _) = expr;
+        let Expression(pos, e, _) = expr;
         let tp = || -> Type {match e {
             ExpressionR::T(left, op, right, _) => {
                 let left = check_references_expr(left, functions, vars, aliases, errors, lexer);
-                let right = check_references_expr(right, functions, vars, aliases, errors, lexer);
+                let right = check_references_expr(right, functions, vars, aliases,  errors, lexer);
                 
-                return match op.combine_type(&left, &right, aliases) {
+                match op.combine_type(&left, &right, aliases) {
                     Type::Invalid => {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{left}` and `{right}` for operation `{op}`")));
                         Type::Invalid
                     },
                     a => a,
-                };
+                }
             },
             ExpressionR::Val(tp, _) => {
-                return tp.clone();
+                tp.clone()
             },
             ExpressionR::Var(name) => {
                 if ! vars.contains_key(name) {
                     errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to variable `{name}`")));
                     return Type::Invalid;
                 }
-                return vars.get(name).unwrap().clone();
+                vars.get(name).unwrap().clone()
             },
             ExpressionR::F(name, vec) => {
                 if ! functions.contains_key(name) {
@@ -1433,7 +1592,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                 for a in vec {
                     check_references_expr(a, functions, vars, aliases, errors, lexer);
                 }
-                return functions.get(name).unwrap().1.clone();
+                functions.get(name).unwrap().1.clone()
             },
             ExpressionR::Arr(vec) => {
                 let mut last_tp = Type::Invalid;
@@ -1449,26 +1608,39 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                     }
                     last_tp = tp;
                 }
-                return Type::Array(Box::new(last_tp));
+                Type::Array(Box::new(last_tp))
             },
             ExpressionR::Undef => {
-                return Type::Primitive(PrimitiveType::Void);
+                Type::Primitive(PrimitiveType::Void)
             },
             ExpressionR::ArrAlloc(tp, _) => {
-                return Type::Array(Box::new(tp.clone()));
+                Type::Array(Box::new(tp.clone()))
             },
             ExpressionR::Index(ident, a) => {
                 let inner_type = check_references_expr(a, functions, vars, aliases, errors, lexer);
                 if ! Type::Primitive(PrimitiveType::Int).is_compatible(&inner_type, aliases) {
                     errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `int` and `{inner_type}` in array length definition")));
-                    return Type::Invalid;
+                    Type::Invalid
                 } else {
-                    let ident_type = check_references_expr(&mut (*pos, ExpressionR::Var(ident.to_string()), None), functions, vars, aliases, errors, lexer);
+                    let ident_type = check_references_expr(&mut Expression(*pos, ExpressionR::Var(ident.to_string()), None), functions, vars, aliases, errors, lexer);
                     if let Type::Array(inner) = ident_type {
-                        return *inner;
+                        *inner
+                    } else if let Type::Custom(ref inner) = ident_type {
+                        if aliases.contains_key(inner) {
+                            if let Type::Array(ref inner2) = aliases[inner] {
+                                return *inner2.clone();
+//                                return aliases.get(inner).unwrap().clone();
+                            } else {
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "`{ident_type}` is not an array type")));
+                                Type::Invalid
+                            }
+                        } else {
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "`{ident_type}` is not an array type")));
+                            Type::Invalid
+                        }
                     } else {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "`{ident_type}` is not an array type")));
-                        return Type::Invalid;
+                        Type::Invalid
                     }
                 }
             }
@@ -1479,17 +1651,17 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
     
     // check
     fn check_references(node: &mut ASTNode, functions: &HashMap<String, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, f: String, lexer: &mut Lexer) {
-        if let (_, ASTNodeR::Block(ref mut arr)) = node {
+        if let ASTNode(_, ASTNodeR::Block(ref mut arr)) = node {
             let vars_sub = &mut vars.clone();
             for a in arr {
                 match a {
-                    (_, ASTNodeR::FunctionDecl(func, args, _, block)) => {
+                    ASTNode(_, ASTNodeR::FunctionDecl(func, args, _, block)) => {
                         for a in args.clone() {
                             vars_sub.insert(a.1, a.0);
                         }
                         check_references(block, functions, vars_sub, aliases, errors, func.clone(), lexer);
                     },
-                    (pos, ASTNodeR::FunctionCall(name, args)) => {
+                    ASTNode(pos, ASTNodeR::FunctionCall(name, args)) => {
                         if ! functions.contains_key(name) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to function `{name}`")));
                             continue;
@@ -1501,38 +1673,37 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                         let len_b = args.len();
                         if len_a != len_b {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "expected `{len_a}` arguments, got `{len_b}`")));
+                            continue;
                         };
 
-                        let mut index = 0;
-                        for mut a in args {
-                            let typa = check_references_expr(&mut a, functions, vars_sub, aliases, errors, lexer);
-                            let typb = func_args.get(index).unwrap();
+                        for (index, a) in args.iter_mut().enumerate() {
+                            let typa = check_references_expr(a, functions, vars_sub, aliases, errors, lexer);
+                            let typb = func_args.get(index).unwrap().clone();
 
-                            if ! typa.is_compatible(typb, aliases) {
+                            if ! typa.is_compatible(&typb, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typb}`, found `{typa}`")));
                                 break;
                             }
-                            index += 1;
                         }
                     },
-                    (_, ASTNodeR::Block(..)) => {
+                    ASTNode(_, ASTNodeR::Block(..)) => {
                         check_references(a, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
-                    (pos, ASTNodeR::If(ref mut expr, ref mut block)) => {
+                    ASTNode(pos, ASTNodeR::If(ref mut expr, ref mut block)) => {
                         let bool_type = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                         }
                         check_references(block, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
-                    (pos, ASTNodeR::Return(ref mut expr)) => {
+                    ASTNode(pos, ASTNodeR::Return(ref mut expr)) => {
                         let tp = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         let ret_type  = &functions.get(&f).unwrap().1;
                         if ! ret_type.is_compatible(&tp, aliases) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{ret_type}`, found `{tp}`, because of return type")));
                         }
                     },
-                    (_, ASTNodeR::ArrIndexInit(var, ref mut ind, ref mut expr)) => {
+                    ASTNode(_, ASTNodeR::ArrIndexInit(var, ref mut ind, ref mut expr)) => {
                         if ! vars_sub.contains_key(var) {
                             errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
                         } else {
@@ -1547,10 +1718,18 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                             }
                             
                             let type_l = vars_sub.get(var).unwrap();
-                            if let Type::Array(_) = type_l {} else {
+                            if let Type::Array(_) = type_l {} else if let Type::Custom(inner) = type_l {
+                                if aliases.contains_key(inner) {
+                                    if let Type::Array(_) = aliases.get(inner).unwrap() {} else {
+                                        errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                                    }
+                                } else {
+                                    errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                                }
+                            } else {
                                 errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
                             }
-                            
+
                             if ! type_l.is_compatible(&Type::Array(Box::new(type_r.clone())), aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expeected `{type_l}`, found `{type_r}`")));
                             }
@@ -1561,7 +1740,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                             
                         }
                     },
-                    (_, ASTNodeR::VarInit(var, ref mut expr)) => {
+                    ASTNode(_, ASTNodeR::VarInit(var, ref mut expr)) => {
                         if ! vars_sub.contains_key(var) {
                             errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
                         } else {
@@ -1577,11 +1756,21 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
                         }
 //                        if 
                     },
-                    (_, ASTNodeR::VarDec(tp, name)) => {
+                    ASTNode(_, ASTNodeR::VarDec(_, tp, name)) => {
                         vars_sub.insert(name.clone(), tp.clone());
                     },
-                    (_, ASTNodeR::TypeAlias(_, _)) => {},
-                    (pos, ASTNodeR::Intrinsic(iname, ..)) => {
+                    ASTNode(_, ASTNodeR::VarDecInit(_, tp, name, expr)) => {
+                        let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
+                        if type_r == &Type::Invalid {
+                            continue;
+                        }
+                        if ! tp.is_compatible(type_r, aliases) {
+                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expeected `{tp}`, found `{type_r}`")));
+                        }
+                        vars_sub.insert(name.clone(), tp.clone());
+                    },
+                    ASTNode(_, ASTNodeR::TypeAlias(_, _)) => {},
+                    ASTNode(pos, ASTNodeR::Intrinsic(iname, ..)) => {
                         if ! intrinsics().contains_key(iname.as_str()) {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to compiler intrinsic `{iname}`")));
                         }
@@ -1628,7 +1817,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
 
     // type checking
     if errors.is_empty() {
-        Ok(type_aliases)
+        Ok((globals, type_aliases))
     } else {
         Err(errors)
     }
@@ -1638,8 +1827,8 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<HashMap<String, Type>, V
 enum Inst {
     Func(String, HashMap<String, (usize, usize)>),
     VarSet(usize, usize, usize),
-    If(usize),
-    Endif,
+    If(usize, usize),
+    Endif(usize),
     Ret(usize),
     Call(String),
     Op((usize, usize), usize, Op),
@@ -1652,16 +1841,20 @@ enum Inst {
     Arr(usize, usize),
     Index(usize, usize),
     ArraySet(usize, usize, usize),
+    Global(usize, String),
+    GlobalSet(usize, String, usize),
+    Jump(String),
+    GlobalArraySet(usize, usize, String),
 }
 
-fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, aliases: &HashMap<String, Type>) -> Vec<Inst> {
+fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>) -> Vec<Inst> {
     let mut ret = vec![];
-    let (_pos, expr, tp) = expr;
+    let Expression(_pos, expr, tp) = expr;
     match expr {
         ExpressionR::T(fst, op, snd, _) => {
-            ret.append(&mut intermediate_expr(*fst, index, indicies, aliases));
+            ret.append(&mut intermediate_expr(*fst, index, indicies, globals, aliases));
             ret.push(Inst::Push(index));
-            ret.append(&mut intermediate_expr(*snd, index+1, indicies, aliases));
+            ret.append(&mut intermediate_expr(*snd, index+1, indicies, globals, aliases));
             ret.push(Inst::Pop(index));
             ret.push(Inst::Op((index, index+1), tp.unwrap().size(aliases), op));
         },
@@ -1669,12 +1862,16 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
             ret.push(Inst::Val(index, tp, val));
         },
         ExpressionR::Var(name) => {
-            ret.push(Inst::Var(index, indicies.get(&name).unwrap().0));
+            if indicies.contains_key(&name) {
+                ret.push(Inst::Var(index, indicies.get(&name).unwrap().0));
+            } else {
+                ret.push(Inst::Global(index, name));
+            }
         },
         ExpressionR::F(name, args) => {
             let mut ind = 0;
             for a in args.clone() {
-                ret.append(&mut intermediate_expr(a, ind, indicies, aliases));
+                ret.append(&mut intermediate_expr(a, ind, indicies, globals, aliases));
                 ret.push(Inst::Push(ind));
                 ind += 1;
             }
@@ -1694,11 +1891,15 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
             
         },
         ExpressionR::ArrAlloc(tp, sz) => {
-            ret.push(Inst::Arr(index, sz * tp.size(&aliases)));
+            ret.push(Inst::Arr(index, sz * tp.size(aliases)));
         },
         ExpressionR::Index(var, expr) => {
-            ret.append(&mut intermediate_expr(*expr, index, indicies, aliases));
-            ret.push(Inst::Var(index+1, indicies.get(&var).unwrap().0));
+            ret.append(&mut intermediate_expr(*expr, index, indicies, globals, aliases));
+            if indicies.contains_key(&var) {
+                ret.push(Inst::Var(index+1, indicies.get(&var).unwrap().0));
+            } else {
+                ret.push(Inst::Global(index+1, var));
+            }
             ret.push(Inst::Index(index, index+1));
         },
     }
@@ -1718,38 +1919,87 @@ fn intrinsics() -> HashMap<&'static str, &'static str> {
     [("syscall","\tpush rax\n\tpush rbx\n\tpush rcx\n\tpush rdx\n\tpop rdx\n\tpop rsi\n\tpop rdi\n\tpop rax\n\tsyscall\n\tret"),
      ("convert", "\tret\n"),
      ("str_to_ptr", "\tadd rax, 8\n\tret\n"),
-     ("dereference", "\tmov rax, [rax]\n\tret\n")
+     ("dereference", "\tmov rax, [rax]\n\tret\n"),
+     ("set_ptr", "\tmov [rax], rbx\n\tret\n")
     ]
         .iter()
         .cloned()
         .collect()
 }
 
-fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, aliases: HashMap<String, Type>) -> Vec<Inst> {
+fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>) {
     let mut ret = vec![];
-    
+
+    if is_top_level {
+        // check for global initializations
+        if let ASTNodeR::Block(ref a) = ast {
+            for inst in a {
+                match inst.1 {
+                    ASTNodeR::VarInit(ref name, ref expr) => {
+                        ret.append(&mut intermediate_expr(expr.clone(), 0, offsets, globals, &aliases));
+                        if ! offsets.contains_key(name) {
+                            let len = globals.get(name).unwrap();
+                            ret.push(Inst::GlobalSet(0, name.clone(), *len))
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+        
+        // call main function
+        ret.push(Inst::Call("main".into()));
+        ret.push(Inst::Jump("_end".into()));
+    }
+        
     match ast {
         ASTNodeR::Block(a) => {
+            let mut count: usize = index;
             for i in a {
-                ret.append(&mut intermediate(i.1, offsets, aliases.clone()));
+                count += 1;
+                ret.append(&mut intermediate(i.1, offsets, globals, aliases.clone(), count, false).0);
             }
         },
-        ASTNodeR::VarDec(tp, ref name) => {
-            offsets.insert(name.clone(), (last_ptr(offsets) + tp.size(&aliases), tp.size(&aliases)));
+        ASTNodeR::VarDec(is_global, tp, ref name) => {
+            if ! is_global {
+                offsets.insert(name.clone(), (last_ptr(offsets) + tp.size(&aliases), tp.size(&aliases)));
+            }
         },
         ASTNodeR::ArrIndexInit(arr, ind, expr) => {
-            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
-            ret.append(&mut intermediate_expr(ind, 1, offsets, &aliases));
-            ret.push(Inst::ArraySet(0, 1, offsets.get(&arr).unwrap().0))
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
+            ret.append(&mut intermediate_expr(ind, 1, offsets, globals, &aliases));
+            if offsets.contains_key(&arr) {
+                ret.push(Inst::ArraySet(0, 1, offsets.get(&arr).unwrap().0))
+            } else {
+                ret.push(Inst::GlobalArraySet(0, 1, arr))
+            }
+        },
+        ASTNodeR::VarDecInit(is_global, tp, ref name, expr) => {
+            if ! is_global {
+                offsets.insert(name.clone(), (last_ptr(offsets) + tp.size(&aliases), tp.size(&aliases)));
+            }
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
+            if offsets.contains_key(name) {
+                let vals = offsets.get(name).unwrap();
+                ret.push(Inst::VarSet(0, vals.1, vals.0))
+            } else {
+                let len = globals.get(name).unwrap();
+                ret.push(Inst::GlobalSet(0, name.clone(), *len))
+            }
         },
         ASTNodeR::VarInit(ref name, expr) => {
-            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
-            let vals = offsets.get(name).unwrap();
-            ret.push(Inst::VarSet(0, vals.1, vals.0))
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
+            if offsets.contains_key(name) {
+                let vals = offsets.get(name).unwrap();
+                ret.push(Inst::VarSet(0, vals.1, vals.0))
+            } else {
+                let len = globals.get(name).unwrap();
+                ret.push(Inst::GlobalSet(0, name.clone(), *len))
+            }
         },
         ASTNodeR::FunctionCall(name, args) => {
             for a in args.clone() {
-                ret.append(&mut intermediate_expr(a, 0, offsets, &aliases));
+                ret.append(&mut intermediate_expr(a, 0, offsets, globals, &aliases));
                 ret.push(Inst::Push(0));
             }
 
@@ -1762,10 +2012,10 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, al
             ret.push(Inst::Call(name));
         },
         ASTNodeR::If(expr, block) => {
-            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
-            ret.push(Inst::If(0));
-            ret.append(&mut intermediate(block.1, offsets, aliases));
-            ret.push(Inst::Endif);
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
+            ret.push(Inst::If(0, index));
+            ret.append(&mut intermediate(block.1, offsets, globals, aliases, index + 1, false).0);
+            ret.push(Inst::Endif(index));
         },
         ASTNodeR::FunctionDecl(name, a, rt, block) => {
             let mut offsets: HashMap<String, (usize, usize)> = HashMap::new();
@@ -1774,13 +2024,13 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, al
             }
             
             ret.push(Inst::Func(name, offsets.clone()));
-            ret.append(&mut intermediate(block.1, &mut offsets, aliases));
+            ret.append(&mut intermediate(block.1, &mut offsets, globals, aliases, index + 1, false).0);
             if rt == Type::Primitive(PrimitiveType::Void) {
                 ret.push(Inst::Ret(0));
             }
         },
         ASTNodeR::Return(expr) => {
-            ret.append(&mut intermediate_expr(expr, 0, offsets, &aliases));
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
             ret.push(Inst::Ret(0));
         },
         ASTNodeR::Intrinsic(iname, fname, _, _) => {
@@ -1790,10 +2040,10 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, al
         ASTNodeR::TypeAlias(..) => {},
         
     }
-    ret
+    (ret, globals.clone())
 }
 
-fn gnereate(insts: Vec<Inst>) -> String {
+fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 
     let datatype = |a: usize| match a {
         1 => "byte",
@@ -1854,8 +2104,6 @@ fn gnereate(insts: Vec<Inst>) -> String {
     _start:\n\
     \tpush rbp\n\
     \tmov rbp, rsp\n\
-    \tcall main\n\
-    \tjmp _end\n\
     ".into();
 
     let mut intrinsic_labels: Vec<String> = vec![];
@@ -1871,11 +2119,11 @@ fn gnereate(insts: Vec<Inst>) -> String {
             Inst::Call(name) => {
                 format!("\tcall {name}\n")
             },
-            Inst::If(reg) => {
-                format!("\tcmp {}, 1\n\tjne .l2\n.l1:\n", register(reg))
+            Inst::If(reg, id) => {
+                format!("\tcmp {}, 1\n\tjne .l2_{id}\n.l1_{id}:\n", register(reg))
             },
-            Inst::Endif => {
-                ".l2:\n".into()
+            Inst::Endif(id) => {
+                format!(".l2_{id}:\n")
             },
             Inst::Push(reg) => {
                 format!("\tpush {}\n", register(reg))
@@ -1947,9 +2195,9 @@ fn gnereate(insts: Vec<Inst>) -> String {
             Inst::Intrinsic(iname, fname) => {
                 if ! intrinsic_labels.contains(&iname) {
                     intrinsic_labels.push(iname.clone());
-                    format!("{fname}: \n\tjmp {iname}\n{iname}: \n{}\n", intrinsics().get(iname.as_str()).unwrap())
+                    format!("{fname}: \n\tjmp intrinsic_{iname}\nintrinsic_{iname}: \n{}\n", intrinsics().get(iname.as_str()).unwrap())
                 } else {
-                    format!("{fname}: \n\tjmp {iname}\n")
+                    format!("{fname}: \n\tjmp intrinsic_{iname}\n")
                 }
             },
             Inst::RetVal(reg) => {
@@ -1973,8 +2221,20 @@ fn gnereate(insts: Vec<Inst>) -> String {
                 let r0 = register(reg0);
                 let r1 = register(reg1);
                 format!("\tpush {r0}\n\tmov {r0}, [rbp-{ind}]\n\tadd {r0}, 8\n\tadd {r0}, {r1}\n\tpop {r1}\n\tmov [{r0}], {r1}\n")
-//                format!("\tadd {r1}, rsp\n\tsub {r1}, {arr}\n\tmov [{r1}], {r0}\n")
-//                format!("\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {r0}, [{r1}]\n")
+            },
+            Inst::Global(reg0, name) => {
+                format!("\tmov {}, [global_{name}]\n", register(reg0))
+            },
+            Inst::GlobalSet(reg0, name, sz) => {
+                format!("\tmov {tp} [global_{name}], {}\n", register_sz(reg0, sz), tp = datatype(sz))
+            },
+            Inst::Jump(name) => {
+                format!("\tjmp {name}\n")
+            },
+            Inst::GlobalArraySet(reg0, reg1, arr) => {
+                let r0 = register(reg0);
+                let r1 = register(reg1);
+                format!("\tpush {r0}\n\tmov {r0}, [global_{arr}]\n\tadd {r0}, 8\n\tadd {r0}, {r1}\n\tpop {r1}\n\tmov [{r0}], {r1}\n")
             },
             
         }.as_str())
@@ -1985,12 +2245,12 @@ fn gnereate(insts: Vec<Inst>) -> String {
         ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len()).as_str());
     }
 
-//    ret.push_str("section .bss\n");
-    
-    let mut ind = 0;
-    for a in global_arrays {
+    for (ind, a) in global_arrays.into_iter().enumerate() {
         ret.push_str(format!("arr_{}:\n\tdq {a}\n\tresb {a}\n", ind).as_str());
-        ind += 1;
+    }
+
+    for (val, sz) in globals {
+        ret.push_str(format!("global_{val}:\n\tresb {sz}\n").as_str());
     }
     
     ret
@@ -2029,11 +2289,12 @@ fn main() {
     }
 
     let checked: bool;
-
     let mut aliases: HashMap<String, Type> = HashMap::new();
+    let mut globals: HashMap<String, usize> = HashMap::new();
     
     if let Ok(ref mut ast) = a {
         eprintln!("--- END PARSING ---\nAST NODE: \n{:#?}", ast);
+        eprintln!("--- AST (converted back to code) ---\n{}\n", ast);
         eprintln!("---  START CHECKING ---: \n");
         match check(ast, parser.lexer) {
             Err(e) => {
@@ -2044,8 +2305,9 @@ fn main() {
                 checked = false;
                 error = true;
             },
-            Ok(a) => {
+            Ok((g, a)) => {
                 aliases = a;
+                globals = g;
                 checked = true
             },
         };
@@ -2056,12 +2318,12 @@ fn main() {
     if checked {
         eprintln!("--- END CHECKING ---\n");
         if let Ok(ast) = a {
-            let intermediate = intermediate(ast.1, &mut HashMap::new(), aliases);
+            let (intermediate, globals) = intermediate(ast.1, &mut HashMap::new(), &globals, aliases, 0, true);
             println!("--- START INTERMEDIATE REPRESANTATION ---");
             println!("{:#?}", intermediate);
             println!("--- END INTERMEDIATE REPRESANTATION ---");
 
-            let asm = gnereate(intermediate);
+            let asm = gnereate(intermediate, &globals);
             println!("--- START ASSEMBLY ---");
             println!("{}", asm);
             println!("--- END ASSEMBY ---");

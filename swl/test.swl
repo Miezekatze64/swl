@@ -1,0 +1,153 @@
+intrinsic syscall      as syscall1(int index, int val) -> int;
+intrinsic syscall      as syscall3(int index, int val, int val2, int val3);
+intrinsic str_to_ptr   as arr2addr(string str) -> int;
+intrinsic dereference  as arrlen(string str)   -> int;
+
+intrinsic convert      as ptr2arr(int ptr) -> [unchecked]
+intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
+
+intrinsic set_ptr      as set_ptr(int ptr, int val);
+
+alias string = [char];
+
+func brk(int val) -> int {
+    <- syscall1(12, val);
+}
+
+func sbrk(int inc) -> int {
+    int newbrk;
+    int oldbrk = 0;
+    int curbrk = 0;
+    
+    if (oldbrk == 0) {
+        curbrk = brk(0);
+        oldbrk = curbrk;
+    }
+
+    if (inc == 0) {
+        <- curbrk;
+    }
+    
+    newbrk = curbrk + inc;
+    
+    if (brk(newbrk) == curbrk) {
+        <- (-1);
+    }
+    
+    oldbrk = curbrk;
+    curbrk = newbrk;
+    <- oldbrk;
+}
+
+
+[int]  _m_ptrs;
+[int]  _m_size;
+[bool] _m_is_block;
+int    _m_heap_start = 0;
+int    _m_location = 0;
+func _malloc(int size) -> int {
+    if (_m_heap_start == 0) {
+        _m_heap_start = sbrk(0);
+        _m_ptrs       = ptr2arr(sbrk(1000 * 8));
+        _m_size       = ptr2arr(sbrk(1000 * 8));
+        _m_is_block   = ptr2arr(sbrk(1000));
+    }
+    
+    // TODO: search for holes
+    int ptr = sbrk(size);
+    int current = ptr + size;
+
+    int i = 0;
+    while (i < _m_location) {
+        if (!_m_is_block[i]) {
+            print("FOUND HOLE\n");
+            _m_is_block[i] = true;
+            <- _m_ptrs[i];
+        }
+        i += 1;
+    }
+
+    _m_ptrs[_m_location] = ptr;
+    _m_size[_m_location] = size;
+    _m_is_block[_m_location] = true;
+    _m_location += 1;
+    
+    <- ptr;
+}
+
+func _free(int ptr) {
+    int i = 0;
+    while (i < _m_location) {
+        print("searching...\n");
+        exit(_m_ptrs[i]);
+        if (ptr == _m_ptrs[i]) {
+            // free it
+            print("freed\n");
+            _m_is_block[i] = false;
+            //TODO: check if last one: -> decrement heap space
+        }
+        i += 1;
+    }
+}
+
+func malloc(int size) -> [unchecked] {
+    int ptr     = _malloc(size);
+    set_ptr(ptr, size);
+    [int] array = ptr2arr(ptr);
+    <- array;
+}
+
+func free([unchecked] ptr) {
+    _free(__unsafe_convert(ptr));
+}
+
+
+func ptr_to_string(int ptr, int sz) -> [int] {
+    set_ptr(ptr, sz);
+    <- ptr2arr(ptr);
+}
+
+func strcpy(string a, string b) {
+    // TODO: use loops for this...
+    _strcpy(a, b, 0);
+}
+
+func _strcpy(string a, string b, int index) {
+    if (index == arrlen(b)) {
+        <-;
+    }
+    a[index] = b[index];
+    _strcpy(a, b, index+1);
+}
+
+
+func exit(int code) {
+    syscall1(60, code);
+}
+
+func read([char] str) {
+    syscall3(0, 0, arr2addr(str), arrlen(str));
+}
+
+func print([char] str) {
+    syscall3(1, 1, arr2addr(str), arrlen(str));
+}
+
+func bool_to_string(bool b) -> [char] {
+    if (b) {
+        <- "true";
+    }
+    <- "false";
+}
+
+func main() -> int {
+    [char] ptr1 = malloc(10);
+    [char] ptr2 = malloc(10);
+    
+    free(ptr1);
+    [char] ptr3 = malloc(10);
+    read(ptr3);
+    print(ptr3);
+
+    <- __unsafe_convert(_m_is_block[0]);
+}

@@ -37,7 +37,8 @@ const KEYWORDS: &[&str] = &[
     "alias",
     "intrinsic",
     "as",
-    "arr"
+    "arr",
+    "while",
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +57,7 @@ enum PrimitiveType {
     Char,
     Void,
     Bool,
+    Unchecked,    // VERY UNSAFE, DOESN'T USE TYPE CHECKKING (SIZE: 8)
 }
 
 impl std::fmt::Display for Type {
@@ -67,6 +69,7 @@ impl std::fmt::Display for Type {
                 PrimitiveType::Char => "char",
                 PrimitiveType::Void => "void",
                 PrimitiveType::Bool => "bool",
+                PrimitiveType::Unchecked => "unchecked"
             }.into(),
             Type::Custom(s) => s.clone(),
             Type::Array(a) => {
@@ -96,6 +99,11 @@ impl Type {
         let a = self.dealias(aliases);
         let b = type_r.dealias(aliases);
 
+        // UNSAFE: DON'T USE THIS IF NOT REALLY NEEDED
+        if a == Type::Primitive(PrimitiveType::Unchecked) || b == Type::Primitive(PrimitiveType::Unchecked) {
+            return true;
+        }
+
         if a == b || a == Type::Primitive(PrimitiveType::Float) && b == Type::Primitive(PrimitiveType::Int) {
             true
         } else if let Type::Array(aa) = a {
@@ -117,6 +125,7 @@ impl Type {
                 PrimitiveType::Char => 1,
                 PrimitiveType::Void => 0,
                 PrimitiveType::Bool => 1,
+                PrimitiveType::Unchecked => 8,
             },
             Type::Custom(s) => {
                 if aliases.contains_key(s) {
@@ -131,69 +140,104 @@ impl Type {
     }
 }
 
-impl std::fmt::Display for Op {
+impl std::fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Op::Add => "+",
-            Op::Sub => "-",
-            Op::Mul => "*",
-            Op::Div => "/",
-            Op::Eq => "==",
-            Op::Less => "<",
-            Op::Greater => ">",
-            Op::Mod => "%",
+        write!(f, "{}", match self {
+            UnaryOp::Not       => "!",
         })
     }
 }
 
+impl std::fmt::Display for BinaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            BinaryOp::Add     => "+",
+            BinaryOp::Sub     => "-",
+            BinaryOp::Mul     => "*",
+            BinaryOp::Div     => "/",
+            BinaryOp::Eq      => "==",
+            BinaryOp::Less    => "<",
+            BinaryOp::Greater => ">",
+            BinaryOp::Mod     => "%",
+        })
+    }
+}
+
+impl std::fmt::Display for Op {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Op::Binary(a) => a.to_string(),
+            Op::Unary(a) => a.to_string(),
+        })
+    }
+}
+
+impl UnaryOp {
+    fn with_type(&self, t: &Type, _aliases: &HashMap<String, Type>) -> Type {
+        match self {
+            UnaryOp::Not => match t {
+                Type::Primitive(PrimitiveType::Bool | PrimitiveType::Unchecked) => Type::Primitive(PrimitiveType::Bool),
+                _ => Type::Invalid
+            },
+        }
+    }
+}
+
+
 impl Op {
     fn combine_type(&self, a: &Type, b: &Type, aliases: &HashMap<String, Type>) -> Type {
         match self {
-            Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod => {
-                match a {
-                    Type::Primitive(ref v) => {
-                        match v {
-                            PrimitiveType::Int => if a.is_compatible(b, aliases) {
-                                a.clone()
-                            } else {
-                                Type::Invalid
-                            },
-                            PrimitiveType::Float => if a.is_compatible(b, aliases) {
-                                a.clone()
-                            } else {
-                                Type::Invalid
-                            },
-                            PrimitiveType::Char => Type::Invalid,
-                            PrimitiveType::Void => Type::Invalid,
-                            PrimitiveType::Bool => Type::Invalid,
-                        }
-                    },
-                    _ => Type::Invalid,
-                }
+            Op::Unary(_) => {
+                unreachable!()
             },
-            Op::Less | Op::Greater => match a {
-                Type::Primitive(ref p) => match p {
-                    PrimitiveType::Int | PrimitiveType::Float | PrimitiveType::Char => if a.is_compatible(b, aliases) {
-                        Type::Primitive(PrimitiveType::Bool)
-                    } else {
-                        Type::Invalid
+            Op::Binary(bin) => match bin {
+                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+                    match a {
+                        Type::Primitive(ref v) => {
+                            match v {
+                                PrimitiveType::Int => if a.is_compatible(b, aliases) {
+                                    a.clone()
+                                } else {
+                                    Type::Invalid
+                                },
+                                PrimitiveType::Float => if a.is_compatible(b, aliases) {
+                                    a.clone()
+                                } else {
+                                    Type::Invalid
+                                },
+                                PrimitiveType::Char => Type::Invalid,
+                                PrimitiveType::Void => Type::Invalid,
+                                PrimitiveType::Bool => Type::Invalid,
+                                PrimitiveType::Unchecked => b.clone(),
+                            }
+                        },
+                        _ => Type::Invalid,
+                    }
+                },
+                BinaryOp::Less | BinaryOp::Greater => match a {
+                    Type::Primitive(ref p) => match p {
+                        PrimitiveType::Int | PrimitiveType::Float | PrimitiveType::Char => if a.is_compatible(b, aliases) {
+                            Type::Primitive(PrimitiveType::Bool)
+                        } else {
+                            Type::Invalid
+                        },
+                        _ => Type::Invalid,
                     },
                     _ => Type::Invalid,
                 },
-                _ => Type::Invalid,
-            },
-            Op::Eq => if a == b {
-                Type::Primitive(PrimitiveType::Bool)
-            } else {
-                Type::Invalid
-            },
+                BinaryOp::Eq => if (a == b) || (a == &Type::Primitive(PrimitiveType::Unchecked) || b == &Type::Primitive(PrimitiveType::Unchecked)) {
+                    Type::Primitive(PrimitiveType::Bool)
+                } else{
+                    Type::Invalid
+                },
+            }
         }
     }
 }
 
 fn is_valid_type(val: &str) -> bool {
     // TODO: check for custom types
-    val == "int" || val == "float" || val == "char" || val == "void" || val == "bool"
+    val == "int" || val == "float" || val == "char" || val == "void" || val == "bool" || val == "unchecked"
 }
 
 fn parse_type(string: String) -> Option<Type> {
@@ -201,11 +245,12 @@ fn parse_type(string: String) -> Option<Type> {
         return None;
     }
     match string.as_str() {
-        "int"    => Some(Type::Primitive(PrimitiveType::Int)),
-        "float"  => Some(Type::Primitive(PrimitiveType::Float)),
-        "char"   => Some(Type::Primitive(PrimitiveType::Char)),
-        "void"   => Some(Type::Primitive(PrimitiveType::Void)),
-        "bool"   => Some(Type::Primitive(PrimitiveType::Bool)),
+        "int"       => Some(Type::Primitive(PrimitiveType::Int)),
+        "float"     => Some(Type::Primitive(PrimitiveType::Float)),
+        "char"      => Some(Type::Primitive(PrimitiveType::Char)),
+        "void"      => Some(Type::Primitive(PrimitiveType::Void)),
+        "bool"      => Some(Type::Primitive(PrimitiveType::Bool)),
+        "unchecked" => Some(Type::Primitive(PrimitiveType::Unchecked)),
         _ => {
             if string.ends_with('*') {
                 Some(Type::Pointer(Box::new(parse_type(string.as_str()[0..string.len()-1].into())?)))
@@ -392,7 +437,7 @@ impl Lexer {
                             });
                         }
                     },
-                    '='|'+'|'-'|'*'|'/'|'<'|'>'|'%' => {
+                    '!'|'='|'+'|'-'|'*'|'/'|'<'|'>'|'%' => {
                         if ttype == TokenType::Type && ch == '*' {
                             val.push(ch);
                             ttype = TokenType::Type;
@@ -531,6 +576,7 @@ enum ASTNodeR {
     Block(Vec<ASTNode>),
     VarDec(bool, Type, String),
     VarInit(String, Expression),
+    VarOp(String, BinaryOp, Expression),
     VarDecInit(bool, Type, String, Expression),
     FunctionCall(String, Vec<Expression>),
     If(Expression, Box<ASTNode>),
@@ -539,6 +585,7 @@ enum ASTNodeR {
     TypeAlias(String, Type),
     Intrinsic(String, String, Vec<(Type, String)>, Type),
     ArrIndexInit(String, Expression, Expression),
+    While(Expression, Box<ASTNode>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -554,10 +601,17 @@ enum ExpressionR {
     Undef,
     ArrAlloc(Type, usize),
     Index(String, Box<Expression>),
+    UnaryOp(UnaryOp, Box<Expression>, u32),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 enum Op {
+    Unary(UnaryOp),
+    Binary(BinaryOp),
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+enum BinaryOp {
     Add,
     Sub,
     Mul,
@@ -566,6 +620,11 @@ enum Op {
     Eq,
     Less,
     Greater,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+enum UnaryOp {
+    Not,
 }
 
 // indents a strinig by 4 spaces
@@ -654,6 +713,12 @@ impl std::fmt::Display for ASTNodeR {
             ASTNodeR::VarDecInit(_, typ, name, expr) => {
                 write!(f, "{typ} {name} = {expr};")
             },
+            ASTNodeR::While(cond, block) => {
+                write!(f, "while {cond} {{\n{block}}}")
+            },
+            ASTNodeR::VarOp(name, op, expr) => {
+                write!(f, "{name} {op}= {expr};")
+            },
         }
     }
 }
@@ -668,7 +733,7 @@ impl std::fmt::Display for ExpressionR {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExpressionR::T(left, op, right, _) => {
-                write!(f, "{left} {op} {right}")
+                write!(f, "({left} {op} {right})")
             },
             ExpressionR::Val(tp, val) => {
                 match tp {
@@ -714,6 +779,9 @@ impl std::fmt::Display for ExpressionR {
             ExpressionR::Index(array, index) => {
                 write!(f, "{array}[{index}]")
             },
+            ExpressionR::UnaryOp(op, expr ,_) => {
+                write!(f, "{op}{expr}")
+            },
         }
     }
 }
@@ -740,23 +808,29 @@ impl std::fmt::Display for TokenType {
 impl Op {
     fn from_str(s: String) -> Result<Self, Error> {
         match s.as_str() {
-            "+" =>  Ok(Self::Add),
-            "-" =>  Ok(Self::Sub),
-            "*" =>  Ok(Self::Mul),
-            "/" =>  Ok(Self::Div),
-            "%" => Ok(Self::Mod),
-            "==" => Ok(Self::Eq),
-            "<" => Ok(Self::Less),
-            ">" => Ok(Self::Greater),
+            "+"  => Ok(Op::Binary(BinaryOp::Add)),
+            "-"  => Ok(Op::Binary(BinaryOp::Sub)),
+            "*"  => Ok(Op::Binary(BinaryOp::Mul)),
+            "/"  => Ok(Op::Binary(BinaryOp::Div)),
+            "%"  => Ok(Op::Binary(BinaryOp::Mod)),
+            "==" => Ok(Op::Binary(BinaryOp::Eq)),
+            "<"  => Ok(Op::Binary(BinaryOp::Less)),
+            ">"  => Ok(Op::Binary(BinaryOp::Greater)),
+            "!"  => Ok(Op::Unary(UnaryOp::Not)),
             _ => Err((ErrorLevel::Fatal, format!("FATAL: invalid operator `{s}` set from lexer"))),
         }
     }
     
-    fn get_precedence(op: Op) -> u32 {
-        match op {
-            Op::Eq | Op::Less | Op::Greater => 0,
-            Op::Add | Op::Sub => 1,
-            Op::Mul | Op::Div | Op::Mod => 2,
+    fn get_precedence(op_type: Op) -> u32 {
+        match op_type {
+            Op::Binary(bin_op) => match bin_op {
+                BinaryOp::Eq | BinaryOp::Less | BinaryOp::Greater => 0,
+                BinaryOp::Add | BinaryOp::Sub => 1,
+                BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 2,
+            },
+            Op::Unary(un_op) => match un_op {
+                UnaryOp::Not => 0,
+            }
         }
     }
 }
@@ -898,6 +972,9 @@ impl Parser {
             let ret: Box<Expression>;
             let Expression(_, exp, _) = working_expr;
             let is_first: bool = match exp {
+                ExpressionR::UnaryOp(_, _, precedence) => {
+                    Op::get_precedence(op) <= *precedence
+                },
                 ExpressionR::T(_, _, _, precedence) => {
                     Op::get_precedence(op) <= *precedence
                 },
@@ -1096,11 +1173,18 @@ impl Parser {
                         if var_token.ttype == TokenType::Operator && var_val == "=" {
                             let expr = self.parse_expr(&[";"])?.0;
                             return Ok(Some(ASTNode(token.pos, ASTNodeR::VarInit(val, expr))));
+                        } else if var_token.ttype == TokenType::Operator && var_val.ends_with("=") {
+                            let expr = self.parse_expr(&[";"])?.0;
+                            let op = err_ret!(Op::from_str(var_val.as_str()[..(var_val.len()-1)].into()), errors);
+                            if let Op::Binary(bop) = op {
+                                return Ok(Some(ASTNode(token.pos, ASTNodeR::VarOp(val, bop, expr))));
+                            }
                         } else {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
                         }
                     }
                     ExpressionR::Val(..) => unreachable!(),
+                    ExpressionR::UnaryOp(_, _, _) => unreachable!(),
                     ExpressionR::T(..) => unreachable!(),
                     ExpressionR::Arr(..) => unreachable!(),
                     ExpressionR::Index(a, ind) => {
@@ -1223,6 +1307,45 @@ impl Parser {
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::If(predicate, Box::new(block)))));
                     
                 },
+                "while" => {
+                     if is_root {
+                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
+                         return Err(errors);
+                     }
+                    // next token: '('
+                    err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+                    // loop condition
+                    let condition = err_add!(self.parse_expr(&[")"]), errors).0;
+
+                    err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors);
+                    let block = self.parse_block(token.pos)?;
+                    
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::While(condition, Box::new(block)))));
+                },
+                // "for" => {
+                //     if is_root {
+                //         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
+                //         // next token: '('
+                //         err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+
+                //         // var init
+                //         // get type
+                //         let init_type = err_ret!(self.expect(Some(TokenType::Type), None), errors);
+                //         // get identifier
+                //         let init_ident = err_ret!(self.expect(Some(TokenType::Ident), None), errors);
+                //         // next token: '='
+                //         err_ret!(self.expect(Some(TokenType::Operator), Some("=".into())), errors);
+                //         let init_expr = err_add!(self.parse_expr(&[";"]), errors);
+
+                //         // loop condition
+                //         let cond_expr = err_add!(self.parse_expr(&[";"]), errors);
+                        
+                //         // incrementor
+                //         let inc = self.parse_block_statement(false);
+                        
+                //         return Err(errors);
+                //     }
+                // },
                 "func" => {
                     if ! is_root {
                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "functions are only allowed at top level")));
@@ -1361,7 +1484,7 @@ impl Parser {
     fn parse_subexpr(&mut self, seperators: &[&'static str]) -> Result<(Box<Expression>, Token), Vec<Error>> {
         let inverse = |right_expr: &mut Box<Expression>| {
             let tmp_expr = right_expr.clone();
-            **right_expr = Expression(tmp_expr.0, ExpressionR::T(Box::new(Expression(0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()), None)), Op::Mul, tmp_expr, Op::get_precedence(Op::Mul)), None);
+            **right_expr = Expression(tmp_expr.0, ExpressionR::T(Box::new(Expression(0, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), "-1".into()), None)), Op::Binary(BinaryOp::Mul), tmp_expr, Op::get_precedence(Op::Binary(BinaryOp::Mul))), None);
         };
 
         let mut errors: Vec<Error> = vec![];
@@ -1451,9 +1574,21 @@ impl Parser {
                 } else if val == "+" {
                     // ignore
                     self.parse_subexpr(seperators)
-                } else {
-                    errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected operator `{val}`")));
-                    Err(errors)
+                } else /* check for unary operators */ {
+                    match Op::from_str(val.clone()) {
+                        Ok(Op::Unary(op)) => {
+                            let sub = self.parse_subexpr(seperators)?.0;
+                            Ok((Box::new(Expression(token.pos, ExpressionR::UnaryOp(op, sub, Op::get_precedence(Op::Unary(op))), None)), token))
+                        },
+                        Err(e) => {
+                            errors.push(e);
+                            Err(errors)
+                        },
+                        _ => {
+                            errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "invalid operator {val}")));
+                            Err(errors)
+                        }
+                    }
                 }
             },
         }
@@ -1552,6 +1687,10 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                     vars.insert(name.clone(), tp.clone());
                     globals.insert(name, tp.size(&type_aliases));
                 },
+                ASTNode(_, ASTNodeR::VarDecInit(_, tp, name, _)) => {
+                    vars.insert(name.clone(), tp.clone());
+                    globals.insert(name, tp.size(&type_aliases));
+                },
                 _ => {}
             }
         }
@@ -1569,6 +1708,17 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                 match op.combine_type(&left, &right, aliases) {
                     Type::Invalid => {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{left}` and `{right}` for operation `{op}`")));
+                        Type::Invalid
+                    },
+                    a => a,
+                }
+            },
+            ExpressionR::UnaryOp(op, left, _) => {
+                let left = check_references_expr(left, functions, vars, aliases, errors, lexer);
+                
+                match op.with_type(&left, aliases) {
+                    Type::Invalid => {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible type `{left}` for operation `{op}`")));
                         Type::Invalid
                     },
                     a => a,
@@ -1696,6 +1846,13 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                         }
                         check_references(block, functions, vars_sub, aliases, errors, f.clone(), lexer);
                     },
+                    ASTNode(pos, ASTNodeR::While(ref mut expr, ref mut block)) => {
+                        let bool_type = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
+                        if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
+                        }
+                        check_references(block, functions, vars_sub, aliases, errors, f.clone(), lexer);
+                    },
                     ASTNode(pos, ASTNodeR::Return(ref mut expr)) => {
                         let tp = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         let ret_type  = &functions.get(&f).unwrap().1;
@@ -1754,7 +1911,25 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                             }
                             
                         }
-//                        if 
+                    },
+                    ASTNode(_, ASTNodeR::VarOp(var, op, ref mut expr)) => {
+                        if ! vars_sub.contains_key(var) {
+                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
+                        } else {
+                            let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
+                            if type_r == &Type::Invalid {
+                                continue;
+                            }
+                            let type_l = vars_sub.get(var).unwrap();
+                            if ! type_l.is_compatible(type_r, aliases) {
+                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expeected `{type_l}`, found `{type_r}`")));
+                            }
+
+                            if Op::combine_type(&Op::Binary(*op), type_l, type_l, aliases) == Type::Invalid {
+                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types `{type_l}` and `{type_r}` for operation `{op}`")));
+                            }
+                            
+                        }
                     },
                     ASTNode(_, ASTNodeR::VarDec(_, tp, name)) => {
                         vars_sub.insert(name.clone(), tp.clone());
@@ -1829,9 +2004,13 @@ enum Inst {
     VarSet(usize, usize, usize),
     If(usize, usize),
     Endif(usize),
+    WhileCheck(usize, usize),
+    WhileStart(usize, usize),
+    Endwhile(usize),
     Ret(usize),
     Call(String),
-    Op((usize, usize), usize, Op),
+    UnOp(usize, usize, UnaryOp),
+    BinOp((usize, usize), usize, BinaryOp),
     Val(usize, Type, String),
     Var(usize, usize),
     RetVal(usize),
@@ -1839,7 +2018,7 @@ enum Inst {
     Push(usize),
     Pop(usize),
     Arr(usize, usize),
-    Index(usize, usize),
+    Index(usize, usize, usize),
     ArraySet(usize, usize, usize),
     Global(usize, String),
     GlobalSet(usize, String, usize),
@@ -1851,12 +2030,21 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
     let mut ret = vec![];
     let Expression(_pos, expr, tp) = expr;
     match expr {
-        ExpressionR::T(fst, op, snd, _) => {
+        ExpressionR::UnaryOp(op, fst, _) => {
             ret.append(&mut intermediate_expr(*fst, index, indicies, globals, aliases));
+            ret.push(Inst::Push(index));
+            ret.push(Inst::UnOp(index, tp.unwrap().size(aliases), op));
+        },
+        ExpressionR::T(fst, op, snd, _) => {
+            ret.append(&mut intermediate_expr(*fst.clone(), index, indicies, globals, aliases));
             ret.push(Inst::Push(index));
             ret.append(&mut intermediate_expr(*snd, index+1, indicies, globals, aliases));
             ret.push(Inst::Pop(index));
-            ret.push(Inst::Op((index, index+1), tp.unwrap().size(aliases), op));
+            if let Op::Binary(op) = op {
+                ret.push(Inst::BinOp((index, index+1), fst.2.unwrap().size(aliases), op));
+            } else {
+                unreachable!();
+            }
         },
         ExpressionR::Val(tp, val) => {
             ret.push(Inst::Val(index, tp, val));
@@ -1897,10 +2085,11 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
             ret.append(&mut intermediate_expr(*expr, index, indicies, globals, aliases));
             if indicies.contains_key(&var) {
                 ret.push(Inst::Var(index+1, indicies.get(&var).unwrap().0));
+                ret.push(Inst::Index(index, index+1, indicies.get(&var).unwrap().1));
             } else {
-                ret.push(Inst::Global(index+1, var));
+                ret.push(Inst::Global(index+1, var.clone()));
+                ret.push(Inst::Index(index, index+1, *globals.get(&var).unwrap()));
             }
-            ret.push(Inst::Index(index, index+1));
         },
     }
     ret
@@ -1936,6 +2125,13 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
             for inst in a {
                 match inst.1 {
                     ASTNodeR::VarInit(ref name, ref expr) => {
+                        ret.append(&mut intermediate_expr(expr.clone(), 0, offsets, globals, &aliases));
+                        if ! offsets.contains_key(name) {
+                            let len = globals.get(name).unwrap();
+                            ret.push(Inst::GlobalSet(0, name.clone(), *len))
+                        }
+                    },
+                    ASTNodeR::VarDecInit(_, _, ref name, ref expr) => {
                         ret.append(&mut intermediate_expr(expr.clone(), 0, offsets, globals, &aliases));
                         if ! offsets.contains_key(name) {
                             let len = globals.get(name).unwrap();
@@ -1987,6 +2183,21 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
                 ret.push(Inst::GlobalSet(0, name.clone(), *len))
             }
         },
+        ASTNodeR::VarOp(ref name, op, expr) => {
+            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
+            
+            if offsets.contains_key(name) {
+                let vals = offsets.get(name).unwrap();
+                ret.push(Inst::Var(1, vals.0));
+                ret.push(Inst::BinOp((0, 1), vals.1, op));
+                ret.push(Inst::VarSet(0, vals.1, vals.0))
+            } else {
+                let len = globals.get(name).unwrap();
+                ret.push(Inst::Global(1, name.into()));
+                ret.push(Inst::BinOp((0, 1), *len, op));
+                ret.push(Inst::GlobalSet(0, name.clone(), *len))
+            }
+        },
         ASTNodeR::VarInit(ref name, expr) => {
             ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases));
             if offsets.contains_key(name) {
@@ -2016,6 +2227,13 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
             ret.push(Inst::If(0, index));
             ret.append(&mut intermediate(block.1, offsets, globals, aliases, index + 1, false).0);
             ret.push(Inst::Endif(index));
+        },
+        ASTNodeR::While(cond, block) => {
+            ret.push(Inst::WhileStart(0, index));
+            ret.append(&mut intermediate_expr(cond, 0, offsets, globals, &aliases));
+            ret.push(Inst::WhileCheck(0, index));
+            ret.append(&mut intermediate(block.1, offsets, globals, aliases, index + 1, false).0);
+            ret.push(Inst::Endwhile(index));
         },
         ASTNodeR::FunctionDecl(name, a, rt, block) => {
             let mut offsets: HashMap<String, (usize, usize)> = HashMap::new();
@@ -2113,17 +2331,26 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     for a in insts {
         ret.push_str(match a {
             Inst::Func(name, offsets) => {
-                let string = (0..offsets.len()).map(|a| format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(a), ind = offsets.iter().nth(a).unwrap().1.0)).collect::<String>();
+                let string = (0..offsets.len()).map(|a| format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register_sz(a, offsets.iter().nth(a).unwrap().1.1), ind = offsets.iter().nth(a).unwrap().1.0)).collect::<String>();
                 format!("{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
             },
             Inst::Call(name) => {
                 format!("\tcall {name}\n")
             },
             Inst::If(reg, id) => {
-                format!("\tcmp {}, 1\n\tjne .l2_{id}\n.l1_{id}:\n", register(reg))
+                format!("\tcmp {}, 1\n\tjne .l2_{id}\n.l1_{id}:\n", register_sz(reg, 1))
             },
             Inst::Endif(id) => {
                 format!(".l2_{id}:\n")
+            },
+            Inst::WhileCheck(reg, id) => {
+                format!("\tcmp {}, 1\n\tjne .while_{id}_end\n", register(reg))
+            },
+            Inst::WhileStart(_, id) => {
+                format!(".while_{id}:\n")
+            }
+            Inst::Endwhile(id) => {
+                format!("\tjmp .while_{id}\n.while_{id}_end:\n")
             },
             Inst::Push(reg) => {
                 format!("\tpush {}\n", register(reg))
@@ -2148,6 +2375,7 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                                     "0"
                                 }.into()
                             },
+                            PrimitiveType::Unchecked => val,
                         }
                     },
                     Type::Array(ref bx) => {
@@ -2174,16 +2402,21 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     "\tleave\n\tret\n".into()
                 }
             },
-            Inst::Op(reg, sz, op) => {
+            Inst::UnOp(reg, sz, op) => {
                 match op {
-                    Op::Add => format!("\tadd {}, {}\n",  register(reg.0), register(reg.1)),
-                    Op::Sub => format!("\tsub {}, {}\n",  register(reg.0), register(reg.1)),
-                    Op::Mul => format!("\timul {}, {}\n", register(reg.0), register(reg.1)),
-                    Op::Div => format!("\tidiv {}, {}\n", register(reg.0), register(reg.1)),
-                    Op::Eq => format!("\tcmp {r0}, {r1}\n\tsete al\n\tmov {r0}, al\n", r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
-                    Op::Less => format!("\tcmp {r0}, {r1}\n\tsetl al\n\tmov {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
-                    Op::Greater => format!("\tcmp {r0}, {r1}\n\tsetg al\n\tmov {r0}, al\n", r0 = register(reg.0), r1 = register(reg.1)),
-                    Op::Mod => format!("\tmov rax, {r0}\n\tidiv {r1}\n\tmov {r0}, rdx\n", r0 = register(reg.0), r1 = register(reg.1)),
+                    UnaryOp::Not => format!("\ttest {r}, {r}\n\tsetz {r}\n", r = register_sz(reg, sz)),
+                }
+            },
+            Inst::BinOp(reg, sz, op) => {
+                match op {
+                    BinaryOp::Add => format!("\tadd {}, {}\n",  register(reg.0), register(reg.1)),
+                    BinaryOp::Sub => format!("\tsub {}, {}\n",  register(reg.0), register(reg.1)),
+                    BinaryOp::Mul => format!("\timul {}, {}\n", register(reg.0), register(reg.1)),
+                    BinaryOp::Div => format!("\tidiv {}, {}\n", register(reg.0), register(reg.1)),
+                    BinaryOp::Eq  => format!("\tcmp {r0}, {r1}\n\tsete al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
+                    BinaryOp::Less => format!("\tcmp {r0}, {r1}\n\tsetl al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
+                    BinaryOp::Greater => format!("\tcmp {r0}, {r1}\n\tsetg al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
+                    BinaryOp::Mod => format!("\tmov rax, {r0}\n\tidiv {r1}\n\tmov {r0}, rdx\n", r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
                 }
             },
             Inst::VarSet(reg, sz, index) => {
@@ -2212,9 +2445,9 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 arr_index += 1;
                 format!("\tmov {r0}, arr_{}\n", arr_index -1, r0 = register(reg))
             },
-            Inst::Index(reg0, reg1) => {
-                let r0 = register(reg0);
-                let r1 = register(reg1);
+            Inst::Index(reg0, reg1, sz) => {
+                let r0 = register_sz(reg0, sz);
+                let r1 = register_sz(reg1, sz);
                 format!("\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {r0}, [{r1}]\n")
             },
             Inst::ArraySet(reg0, reg1, ind) => {
@@ -2242,7 +2475,7 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     ret.push_str("_end:\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n");
 
     for a in global_strings {
-        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len()).as_str());
+        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len() - a.matches("\\").count()).as_str());
     }
 
     for (ind, a) in global_arrays.into_iter().enumerate() {
@@ -2257,8 +2490,6 @@ fn gnereate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 }
 
 fn main() {
-    let outfile: String = "./a.out".into();
-    
     let mut args = args();
     let arg0 = args.next().unwrap_or_else(|| {"<program>".into()});
 
@@ -2271,6 +2502,10 @@ fn main() {
             exit(1);
         },
     };
+
+    let path: String = filename.chars().rev().skip_while(|x| x != &'/').collect::<String>().chars().rev().collect();
+    let name: String = filename.chars().rev().skip_while(|x| x != &'.').skip(1).take_while(|x| x != &'/').collect::<String>().chars().rev().collect();
+    println!("PATH: {path}, NAME: {name}");
 
     let mut parser: Parser = Parser::new(filename).unwrap_or_else(|a| {
         eprintln!("Error reading file: {}", a);
@@ -2328,7 +2563,10 @@ fn main() {
             println!("{}", asm);
             println!("--- END ASSEMBY ---");
 
-            match fs::write("tmp.asm", asm) {
+            let mut asm_path = path.clone();
+            asm_path.push_str(&name);
+            asm_path.push_str(".asm");
+            match fs::write(asm_path.clone(), asm) {
                 Ok(_) => {},
                 Err(a) => {
                     eprintln!("Error writing file: {}", a);
@@ -2337,13 +2575,19 @@ fn main() {
             };
 
             // call nasm and ld
-            let nasm =  Command::new("nasm").arg("-felf64").arg("tmp.asm").output().unwrap();
+            let nasm =  Command::new("nasm").arg("-felf64").arg(asm_path).output().unwrap();
             if ! nasm.status.success() {
                 eprintln!("ERROR executing nasm: \n{}", std::str::from_utf8(&nasm.stderr).unwrap());
                 error = true;
             }
 
-            let ld = Command::new("ld").arg("-o").arg(outfile).arg("tmp.o").output().unwrap();
+            let mut obj_path = path.clone();
+            obj_path.push_str(&name);
+            obj_path.push_str(".o");
+
+            let mut outfile = path.clone();
+            outfile.push_str(&name);
+            let ld = Command::new("ld").arg("-o").arg(outfile).arg(obj_path).output().unwrap();
             if ! ld.status.success() {
                 eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
                 error = true;
@@ -2356,4 +2600,5 @@ fn main() {
         exit(1);
     }
 }
+
 

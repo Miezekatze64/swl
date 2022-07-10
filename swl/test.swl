@@ -1,4 +1,4 @@
-intrinsic syscall      as syscall1(int index, int val) -> int;
+/*intrinsic syscall      as syscall1(int index, int val) -> int;
 intrinsic syscall      as syscall3(int index, int val, int val2, int val3);
 intrinsic str_to_ptr   as arr2addr(string str) -> int;
 intrinsic dereference  as arrlen(string str)   -> int;
@@ -7,8 +7,6 @@ intrinsic convert      as ptr2arr(int ptr) -> [unchecked]
 intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
 
 intrinsic set_ptr      as set_ptr(int ptr, int val);
-
-alias string = [char];
 
 func brk(int val) -> int {
     <- syscall1(12, val);
@@ -140,14 +138,69 @@ func bool_to_string(bool b) -> [char] {
     <- "false";
 }
 
+alias string = [char];
+
+struct Test {
+    int a;
+    int b;
+}
+
+Test test;
+// TODO: better struct Test {int a, int b,...} to_string...
+func f() -> Test {
+    <- test;
+}
+
+func ident(Test t) -> Test {
+    <- t;
+}
+
+func str() -> Test {
+    <- Test {
+        b: 1;
+        a: 2;
+    };
+}
+
+*/
+ 
+alias string = [char];
 func main() -> int {
-    [char] ptr1 = malloc(10);
+/*    [char] ptr1 = malloc(10);
     [char] ptr2 = malloc(10);
-    
     free(ptr1);
     [char] ptr3 = malloc(10);
     read(ptr3);
-    print(ptr3);
+    print(ptr3);*/
 
-    <- __unsafe_convert(_m_is_block[0]);
+    int* a = ref 0;
+
+//    <- deref 0;
+    <- 0;
+
 }
+
+/** TODO: ! IMPORTANT -- finish `ref` and `deref` implementation + implement `is_ref` for all possibilities -- IMPORTANT **/
+//       - fix `unreachable!()` at line 1292 (struct literals as statement), should add error
+//       - check for redefined functions
+//       - disallow redifinition of vars in same scope
+//       - ensure that innermost var definition is used
+//       - complete malloc implementation + wrapper functions
+//       - add some kind of generic types... (e.g. struct List<T> {T head; List<T> tail}...) + type inference -> multiple function generation 
+//       - implement some kind of synamic array / list / vector
+//       - add support for operator overloading (operator +(ohter_num a, other_num b) -> other_num)
+//       - support floats
+//       - add support for member functions (function as_cstr() -> char* from string {})
+//       - check for bugs...
+//       - maybe add enums sometimes...
+//       - add tuples
+//       - create stdlib
+//       - create stdmath library
+//       - test sample programs (e.g. fizzbuzz)
+//       - check turing completenes (maybe implement RULE 110)
+//       - add some unique features to differ more from c and rust...
+//       - add support for functional concepts
+//       - add lazy evaluated list (infinite datastructures)
+//       - create code optimizer
+//       - add macro system / preprocessor
+    

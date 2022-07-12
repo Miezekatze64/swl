@@ -1,1 +1,9 @@
 /target
+*
+!*.swl
+!*.rs
+!*.toml
+!*.lock
+!*.el
+!*.vim
+!*.md

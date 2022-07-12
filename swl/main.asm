@@ -1844,40 +1844,6 @@ main:
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; VALUE 1
-	mov rax, 1
-;; PUSH
-	push rax
-;; VALUE 1
-	mov rax, 1
-;; PUSH
-	push rax
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL arr2addr
-	call arr2addr
-;; PUSH
-	push rax
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
-;; PUSH
-	push rax
-;; POP
-	pop rdx
-;; POP
-	pop rcx
-;; POP
-	pop rbx
-;; POP
-	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
 ;; VALUE test
 	mov rax, str_test
 ;; SET VAR 24
@@ -1946,7 +1912,7 @@ str_test:
 	db `test`
 global__m_heap_start:
 	resb 8
-global__m_location:
-	resb 8
 global__m_tcache:
+	resb 8
+global__m_location:
 	resb 8

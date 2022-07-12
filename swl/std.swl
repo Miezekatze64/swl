@@ -8,11 +8,15 @@ intrinsic dereference  as arrlen(string str)   -> int;
 intrinsic convert      as ptr2arr(int ptr) -> [unchecked]
 intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
 
-intrinsic set_ptr      as set_ptr(int ptr, int val);
+intrinsic set_ptr      as set_ptr(unchecked* ptr, int val);
+intrinsic set_ptr      as set_addr(int ptr, int val);
 
 // the default string type (an array of characters)
+// strings are fixed-sized arrays and so immutable
+// member-functions always return a new instance
 alias string = [char];
 
+/** MEMORY UTILS **/
 
 // calls the brk (break) system call, to change the current program break (start of heap) to given location
 // -------
@@ -130,20 +134,17 @@ func _free(int ptr) {
             // test for merge left
             if (i > 0) {
                 if (!_m_tcache[i - 1].is_block) {
-                    print("UNIFY LEFT\n");
                     _m_tcache[i - 1].size = _m_tcache[i - 1].size + _m_tcache[i].size;
                 }
             }
 
             if (i < _m_location - 1) {
                 if (!_m_tcache[i + 1].is_block) {
-                    print("UNIFY RIGHT\n");
                     _m_tcache[i].size = _m_tcache[i + 1].size + _m_tcache[i].size;
                 }
             }
 
             if (i == _m_location - 1) {
-                print("DECREMENT\n");
                 // decrement heap space
                 _sbrk(-_m_tcache[i].size);
             }
@@ -162,7 +163,7 @@ func _free(int ptr) {
 // returns: an array at the newly allocated space
 func alloc_array(int size) -> [unchecked] {
     int ptr     = _malloc(size);
-    set_ptr(ptr, size);
+    set_addr(ptr, size);
     [int] array = ptr2arr(ptr);
     <- array;
 }
@@ -189,6 +190,8 @@ func strcpy(string a, string b) {
     }
 }
 
+/** IO UTILS **/
+    
 // exits the program with given exit code
 // ------
 // args:
@@ -213,6 +216,39 @@ func print([char] str) {
     syscall3(1, 1, arr2addr(str), arrlen(str));
 }
 
+func println([char] str) {
+    print(str.append('\n'));
+}
+
+/** STRING UTILS **/
+
+// TODO: finish
+func digit_to_ascii(int i) -> char {
+    <- 'a';
+}
+    
+// TODO: finish
+func itoa(int i) -> string {
+    int len = 1;
+    int num = i;
+    while (num >= 10) {
+        num /= 10;
+        len += 1;
+    }
+
+    string result = alloc_array(len + 1);
+    
+    int index = len - 1;
+    int num = i;
+    while (index >= 0) {
+        result[index] = digit_to_ascii(num % 10);
+        num /= 10;
+        index -= 1;
+    }
+    
+    <- result;
+}
+    
 // converts a boolean to a string (true -> "true", false -> "false")
 // ------
 // args:
@@ -232,6 +268,46 @@ func len(string self) -> int from string {
     <- arrlen(self);
 }
 
+// appends a given character to a string and returns the new string
+// ------
+// args:
+//   c <- the char to append
+// returns: the new string
+func append(string self, char c) -> string from string {
+    string new = alloc_array(self.len() + 1);
+    strcpy(new, self);
+    int len = self.len();
+    new[len] = c;
+    <- new;
+}
+
+// checks if string starts with given character
+// ------
+// args:
+//   c <- the character
+// returns: true, if string starts with c, false otherwise
+func startsWith(string self, char c) -> bool from string {
+    if (self.len() < 1) {
+        <- false;
+    }
+    <- self[0] == c;
+}
+
+// checks if string ends with given character
+// ------
+// args:
+//   c <- the character
+// returns: true, if string ends with c, false otherwise
+func endsWith(string self, char c) -> bool from string {
+    if (self.len() < 1) {
+        <- false;
+    }
+    <- self[self.len() - 1] == c;
+}
+
+    
+/** MATH UTILS **/
+    
 // returns the smaller of two numbers
 // ------
 // args:
@@ -251,12 +327,9 @@ func min(int a, int b) -> int {
 //   a <- the first number
 //   b <- the second number
 // returns: the bigger number
-func max(int a, int b) {
+func max(int a, int b) -> int {
     if (a > b) {
         <- a;
     }
     <- b;
 }
-
-
-

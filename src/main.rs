@@ -1,4 +1,6 @@
-use std::{fs, env::args, process::{exit, Command}, io, collections::HashMap, time::SystemTime};
+use std::{fs, env::args, process::{exit, Command}, io, collections::HashMap,
+          time::SystemTime, hash::Hash};
+use std::fmt::Write as _;
 
 type Error = (ErrorLevel, String);
 
@@ -47,7 +49,7 @@ const KEYWORDS: &[&str] = &[
     "from"
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 enum Type {
     Primitive(PrimitiveType),
     Custom(String),
@@ -55,6 +57,19 @@ enum Type {
     Pointer(Box<Type>),
     Invalid,
     Struct(String, HashMap<String, (Type, usize)>),
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Primitive(l0), Self::Primitive(r0)) => l0 == r0,
+            (Self::Custom(l0), Self::Custom(r0)) => l0 == r0,
+            (Self::Array(l0), Self::Array(r0)) => l0 == r0,
+            (Self::Pointer(l0), Self::Pointer(r0)) => l0 == r0,
+            (Self::Struct(l0, l1), Self::Struct(r0, r1)) => l0 == r0 && l1 == r1,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 impl std::hash::Hash for Type {
@@ -66,7 +81,8 @@ impl std::hash::Hash for Type {
             Type::Pointer(a) => a.hash(state),
             Type::Invalid => 0.hash(state),
             Type::Struct(x, map) => {
-                map.iter().map(|(a, b)| (a.clone(), b.clone())).collect::<Vec<(String, (Type, usize))>>().hash(state);
+                map.iter().map(|(a, b)| (a.clone(), b.clone()))
+                    .collect::<Vec<(String, (Type, usize))>>().hash(state);
                 x.hash(state);
             },
         }
@@ -104,19 +120,21 @@ impl std::fmt::Display for Type {
             Type::Invalid => "__invalid__".into(),
             Type::Struct(name, fields) => {
                 // convert hashmap to vector
-                let mut vector_: Vec<String> = fields.iter().map(|(x, _)| x.clone()).collect();
+                let mut vector_: Vec<String> = fields.iter()
+                    .map(|(x, _)| x.clone()).collect();
                 vector_.sort();
-                let vector: Vec<(String, Type)> = vector_.iter().map(|x| (x.clone(), fields[x].0.clone())).collect();
+                let vector: Vec<(String, Type)> = vector_.iter()
+                    .map(|x| (x.clone(), fields[x].0.clone())).collect();
 
-                
+
                 let mut s = format!("struct {name} {{");
                 for (i, (n, t)) in vector.iter().enumerate() {
-                    s.push_str(&format!("{t} {n}"));
+                    let _ = write!(s, "{t} {n}");
                     if i < vector.len() - 1 {
-                        s.push_str(", ");
+                        s += ", ";
                     }
                 }
-                s.push_str("}");
+                s += "}";
                 s
             },
         }.as_str())
@@ -134,17 +152,20 @@ impl Type {
         }
         ret
     }
-    
-    fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>) -> bool {
+
+    fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>)
+                     -> bool {
         let a = self.dealias(aliases);
         let b = type_r.dealias(aliases);
 
         // UNSAFE: DON'T USE THIS IF NOT REALLY NEEDED
-        if a == Type::Primitive(PrimitiveType::Unchecked) || b == Type::Primitive(PrimitiveType::Unchecked) {
+        if a == Type::Primitive(PrimitiveType::Unchecked) ||
+            b == Type::Primitive(PrimitiveType::Unchecked) {
             return true;
         }
 
-        if a == b || a == Type::Primitive(PrimitiveType::Float) && b == Type::Primitive(PrimitiveType::Int) {
+        if a == b || a == Type::Primitive(PrimitiveType::Float) &&
+            b == Type::Primitive(PrimitiveType::Int) {
             true
         } else if let Type::Array(aa) = a {
             if let Type::Array(bb) = b {
@@ -167,7 +188,8 @@ impl Type {
                             // TODO: Error
                             return false;
                         }
-                        comp &= typ.0.is_compatible(&b_fields[string].0, aliases);
+                        comp &= typ.0.is_compatible(&b_fields[string].0,
+                                                    aliases);
                     }
                     for (string, _) in b_fields {
                         if ! a_fields.contains_key(&string) {
@@ -257,7 +279,8 @@ impl UnaryOp {
     fn with_type(&self, t: &Type, _aliases: &HashMap<String, Type>) -> Type {
         match self {
             UnaryOp::Not => match t {
-                Type::Primitive(PrimitiveType::Bool | PrimitiveType::Unchecked) => Type::Primitive(PrimitiveType::Bool),
+                Type::Primitive(PrimitiveType::Bool | PrimitiveType::Unchecked)
+                    => Type::Primitive(PrimitiveType::Bool),
                 _ => Type::Invalid
             },
         }
@@ -266,26 +289,30 @@ impl UnaryOp {
 
 
 impl Op {
-    fn combine_type(&self, a: &Type, b: &Type, aliases: &HashMap<String, Type>) -> Type {
+    fn combine_type(&self, a: &Type, b: &Type, aliases: &HashMap<String, Type>)
+                    -> Type {
         match self {
             Op::Unary(_) => {
                 unreachable!()
             },
             Op::Binary(bin) => match bin {
-                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div |
+                BinaryOp::Mod => {
                     match a {
                         Type::Primitive(ref v) => {
                             match v {
-                                PrimitiveType::Int => if a.is_compatible(b, aliases) {
-                                    a.clone()
-                                } else {
-                                    Type::Invalid
-                                },
-                                PrimitiveType::Float => if a.is_compatible(b, aliases) {
-                                    a.clone()
-                                } else {
-                                    Type::Invalid
-                                },
+                                PrimitiveType::Int =>
+                                    if a.is_compatible(b, aliases) {
+                                        a.clone()
+                                    } else {
+                                        Type::Invalid
+                                    },
+                                PrimitiveType::Float =>
+                                    if a.is_compatible(b, aliases) {
+                                        a.clone()
+                                    } else {
+                                        Type::Invalid
+                                    },
                                 PrimitiveType::Char => Type::Invalid,
                                 PrimitiveType::Void => Type::Invalid,
                                 PrimitiveType::Bool => Type::Invalid,
@@ -295,9 +322,11 @@ impl Op {
                         _ => Type::Invalid,
                     }
                 },
-                BinaryOp::Less | BinaryOp::Greater | BinaryOp::LessEq | BinaryOp::GreaterEq => match a {
+                BinaryOp::Less | BinaryOp::Greater | BinaryOp::LessEq |
+                BinaryOp::GreaterEq => match a {
                     Type::Primitive(ref p) => match p {
-                        PrimitiveType::Int | PrimitiveType::Float | PrimitiveType::Char => if a.is_compatible(b, aliases) {
+                        PrimitiveType::Int | PrimitiveType::Float |
+                        PrimitiveType::Char => if a.is_compatible(b, aliases) {
                             Type::Primitive(PrimitiveType::Bool)
                         } else {
                             Type::Invalid
@@ -306,16 +335,19 @@ impl Op {
                     },
                     _ => Type::Invalid,
                 },
-                BinaryOp::Eq => if (a == b) || (a == &Type::Primitive(PrimitiveType::Unchecked) || b == &Type::Primitive(PrimitiveType::Unchecked)) {
+                BinaryOp::Eq => if (a == b) ||
+                    (a == &Type::Primitive(PrimitiveType::Unchecked) ||
+                     b == &Type::Primitive(PrimitiveType::Unchecked)) {
                     Type::Primitive(PrimitiveType::Bool)
                 } else{
                     Type::Invalid
                 },
-                BinaryOp::BoolAnd | BinaryOp::BoolOr => if (a == b) && *a == Type::Primitive(PrimitiveType::Bool) {
-                    Type::Primitive(PrimitiveType::Bool)
-                } else {
-                    Type::Invalid
-                }
+                BinaryOp::BoolAnd | BinaryOp::BoolOr =>
+                    if (a == b) && *a == Type::Primitive(PrimitiveType::Bool) {
+                        Type::Primitive(PrimitiveType::Bool)
+                    } else {
+                        Type::Invalid
+                    }
             }
         }
     }
@@ -323,7 +355,8 @@ impl Op {
 
 fn is_valid_type(val: &str) -> bool {
     // TODO: check for custom types
-    val == "int" || val == "float" || val == "char" || val == "void" || val == "bool" || val == "unchecked"
+    val == "int" || val == "float" || val == "char" ||
+        val == "void" || val == "bool" || val == "unchecked"
 }
 
 fn parse_type(string: String) -> Option<Type> {
@@ -339,7 +372,8 @@ fn parse_type(string: String) -> Option<Type> {
         "unchecked" => Some(Type::Primitive(PrimitiveType::Unchecked)),
         _ => {
             if string.ends_with('*') {
-                Some(Type::Pointer(Box::new(parse_type(string.as_str()[0..string.len()-1].into())?)))
+                Some(Type::Pointer(Box::new(
+                    parse_type(string.as_str()[0..string.len()-1].into())?)))
             } else {
                 Some(Type::Custom(string))
             }
@@ -355,10 +389,10 @@ macro_rules! error {
         | | -> String {
             let (l, c) = $lexer.pos_to_line_char($pos);
             return format!("{file}:{line}:{ch}: {msg}",
-                    msg = format!($msg_fmt),
-                    file = $lexer.filename,
-                    line = l+1,
-                    ch = c+1
+                           msg = format!($msg_fmt),
+                           file = $lexer.filename,
+                           line = l+1,
+                           ch = c+1
             )
         }()
     }
@@ -400,8 +434,8 @@ impl Lexer {
                 ttype: TokenType::Eof,
                 value: "".into(),
             });
-        }        
-        
+        }
+
         let mut token_pos = self.pos;
         let mut val: String = "".to_string();
         let mut ttype = TokenType::Undef;
@@ -434,8 +468,35 @@ impl Lexer {
                             value: val,
                         })
                     }
+                    if val.len() == 2 && val.starts_with('\\') && ch == '\'' {
+                        val = match val.chars().nth(1).unwrap() {
+                            'n' => "\n",
+                            'r' => "\r",
+                            't' => "\t",
+                            '\\' => "\\",
+                            _ => {
+                                return Err((ErrorLevel::Err,
+                                    error!(self, self.pos,
+                                           "invalid escape literal: '{val}'")));
+                            }
+                        }.to_string();
+                        self.pos += 1;
+                        return Ok(Token {
+                            pos: token_pos,
+                            ttype,
+                            value: val,
+                        })
+                    }
+                    
+                    if val.len() == 1 && val.starts_with('\\') {
+                        val.push(ch);
+                        self.pos += 1;
+                        continue;
+                    }
                     if !val.is_empty() {
-                        return Err((ErrorLevel::Err, error!(self, self.pos, "invalid character literal")));
+                        return Err((ErrorLevel::Err,
+                                    error!(self, self.pos,
+                                           "invalid character literal: {val}")));
                     }
                     val.push(ch);
                     false
@@ -461,8 +522,9 @@ impl Lexer {
                             ttype = TokenType::Char;
                         } else {
                             // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
-                            
+                            ttype = check_keywords_and_types(val.as_str(),
+                                                             ttype);
+
                             return Ok(Token {
                                 pos: token_pos,
                                 ttype,
@@ -475,8 +537,9 @@ impl Lexer {
                             ttype = TokenType::String;
                         } else {
                             // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
-                            
+                            ttype = check_keywords_and_types(val.as_str(),
+                                                             ttype);
+
                             return Ok(Token {
                                 pos: token_pos,
                                 ttype,
@@ -485,17 +548,19 @@ impl Lexer {
                         }
                     },
                     'a'..='z'|'_'|'A'..='Z' => {
-                        if ttype == TokenType::Undef || ttype == TokenType::Ident {
+                        if ttype == TokenType::Undef ||
+                            ttype == TokenType::Ident {
                             ttype = TokenType::Ident;
                             val.push(ch);
                         } else {
                             // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
+                                ttype = check_keywords_and_types(
+                                    val.as_str(), ttype);
 
                             if val == "." {
                                 ttype = TokenType::Special;
                             }
-                            
+
                             return Ok(Token {
                                 pos: token_pos,
                                 ttype,
@@ -504,87 +569,105 @@ impl Lexer {
                         }
                     },
                     '0'..='9'|'.' => {
-                        if ttype == TokenType::Float || ( (ttype == TokenType::Undef || ttype == TokenType::Int) && ch == '.') {
-                            ttype = TokenType::Float;
-                            val.push(ch);
-                        } else if ttype == TokenType::Undef || ttype == TokenType::Int {
-                            ttype = TokenType::Int;
-                            val.push(ch);
-                        } else if ttype == TokenType::Ident && ch != '.' {
-                            ttype = TokenType::Ident;
-                            val.push(ch);
-                        } else if ttype == TokenType::Operator && val == "-" {
-                            val.push(ch);
-                            ttype = TokenType::Int;
-                        } else {
-                            // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
+                        if ttype == TokenType::Float ||
+                            ((ttype == TokenType::Undef
+                              || ttype == TokenType::Int) && ch == '.') {
+                                ttype = TokenType::Float;
+                                val.push(ch);
+                            } else if ttype == TokenType::Undef ||
+                            ttype == TokenType::Int {
+                                ttype = TokenType::Int;
+                                val.push(ch);
+                            } else if ttype == TokenType::Ident && ch != '.' {
+                                ttype = TokenType::Ident;
+                                val.push(ch);
+                            } else if ttype == TokenType::Operator &&
+                            val == "-" {
+                                val.push(ch);
+                                ttype = TokenType::Int;
+                            } else {
+                                // check for keywords / types
+                                ttype = check_keywords_and_types(
+                                    val.as_str(), ttype);
 
-                            if val == "." {
-                                ttype = TokenType::Special;
-                            }
-                            
-                            return Ok(Token {
-                                pos: token_pos,
+                                if val == "." {
+                                    ttype = TokenType::Special;
+                                }
+
+                                return Ok(Token {
+                                    pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
-                        }
+                                    value: val,
+                                });
+                            }
                     },
                     '!'|'='|'+'|'-'|'*'|'/'|'<'|'>'|'%'|'|'|'&' => {
                         if ttype == TokenType::Type && ch == '*' {
                             val.push(ch);
                             ttype = TokenType::Type;
-                        } else if ttype == TokenType::Operator && val == "/" && ch == '/' {
-                            // comment
-                            loop {
-                                if self.source[self.pos] == '\n' {
-                                    break;
-                                }
-                                self.pos += 1;
-                            }
-                            return self.next_token();
-                        } else if ttype == TokenType::Operator && val == "/" && ch == '*' {
-                            // multi-line comment
-                            loop {
-                                if self.pos < 2 {
+                        } else if ttype == TokenType::Operator &&
+                            val == "/" && ch == '/' {
+                                // comment
+                                loop {
+                                    if self.source[self.pos] == '\n' {
+                                        break;
+                                    }
                                     self.pos += 1;
-                                    continue;
                                 }
-                                if self.source[self.pos-1] == '*' && self.source[self.pos] == '/' {
+                                return self.next_token();
+                            } else if ttype == TokenType::Operator &&
+                            val == "/" && ch == '*' {
+                                // multi-line comment
+                                loop {
+                                    if self.pos < 2 {
+                                        self.pos += 1;
+                                        continue;
+                                    }
+                                    if self.source[self.pos-1] == '*' &&
+                                        self.source[self.pos] == '/' {
+                                            self.pos += 1;
+                                            break;
+                                        }
                                     self.pos += 1;
-                                    break;
                                 }
-                                self.pos += 1;
-                            }
-                            return self.next_token();
-                        } else if (ttype == TokenType::Operator && val == "-" && ch == '>')  ||  (ttype == TokenType::Operator && val.starts_with('<') && ch == '-') {
-                            val.push(ch);
-                            ttype = TokenType::Special;
-                        } else if ttype == TokenType::Undef || ttype == TokenType::Operator {
-                            ttype = TokenType::Operator;
-                            val.push(ch);
-                        } else {
-                            // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
+                                return self.next_token();
+                            } else if (ttype == TokenType::Operator &&
+                                       val == "-" && ch == '>') ||
+                            (ttype == TokenType::Operator &&
+                             val.starts_with('<') && ch == '-') {
+                                val.push(ch);
+                                ttype = TokenType::Special;
+                            } else if ttype == TokenType::Undef ||
+                            ttype == TokenType::Operator {
+                                ttype = TokenType::Operator;
+                                val.push(ch);
+                            } else {
+                                // check for keywords / types
+                                ttype = check_keywords_and_types(
+                                    val.as_str(), ttype);
 
-                            return Ok(Token {
-                                pos: token_pos,
-                                ttype,
-                                value: val,
-                            });
-                        }
+                                return Ok(Token {
+                                    pos: token_pos,
+                                    ttype,
+                                    value: val,
+                                });
+                            }
                     },
                     ';' | '(' | ')' | ',' | '{' | '}' | '[' | ']' | ':' => {
                         if ttype == TokenType::Undef {
                             ttype = TokenType::Special;
                             val.push(ch);
-                        } else if ttype == TokenType::Special && !val.contains(')') && !val.contains('(') && !val.contains('[') && !val.contains(']') && !val.contains('}') && !val.contains('{') && ch != ';' {
+                        } else if ttype == TokenType::Special &&
+                            !val.contains(')') && !val.contains('(') &&
+                            !val.contains('[') && !val.contains(']') &&
+                            !val.contains('}') && !val.contains('{') &&
+                            ch != ';' {
                             val.push(ch);
                         } else {
                             // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
-                            
+                                ttype = check_keywords_and_types(
+                                    val.as_str(), ttype);
+
                             return Ok(Token {
                                 pos: token_pos,
                                 ttype,
@@ -595,8 +678,9 @@ impl Lexer {
                     ' '|'\t'|'\n' => {
                         if ttype != TokenType::Undef {
                             // check for keywords / types
-                            ttype = check_keywords_and_types(val.as_str(), ttype);
-                            
+                            ttype = check_keywords_and_types(
+                                val.as_str(), ttype);
+
                             return Ok(Token{
                                 pos: token_pos,
                                 ttype,
@@ -608,7 +692,9 @@ impl Lexer {
                     }
                     _ => {
                         self.pos += 1;
-                        return Err((ErrorLevel::Err, error!(self, self.pos, "invalid character `{ch}`")))
+                        return Err((ErrorLevel::Err,
+                                    error!(self, self.pos,
+                                           "invalid character `{ch}`")))
                     }
                 };
             }
@@ -621,7 +707,7 @@ impl Lexer {
                     value: val,
                 })
             }
-            
+
             (self.line, self.ch) = self.pos_to_line_char(self.pos);
         }
     }
@@ -739,9 +825,9 @@ enum UnaryOp {
 fn indent(string: String) -> String {
     let mut ret = String::new();
     for line in string.lines() {
-        ret.push_str("    ");
-        ret.push_str(line);
-        ret.push_str("\n");
+        ret += "    ";
+        ret += line;
+        ret += "\n";
     }
     ret
 }
@@ -874,12 +960,15 @@ impl std::fmt::Display for ExpressionR {
                     Type::Primitive(_) => write!(f, "{val}"),
                     Type::Custom(_) => write!(f, "{val}[INVALID]"),
                     Type::Array(a) => match **a {
-                        Type::Primitive(PrimitiveType::Char) => write!(f, "\"{val}\""),
+                        Type::Primitive(PrimitiveType::Char) =>
+                            write!(f, "\"{val}\""),
                         _ => write!(f, "{{{val}}}[INVALID]"),
                     },
                     Type::Pointer(_) => write!(f, "{val}*[INVALID]"),
                     Type::Invalid => write!(f, "[INVALID]"),
-                    Type::Struct(name, _) => write!(f, "{name}[INVALID, SHOULD BE A STRUCT LITERAL]"),
+                    Type::Struct(name, _) =>
+                        write!(f,
+                               "{name}[INVALID, SHOULD BE A STRUCT LITERAL]"),
                 }
             },
             ExpressionR::Var(var) => {
@@ -982,15 +1071,17 @@ impl Op {
             "&&" => Ok(Op::Binary(BinaryOp::BoolAnd)),
             "||" => Ok(Op::Binary(BinaryOp::BoolOr)),
             "!"  => Ok(Op::Unary(UnaryOp::Not)),
-            _ => Err((ErrorLevel::Fatal, format!("FATAL: invalid operator `{s}` set from lexer"))),
+            _ => Err((ErrorLevel::Fatal,
+                     format!("FATAL: invalid operator `{s}` set from lexer"))),
         }
     }
-    
+
     fn get_precedence(op_type: Op) -> u32 {
         match op_type {
             Op::Binary(bin_op) => match bin_op {
                 BinaryOp::BoolAnd | BinaryOp::BoolOr => 0,
-                BinaryOp::Eq | BinaryOp::Less | BinaryOp::Greater | BinaryOp::GreaterEq | BinaryOp::LessEq => 1,
+                BinaryOp::Eq | BinaryOp::Less |
+                BinaryOp::Greater | BinaryOp::GreaterEq | BinaryOp::LessEq => 1,
                 BinaryOp::Add | BinaryOp::Sub => 2,
                 BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 3,
             },
@@ -1075,17 +1166,20 @@ impl Parser {
         self.parse_block_(true, 0, verbose)
     }
 
-    fn parse_block(&mut self, pos: usize, verbose: usize) -> Result<ASTNode, Vec<Error>> {
+    fn parse_block(&mut self, pos: usize, verbose: usize)
+                   ->Result<ASTNode, Vec<Error>> {
         self.parse_block_(false, pos, verbose)
     }
-    
-    fn parse_block_(&mut self, is_root: bool, pos: usize, verbose: usize) -> Result<ASTNode, Vec<Error>> {
+
+    fn parse_block_(&mut self, is_root: bool, pos: usize, verbose: usize)
+                    ->Result<ASTNode, Vec<Error>> {
         let mut block: ASTNode = ASTNode(pos, ASTNodeR::Block(vec![]));
         let mut errors: Vec<Error> = vec![];
         loop {
             match block {
                 ASTNode(_, ASTNodeR::Block(ref mut vec)) => {
-                    let bs = match self.parse_block_statement(is_root, verbose) {
+                    let bs = match self.parse_block_statement(
+                        is_root, verbose) {
                         Ok(a) => a,
                         Err(e) => {
                             for a in e {
@@ -1096,9 +1190,13 @@ impl Parser {
                                 let tk = self.lexer.peek_token();
                                 match tk {
                                     Ok(a) => {
-                                        if a.ttype == TokenType::Eof || (a.ttype == TokenType::Special && (a.value == ";" || a.value == "{")) {
+                                        if a.ttype == TokenType::Eof ||
+                                            (a.ttype == TokenType::Special &&
+                                             (a.value == ";" || a.value == "{"))
+                                        {
                                             break;
-                                        } else if a.ttype == TokenType::Special && a.value == "}" {
+                                        } else if a.ttype == TokenType::Special
+                                            && a.value == "}" {
                                             return Err(errors);
                                         } else {
                                             self.lexer.next_token().unwrap();
@@ -1132,9 +1230,12 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self, seperators: &[&'static str]) -> Result<(Expression, Token), Vec<Error>> {
+    fn parse_expr(&mut self, seperators: &[&'static str])
+                  -> Result<(Expression, Token), Vec<Error>> {
         let mut errors: Vec<Error> = vec![];
-        let check_precedence_and_update = |op: Op, right_expr: Box<Expression>, working_expr: &Expression| -> Box<Expression> {
+        let check_precedence_and_update =
+            |op: Op, right_expr: Box<Expression>, working_expr: &Expression|
+                                     -> Box<Expression> {
             let ret: Box<Expression>;
             let Expression(_, exp, _) = working_expr;
             let is_first: bool = match exp {
@@ -1143,30 +1244,46 @@ impl Parser {
                 },
                 ExpressionR::T(_, _, _, precedence) => {
                     Op::get_precedence(op) <= *precedence
-                }, 
-                ExpressionR::Val(..) | ExpressionR::Arr(..) | ExpressionR::F(..) | ExpressionR::Var(..) | ExpressionR::ArrAlloc(..) | ExpressionR::Index(..) | ExpressionR::StructLiteral(..) | ExpressionR::StructField(..) | ExpressionR::Ref(..) | ExpressionR::Deref(..) | ExpressionR::MemberFunction(..) => {
+                },
+                ExpressionR::Val(..) | ExpressionR::Arr(..) |
+                ExpressionR::F(..) | ExpressionR::Var(..) |
+                ExpressionR::ArrAlloc(..) | ExpressionR::Index(..) |
+                ExpressionR::StructLiteral(..) | ExpressionR::StructField(..) |
+                ExpressionR::Ref(..) | ExpressionR::Deref(..) |
+                ExpressionR::MemberFunction(..) => {
                     true
                 },
                 ExpressionR::Undef => unreachable!(),
             };
 
             if is_first {
-                let tmp_expr = Expression(working_expr.0, ExpressionR::T(Box::new(working_expr.clone()), op, right_expr
-                                             , Op::get_precedence(op)), None);
+                let tmp_expr =
+                    Expression(working_expr.0,
+                               ExpressionR::T(Box::new(working_expr.clone()),
+                                              op, right_expr,
+                                              Op::get_precedence(op)), None);
                 ret = Box::new(tmp_expr);
             } else {
-                assert!(matches!(*working_expr, Expression(_, ExpressionR::T(..), _)));
+                assert!(matches!(*working_expr,
+                                 Expression(_, ExpressionR::T(..), _)));
                 let mut expr: Expression = working_expr.clone();
-                let tmp_expr = if let Expression(pos, ExpressionR::T(_, _, right, _), _) = &expr {
-                    Expression(*pos, ExpressionR::T(right.clone(), op, right_expr, Op::get_precedence(op)), None)
+                let tmp_expr =
+                    if let Expression(pos,ExpressionR::T(_, _, right, _), _) =
+                    &expr {
+                        Expression(*pos, ExpressionR::T(right.clone(),
+                                                        op, right_expr,
+                                                        Op::get_precedence(op)),
+                                   None)
                 } else {
                     unreachable!();
                 };
 
                 if let Expression(pos, ExpressionR::T(a, b, _, d), _) = expr {
-                    expr = Expression(pos, ExpressionR::T(a, b, Box::new(tmp_expr), d), None);
+                    expr = Expression(pos,ExpressionR::T(a, b,
+                                                         Box::new(tmp_expr),
+                                                         d), None);
                 }
-                    
+
                 ret = Box::new(expr);
             }
 
@@ -1195,14 +1312,17 @@ impl Parser {
                         continue;
                     },
                 }
-            } else if tk_op.ttype == TokenType::Eof || (tk_op.ttype == TokenType::Special && seperators.contains(&tk_op.value.as_str())) {
-                self.lexer.next_token().unwrap();
-                return Ok((*nleft_expr, tk_op));
-            } else {
-                let val = tk_op.value;
-                errors.push((ErrorLevel::Err, error!(self.lexer, tk_op.pos, "invalid token `{val}`")));
-                return Err(errors);
-            };
+            } else if tk_op.ttype == TokenType::Eof ||
+                (tk_op.ttype == TokenType::Special &&
+                 seperators.contains(&tk_op.value.as_str())) {
+                    self.lexer.next_token().unwrap();
+                    return Ok((*nleft_expr, tk_op));
+                } else {
+                    let val = tk_op.value;
+                    errors.push((ErrorLevel::Err, error!(
+                        self.lexer, tk_op.pos, "invalid token `{val}`")));
+                    return Err(errors);
+                };
 
             self.lexer.next_token().unwrap();
 
@@ -1212,65 +1332,82 @@ impl Parser {
             if let Expression(_, ExpressionR::Undef, _) = *subexpr_r.0 {
                 return Ok((*left_expr, subexpr.1));
             }
-            
+
             let right_expr = subexpr_r.0;
-            nleft_expr = check_precedence_and_update(op, right_expr.clone(), &mut left_expr);
+            nleft_expr = check_precedence_and_update(
+                op, right_expr.clone(), &mut left_expr);
         }
     }
 
-    fn parse_block_statement(&mut self, is_root: bool, verbose: usize) -> Result<Option<ASTNode>, Vec<Error>> {
+    fn parse_block_statement(&mut self, is_root: bool, verbose: usize)
+                             -> Result<Option<ASTNode>, Vec<Error>> {
         // save position for type parsing
         let start_pos = self.lexer.pos;
-        
+
         let mut errors: Vec<Error> = vec![];
         let mut token = get_token!(self.lexer, errors);
         let val = token.value;
 
 
-        fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool) -> Result<Option<ASTNode>, Vec<Error>> {
+        fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool)
+                         -> Result<Option<ASTNode>, Vec<Error>> {
             // declare variable
             let pos = parser.lexer.pos;
             let mut errors: Vec<Error> = vec![];
-            
-            let next_token = err_ret!(parser.expect(Some(TokenType::Ident), None), errors);
+
+            let next_token = err_ret!(parser.expect(
+                Some(TokenType::Ident), None), errors);
             let ident = next_token.value;
-            
+
             // check next token
             let next_token = err_ret!(parser.lexer.next_token(), errors);
             let ntv = next_token.value.clone();
             match next_token.ttype {
                 TokenType::Special => {
                     if next_token.value == ";" {
-                        Ok(Some(ASTNode(pos, ASTNodeR::VarDec(is_root, typ, ident))))
-                        } else {
-                            return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]);
-                        }
+                        Ok(Some(ASTNode(pos, ASTNodeR::VarDec(
+                            is_root, typ, ident))))
+                    } else {
+                        Err(vec![(ErrorLevel::Err, error!(
+                            parser.lexer, next_token.pos,
+                            "unexpected token `{ntv}`"))])
+                    }
                 },
                 TokenType::Operator => {
                     if next_token.value == "=" {
                         // variable initialization
                         let expr = parser.parse_expr(&[";"])?;
-                        Ok(Some(ASTNode(pos, ASTNodeR::VarDecInit(is_root, typ, ident, expr.0))))
+                        Ok(Some(ASTNode(pos, ASTNodeR::VarDecInit(
+                            is_root, typ, ident, expr.0))))
                     } else {
-                        return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]);
+                        Err(vec![(ErrorLevel::Err, error!(
+                            parser.lexer, next_token.pos,
+                            "unexpected token `{ntv}`"))])
                     }
                 },
-                _ => return Err(vec![(ErrorLevel::Err, error!(parser.lexer, next_token.pos, "unexpected token `{ntv}`"))]),
+                _ => Err(vec![(ErrorLevel::Err, error!(
+                    parser.lexer, next_token.pos,
+                    "unexpected token `{ntv}`"))]),
             }
         }
 
 
         // may be a later defined type
-        if token.ttype == TokenType::Ident && self.lexer.peek_token().is_ok() && (self.lexer.peek_token().unwrap().ttype == TokenType::Ident || self.lexer.peek_token().unwrap().value == "*") {
-            token.ttype = TokenType::Type;
+        if token.ttype == TokenType::Ident &&
+            self.lexer.peek_token().is_ok() &&
+            (self.lexer.peek_token().unwrap().ttype == TokenType::Ident ||
+             self.lexer.peek_token().unwrap().value == "*") {
+                token.ttype = TokenType::Type;
         }
 
         type Args = Vec<(Type, String)>;
 
-        fn parse_function_decl(parser: &mut Parser, errors: &mut Vec<(ErrorLevel, String)>) -> Result<(Args, Type), Vec<Error>> {
+        fn parse_function_decl(parser: &mut Parser,
+                               errors: &mut Vec<(ErrorLevel, String)>)
+                               -> Result<(Args, Type), Vec<Error>> {
             // parse args
             let mut args: Args = vec![];
-            
+
             let check = get_peek_token!(parser.lexer, errors);
             if check.ttype != TokenType::Special || check.value != ")" {
                 loop {
@@ -1282,22 +1419,31 @@ impl Parser {
                         },
                     };
 
-                    let nval = err_break!(parser.expect(Some(TokenType::Ident), None), errors).value;
+                    let nval = err_break!(parser.expect(Some(TokenType::Ident)
+                                                        , None), errors).value;
                     args.insert(args.len(), (t, nval));
 
                     let token = get_token!(parser.lexer, errors);
                     let val = token.value;
                     if token.ttype != TokenType::Special {
-                        errors.push((ErrorLevel::Err, error!(parser.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
+                        errors.push((
+                            ErrorLevel::Err,error!(
+                                parser.lexer,token.pos,
+                                "unexpected token `{val}`, `,` or `)` expect"
+                            )));
                         return Err(errors.clone());
                     }
-                    
+
                     if val == "," {
                         continue;
                     } else if val == ")" {
                         break;
                     } else {
-                        errors.push((ErrorLevel::Err, error!(parser.lexer, token.pos, "unexpected token `{val}`, `,` or `)` expect")));
+                        errors.push((
+                            ErrorLevel::Err, error!(
+                                parser.lexer, token.pos,
+                                "unexpected token `{val}`, `,` or `)` expect"
+                            )));
                         return Err(errors.clone());
                     }
                 }
@@ -1308,9 +1454,10 @@ impl Parser {
             // optional return type (-> type)
             // else {
             let mut ret_type = Type::Primitive(PrimitiveType::Void);
-            
+
             let next_token = get_peek_token!(parser.lexer, errors);
-            if next_token.ttype == TokenType::Special && next_token.value == "->" {
+            if next_token.ttype == TokenType::Special &&
+                next_token.value == "->" {
                 parser.lexer.next_token().unwrap();
                 // expect return type
 
@@ -1326,44 +1473,76 @@ impl Parser {
 
             Ok((args, ret_type))
         }
-        
+
         match token.ttype {
-            TokenType::Int | TokenType::Float | TokenType::Char | TokenType::String | TokenType::Bool => {
-                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "invalid literal")));
+            TokenType::Int | TokenType::Float | TokenType::Char |
+            TokenType::String | TokenType::Bool => {
+                errors.push((ErrorLevel::Err,
+                             error!(self.lexer, token.pos, "invalid literal")));
                 return self.parse_block_statement(is_root, verbose);
             },
             TokenType::Ident => {
-                let expr = self.parse_ident_expr(val.clone(), token.pos,  &[";"])?;
+                let expr = self.parse_ident_expr(val.clone(),
+                                                 token.pos,  &[";"])?;
                 let exp = self.parse_member(*expr, &[";"])?.1;
 
                 match exp {
                     ExpressionR::Var(..) => {
                         let var_token = get_token!(self.lexer, errors);
                         let var_val = var_token.value;
-                        
-                        if var_token.ttype == TokenType::Operator && var_val == "=" {
+
+                        if var_token.ttype == TokenType::Operator &&
+                            var_val == "=" {
                             let expr = self.parse_expr(&[";"])?.0;
-                            return Ok(Some(ASTNode(token.pos, ASTNodeR::VarInit(val, expr, None))));
-                        } else if var_token.ttype == TokenType::Operator && var_val.ends_with("=") {
-                            let expr = self.parse_expr(&[";"])?.0;
-                            let op = err_ret!(Op::from_str(var_val.as_str()[..(var_val.len()-1)].into()), errors);
-                            if let Op::Binary(bop) = op {
-                                return Ok(Some(ASTNode(token.pos, ASTNodeR::VarOp(val, bop, expr))));
-                            }
-                        } else if var_token.ttype == TokenType::Special && var_val == "[" {
-                            // array indexing
-                            let index = self.parse_expr(&["]"])?.0;
-                            err_ret!(self.expect(Some(TokenType::Operator), Some("=".into())), errors);
-                            let right_expr = self.parse_expr(&[";"])?.0;
-                            let left_expr = Expression(token.pos, ExpressionR::Var(val), None);
-                            return Ok(Some(ASTNode(token.pos, ASTNodeR::ArrIndexInit(left_expr, index, right_expr, vec![]))));
+                                return Ok(Some(ASTNode(
+                                    token.pos,ASTNodeR::VarInit(
+                                        val, expr, None))));
+                            } else if var_token.ttype == TokenType::Operator &&
+                            var_val.ends_with('=') {
+                                let expr = self.parse_expr(&[";"])?.0;
+                                let op = err_ret!(
+                                    Op::from_str(
+                                        var_val.as_str()
+                                            [..(var_val.len()-1)]
+                                            .into()), errors);
+                                if let Op::Binary(bop) = op {
+                                    return Ok(Some(ASTNode(
+                                        token.pos,
+                                        ASTNodeR::VarOp(val, bop, expr))));
+                                }
+                            } else if var_token.ttype == TokenType::Special &&
+                            var_val == "[" {
+                                // array indexing
+                                let index = self.parse_expr(&["]"])?.0;
+                                err_ret!(self.expect(Some(TokenType::Operator),
+                                                     Some("=".into())), errors);
+                                let right_expr = self.parse_expr(&[";"])?.0;
+                                let left_expr =
+                                    Expression(token.pos,
+                                               ExpressionR::Var(val), None);
+                                return Ok(Some(
+                                    ASTNode(
+                                        token.pos,
+                                        ASTNodeR::ArrIndexInit(left_expr,
+                                                               index,
+                                                               right_expr,
+                                                               vec![])
+                                    )
+                                ));
                         } else {
-                            errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
+                                errors.push((
+                                    ErrorLevel::Err,
+                                    error!(self.lexer,
+                                           token.pos,
+                                           "unexpected token `{var_val}`"
+                                    )
+                                ));
                         }
                     },
                     ExpressionR::StructLiteral(..) => unreachable!(),
                     ExpressionR::StructField(strct, field, _) => {
-                        err_ret!(self.expect(Some(TokenType::Operator), Some("=".into())), errors);
+                        err_ret!(self.expect(Some(TokenType::Operator),
+                                             Some("=".into())), errors);
                         let expr = self.parse_expr(&[";"])?.0;
                         return Ok(Some(ASTNode(token.pos, ASTNodeR::SetField(*strct, field, expr, None))));
                     },
@@ -1392,7 +1571,7 @@ impl Parser {
                         if is_root {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "function calls are not allowed at top level")));
                         }
-                        
+
                         // expect semicolon
                         err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
                         
@@ -1493,10 +1672,10 @@ impl Parser {
                     
                 },
                 "while" => {
-                     if is_root {
-                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
-                         return Err(errors);
-                     }
+                    if is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
+                        return Err(errors);
+                    }
                     // next token: '('
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
                     // loop condition
@@ -1509,8 +1688,8 @@ impl Parser {
                 },
                 "break" => {
                     if is_root {
-                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
-                         return Err(errors);
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
+                        return Err(errors);
                     }
                     err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Break())));
@@ -1532,10 +1711,10 @@ impl Parser {
 
                 //         // loop condition
                 //         let cond_expr = err_add!(self.parse_expr(&[";"]), errors);
-                        
+                
                 //         // incrementor
                 //         let inc = self.parse_block_statement(false);
-                        
+                
                 //         return Err(errors);
                 //     }
                 // },
@@ -1553,7 +1732,7 @@ impl Parser {
                     let (args, ret_type) = err_add!(parse_function_decl(self, &mut errors), errors);
 
                     let mut from_type = None;
-                        
+                    
                     let check_from = get_peek_token!(self.lexer, errors);
                     if check_from.ttype == TokenType::Keyword && check_from.value == "from" {
                         self.lexer.next_token().unwrap();
@@ -1568,7 +1747,7 @@ impl Parser {
 
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::FunctionDecl(from_type, name, args, ret_type, Box::new(block)))));
 
-//                    let func_expr: Expression = Expression::F(ident, args);
+                    //                    let func_expr: Expression = Expression::F(ident, args);
                 },
                 "include" => {
                     if ! is_root {
@@ -1993,7 +2172,7 @@ impl Parser {
                 let exp_val = ival;
                 let val = token.value;
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, `{exp_val}` expected")))
-          } else {
+            } else {
                 Ok(token)
             }
         } else if let Some(t) = typ {
@@ -2002,7 +2181,7 @@ impl Parser {
                 let val = token.value;
                 let ttype = t.to_string();
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, {ttype} expected")))
-          } else {
+            } else {
                 Ok(token)
             }
         } else {
@@ -2011,14 +2190,18 @@ impl Parser {
     }
 }
 
-fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>, HashMap<String, Type>, HashMap<(Option<Type>, String), (Vec<Type>, Type)>), Vec<Error>> {
+type Globals = HashMap<String, usize>;
+type Aliases = HashMap<String, Type>;
+type Vars = Aliases;
+type Functions = HashMap<(Option<Type>, String), (Vec<Type>, Type)>;
+fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Functions), Vec<Error>> {
     let mut errors: Vec<Error> = vec![];
     
     // collect all aliases + functions
-    let mut type_aliases: HashMap<String, Type> = HashMap::new();
-    let mut functions: HashMap<(Option<Type>, String), (Vec<Type>, Type)> = HashMap::new();
-    let mut vars: HashMap<String, Type> = HashMap::new();
-    let mut globals: HashMap<String, usize> = HashMap::new();
+    let mut type_aliases: Aliases = HashMap::new();
+    let mut functions: Functions = HashMap::new();
+    let mut vars: Vars = HashMap::new();
+    let mut globals: Globals = HashMap::new();
     
     if let ASTNode(_, ASTNodeR::Block(arr)) = ast.clone() {
         for a in arr.clone() {
@@ -2030,7 +2213,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                     type_aliases.insert(name.clone(), Type::Struct(name, fields));
                 },
                 ASTNode(_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
-                    functions.insert((None, fname), (args.into_iter().map(|(a, _)|a).collect(), rt));
+                    functions.insert((None, fname), (args.into_iter().enumerate().map(|(_, (a, _))| a).collect(), rt));
                 }
                 _ => {}
             }
@@ -2041,8 +2224,16 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                     vars.insert(name.clone(), tp.clone());
                     globals.insert(name, tp.size(&type_aliases));
                 },
-                ASTNode(_, ASTNodeR::FunctionDecl(tp, name, args, ret_type, _)) => {
-                    functions.insert((tp.map(|x| x.dealias(&type_aliases)), name), (args.into_iter().map(|(a, _)| a).collect(), ret_type));
+                ASTNode(pos, ASTNodeR::FunctionDecl(tp, name, args, ret_type, _)) => {
+                    let left_type = tp.map(|x| x.dealias(&type_aliases));
+
+                    if let Some(lt) = left_type.clone() {
+                        let first_type = args[0].clone().0;
+                        if ! lt.is_compatible(&first_type, &type_aliases) {
+                            errors.push((ErrorLevel::Err, error!(lexer, pos, "incompatible types: first parameter of member function declaration has to be the same type as the type used on. (got `{first_type}`, expected `{lt}`)")));
+                        }
+                    }
+                    functions.insert((left_type, name), (args.into_iter().map(|(a, _)| a).collect(), ret_type));
                 },
                 ASTNode(_, ASTNodeR::VarDecInit(_, tp, name, _)) => {
                     vars.insert(name.clone(), tp.clone());
@@ -2055,7 +2246,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
         unreachable!();
     }
 
-    fn check_references_expr(expr: &mut Expression, functions: &HashMap<(Option<Type>, String), (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
+    fn check_references_expr(expr: &mut Expression, functions: &Functions, vars: &HashMap<String, Type>, aliases: &Aliases, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
         
         //        fn tp(expr: &mut Expression, functions: &HashMap<Option<String>, (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &HashMap<String, Type>, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
         let tp = | | -> Type {
@@ -2088,8 +2279,8 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                 },
                 ExpressionR::StructLiteral(name, fields) => {
                     let mut fields_: HashMap<String, (Type, usize)> = HashMap::new();
-                    for (name_, mut expr) in fields {
-                        let tp = check_references_expr(&mut expr, functions, vars, aliases, errors, lexer);
+                    for (name_, expr) in fields {
+                        let tp = check_references_expr(expr, functions, vars, aliases, errors, lexer);
                         fields_.insert(name_.clone(), (tp.clone(), fields_.len()));
                     }
                     Type::Struct(name.clone(), fields_)
@@ -2166,27 +2357,32 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                     let func_args = &functions.get(&(Some(left_type.clone()), name.clone())).unwrap().0;
 
                     let len_a = func_args.len();
-                    let len_b = vec.len();
-                    if len_a != len_b+1 {
+                    let len_b = vec.len()+1;
+                    if len_a != len_b {
                         errors.push((ErrorLevel::Err, error!(lexer, pos, "expected `{len_a}` arguments, got `{len_b}`")));
                         return Type::Invalid;
                     };
+
                     
                     for (index, a) in vec.iter_mut().enumerate() {
                         let typa = check_references_expr(a, functions, vars, aliases, errors, lexer);
-                        let typb = func_args.get(index).unwrap().clone();
+                        let typb = func_args.get(index+1).unwrap().clone();
                         
                         if ! typa.is_compatible(&typb, aliases) {
                             errors.push((ErrorLevel::Err, error!(lexer, pos, "incompatible types: expected `{typb}`, found `{typa}`")));
                             break;
                         }
                     }
+                    if !errors.is_empty() {
+                        return Type::Invalid;
+                    }
+                    
                     functions.get(&(Some(left_type.clone()), name.clone())).unwrap().1.clone()
                 },
                 ExpressionR::Arr(ref mut vec) => {
                     let mut last_tp = Type::Invalid;
-                    for mut a in vec {
-                        let tp = check_references_expr(&mut a, functions, vars, aliases, errors, lexer);
+                    for a in vec {
+                        let tp = check_references_expr(a, functions, vars, aliases, errors, lexer);
                         if last_tp == Type::Invalid {
                             last_tp = tp.clone();
                         }
@@ -2247,9 +2443,12 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
         expr.2 = Some(typ.clone());
         typ
     }
+
+    type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a mut Aliases, &'a mut Globals, &'a mut Vec<(ErrorLevel, String)>);
     
     // check
-    fn check_references(node: &mut ASTNode, functions: &mut HashMap<(Option<Type>, String), (Vec<Type>, Type)>, vars: &HashMap<String, Type>, aliases: &mut HashMap<String, Type>, globals: &mut HashMap<String, usize>,errors: &mut Vec<(ErrorLevel, String)>, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer) {
+    fn check_references(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer) {
+        let (node, functions, vars, aliases, globals, errors) = largs;
         if let ASTNode(_, ASTNodeR::Block(ref mut arr)) = node {
             let vars_sub = &mut vars.clone();
             for mut a in arr {
@@ -2262,7 +2461,8 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                             }
                             vars_sub.insert(arg.1, arg.0);
                         }
-                        check_references(block, functions, vars_sub, aliases, globals, errors, (tp.as_ref().map(|x| x.dealias(aliases)), func.clone()), false, lexer);
+                        let ac = aliases.clone();
+                        check_references((block, functions, vars_sub, aliases, globals, errors), (tp.as_ref().map(|x| x.dealias(&ac)), func.clone()), false, lexer);
                     },
                     ASTNode(pos, ASTNodeR::FunctionCall(name, args)) => {
                         if ! functions.contains_key(&(None, name.clone())) {
@@ -2295,18 +2495,18 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to member function `{name}` from type {left_type}")));
                             continue;
                         }
-                        let func_args = &functions.get(&(None, name.clone())).unwrap().0;
+                        let func_args = &functions.get(&(Some(left_type), name.clone())).unwrap().0;
 
                         let len_a = func_args.len();
-                        let len_b = vec.len();
-                        if len_a != len_b+1 {
+                        let len_b = vec.len()+1;
+                        if len_a != len_b {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "expected `{len_a}` arguments, got `{len_b}`")));
                             continue;
                         };
 
                         for (index, a) in vec.iter_mut().enumerate() {
                             let typa = check_references_expr(a, functions, vars_sub, aliases, errors, lexer);
-                            let typb = func_args.get(index).unwrap().clone();
+                            let typb = func_args.get(index+1).unwrap().clone();
 
                             if ! typa.is_compatible(&typb, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typb}`, found `{typa}`")));
@@ -2315,7 +2515,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                         }
                     }
                     ASTNode(_, ASTNodeR::Block(..)) => {
-                        check_references(a, functions, vars_sub, aliases, globals, errors, f.clone(), false, lexer);
+                        check_references((a, functions, vars_sub, aliases, globals, errors), f.clone(), false, lexer);
                     },
                     ASTNode(pos, ASTNodeR::SetField(ref mut expr_, ref mut name, ref mut rexpr, _)) => {
                         let struct_type = check_references_expr(expr_, functions, vars_sub, aliases, errors, lexer).dealias(aliases);
@@ -2338,14 +2538,14 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
                         if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                         }
-                        check_references(block, functions, vars_sub, aliases, globals, errors, f.clone(), is_loop, lexer);
+                        check_references((block, functions, vars_sub, aliases, globals, errors), f.clone(), is_loop, lexer);
                     },
                     ASTNode(pos, ASTNodeR::While(ref mut expr, ref mut block)) => {
                         let bool_type = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                         }
-                        check_references(block, functions, vars_sub, aliases, globals, errors, f.clone(), true, lexer);
+                        check_references((block, functions, vars_sub, aliases, globals, errors), f.clone(), true, lexer);
                     },
                     ASTNode(pos, ASTNodeR::Return(ref mut expr)) => {
                         let tp = check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
@@ -2521,7 +2721,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(HashMap<String, usize>,
         }
     }
 
-    check_references(ast, &mut functions, &vars, &mut type_aliases, &mut globals, &mut errors, (None, "".into()), false, &mut lexer);
+    check_references((ast, &mut functions, &vars, &mut type_aliases, &mut globals, &mut errors), (None, "".into()), false, &mut lexer);
     check_function_ret_paths(&ast.1, &mut errors, &mut lexer);
 
     // type checking
@@ -2617,7 +2817,7 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
                         ind += 8;
                         sz -= 8;
                     }
-                    ret.push(Inst::Global(index+ind/8, name.clone(), sz, ind, is_ref));
+                    ret.push(Inst::Global(index+ind/8, name, sz, ind, is_ref));
                 }
             }
         },
@@ -2638,10 +2838,10 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
             if is_ref {
                 let len = tp.unwrap().size(aliases);
                 for i in (0..(len/8)).rev() {
-                    indicies.insert("__struct_reserved__".into(), (last_ptr(&indicies)+8, 8));
-                    ret.push(Inst::VarSet(index+i, 8, last_ptr(&indicies)));
+                    indicies.insert("__struct_reserved__".into(), (last_ptr(indicies)+8, 8));
+                    ret.push(Inst::VarSet(index+i, 8, last_ptr(indicies)));
                 }
-                ret.push(Inst::Var(index, last_ptr(&indicies), 8, true));
+                ret.push(Inst::Var(index, last_ptr(indicies), 8, true));
             }
             ret.push(Inst::RetVal(index));
         },
@@ -2663,10 +2863,10 @@ fn intermediate_expr(expr: Expression, index: usize, indicies: &mut HashMap<Stri
             if is_ref {
                 let len = tp.unwrap().size(aliases);
                 for i in (0..(len/8)).rev() {
-                    indicies.insert("__struct_reserved__".into(), (last_ptr(&indicies)+8, 8));
-                    ret.push(Inst::VarSet(index+i, 8, last_ptr(&indicies)));
+                    indicies.insert("__struct_reserved__".into(), (last_ptr(indicies)+8, 8));
+                    ret.push(Inst::VarSet(index+i, 8, last_ptr(indicies)));
                 }
-                ret.push(Inst::Var(index, last_ptr(&indicies), 8, true));
+                ret.push(Inst::Var(index, last_ptr(indicies), 8, true));
             }
             ret.push(Inst::RetVal(index));
         },
@@ -2782,7 +2982,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
                             let len = globals.get(name).unwrap();
                             if *len < 8 {
                                 ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                            } if let Type::Struct(_, map) = tp.dealias(&aliases) {
+                            } else if let Type::Struct(_, map) = tp.dealias(&aliases) {
                                 let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
                                 vector.sort();
                                 let mut offset = 0;
@@ -2850,7 +3050,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
                 let size = vals.1;
                 if size < 8 {
                     ret.push(Inst::VarSet(0, vals.1, vals.0))
-                } if let Type::Struct(_, map) = tp.dealias(&aliases) {
+                } else if let Type::Struct(_, map) = tp.dealias(&aliases) {
                     let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
                     vector.sort();
                     let mut offset = vals.0;
@@ -2874,7 +3074,7 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
                 let len = globals.get(name).unwrap();
                 if *len < 8 {
                     ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                } if let Type::Struct(_, map) = tp {
+                } else if let Type::Struct(_, map) = tp {
                     let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
                     vector.sort();
                     let mut offset = 0;
@@ -2897,16 +3097,16 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
             }
         },
         ASTNodeR::VarOp(ref name, op, expr) => {
-            ret.append(&mut intermediate_expr(expr, 0, offsets, globals, &aliases, false));
+            ret.append(&mut intermediate_expr(expr, 1, offsets, globals, &aliases, false));
             
             if offsets.contains_key(name) {
                 let vals = offsets.get(name).unwrap();
-                ret.push(Inst::Var(1, vals.0, vals.1, false));
+                ret.push(Inst::Var(0, vals.0, vals.1, false));
                 ret.push(Inst::BinOp((0, 1), vals.1, op));
                 ret.push(Inst::VarSet(0, vals.1, vals.0))
             } else {
                 let len = globals.get(name).unwrap();
-                ret.push(Inst::Global(1, name.into(), 8, 0, false));
+                ret.push(Inst::Global(0, name.into(), 8, 0, false));
                 ret.push(Inst::BinOp((0, 1), *len, op));
                 ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
             }
@@ -3031,10 +3231,12 @@ fn intermediate(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
         },
         ASTNodeR::FunctionDecl(_, name, a, rt, block) => {
             let mut offsets: HashMap<String, (usize, usize)> = HashMap::new();
+            let mut offset = 0;
             for arg in a {
-                offsets.insert(arg.1, (last_ptr(&offsets) + arg.0.size(&aliases), arg.0.size(&aliases)));
+                offsets.insert(arg.1, (offset + arg.0.size(&aliases), arg.0.size(&aliases)));
+                offset += arg.0.size(&aliases);
             }
-            
+
             ret.push(Inst::Func(name, offsets.clone()));
             ret.append(&mut intermediate(block.1, &mut offsets, globals, aliases, 0, index * 3, false).0);
             if rt == Type::Primitive(PrimitiveType::Void) {
@@ -3064,7 +3266,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     let datatype = |a: usize| match a {
         1 => "byte",
         2 => "word",
-        4 => "dword",
+        4 => "word",
         8 => "qword",
         _ => "__invalid__"
     };
@@ -3136,21 +3338,19 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
         ret.push_str(match a {
             Inst::Func(name, offsets) => {
                 let mut string = String::new();
-                let mut index = 0;
                 
-                let mut vec: Vec<String> = offsets.iter().map(|(x, _)| x.clone()).collect();
+                let mut vec: Vec<(usize, String)> = offsets.iter().map(|(x, (o, _))| (*o, x.clone())).collect();
                 vec.sort();
 
-                for a in 0..offsets.len() {
-                    let mut sz = offsets[&vec[a]].1;
+                for (index, a) in (0..offsets.len()).enumerate() {
+                    let mut sz = offsets[&vec[a].1].1;
                     let mut add_off = 0;
                     while sz > 8 {
-                        string.push_str(&format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(index), ind = offsets[&vec[a]].0 + add_off));
+                        let _ = write!(string, "\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register(index), ind = offsets[&vec[a].1].0 + add_off);
                         sz -= 8;
                         add_off += 8;
                     }
-                    string.push_str(&format!("\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register_sz(index, sz), ind = offsets[&vec[a]].0 + add_off));
-                    index += 1;
+                    let _ = write!(string, "\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register_sz(index, sz), ind = offsets[&vec[a].1].0 + add_off);
                 }
                 format!(";; FUNCTION DECL {name}\n{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
             },
@@ -3164,7 +3364,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 format!(";; IF {id} END\n.l2_{id}:\n")
             },
             Inst::WhileCheck(reg, id) => {
-                format!(";; WHILE {id} CHECK\n\tcmp {}, 1\n\tjne .loop_{id}_end\n", register(reg))
+                format!(";; WHILE {id} CHECK\n\tcmp {}, 1\n\tjne .loop_{id}_end\n", register_sz(reg, 1))
             },
             Inst::WhileStart(_, id) => {
                 format!(";; WHILE {id} START\n.loop_{id}:\n")
@@ -3237,13 +3437,13 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     BinaryOp::Add => format!(";; ADD\n\tadd {}, {}\n",  register(reg.0), register(reg.1)),
                     BinaryOp::Sub => format!(";; SUB\n\tsub {}, {}\n",  register(reg.0), register(reg.1)),
                     BinaryOp::Mul => format!(";; MUL\n\timul {}, {}\n", register(reg.0), register(reg.1)),
-                    BinaryOp::Div => format!(";; DIV\n\tidiv {}, {}\n", register(reg.0), register(reg.1)),
+                    BinaryOp::Div => format!(";; DIV\n\txor rdx, rdx\n\tmov rax, {}\n\tidiv {}\n", register(reg.0), register(reg.1)),
                     BinaryOp::Eq  => format!(";; EQ\n\tcmp {r0}, {r1}\n\tsete al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
                     BinaryOp::Less => format!(";; LESS\n\tcmp {r0}, {r1}\n\tsetl al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
                     BinaryOp::Greater => format!(";; GREATER\n\tcmp {r0}, {r1}\n\tsetg al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
                     BinaryOp::LessEq => format!(";; LESS OR EQUAL\n\tcmp {r0}, {r1}\n\tsetle al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
                     BinaryOp::GreaterEq => format!(";; LESS\n\tcmp {r0}, {r1}\n\tsetge al\n\tmov {rr}, al\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz), rr = register_sz(reg.0, 1)),
-                    BinaryOp::Mod => format!(";; MOD\n\tmov rax, {r0}\n\tidiv {r1}\n\tmov {r0}, rdx\n", r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
+                    BinaryOp::Mod => format!(";; MOD\n\tmov rax, {r0}\n\txor rdx, rdx\n\tidiv {r1}\n\tmov {r0}, rdx\n", r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
                     BinaryOp::BoolAnd  => format!(";; AND\n\tand {r0}, {r1}\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
                     BinaryOp::BoolOr  => format!(";; AND\n\tor {r0}, {r1}\n",   r0 = register_sz(reg.0, sz), r1 = register_sz(reg.1, sz)),
 
@@ -3260,7 +3460,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     let mut string = String::new();
                     let mut i = 0;
                     while size > 8 {
-                        string.push_str(&format!("\tmov {}, [rbp-{}]\n", register(reg+i/8), index+i));
+                        let _ = writeln!(string, "\tmov {}, [rbp-{}]", register(reg+i/8), index+i);
                         size -= 8;
                         i += 8;
                     }
@@ -3297,12 +3497,10 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     string.push_str(";; ARRAY INDEX\n");
                     let rr = register(sz_vec.len());
                     string.push_str(format!("\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {rr}, rbx\n").as_str());
-                    let mut off = 0;
                     let mut offset = 0;
-                    for sz in sz_vec {
-                        let r = register_sz(reg0 + off, sz);
+                    for (off, sz) in sz_vec.iter().enumerate() {
+                        let r = register_sz(reg0 + off, *sz);
                         string.push_str(format!("\tmov {r}, [{rr}+{offset}]\n").as_str());
-                        off += 1;
                         offset += sz;
                     }
 
@@ -3322,21 +3520,17 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 } else {
                     let mut string: String = String::new();
                     string.push_str(";; SET ARRAY INDEX\n");
-                    let mut off = 0;
-                    for _ in &sz_vec {
+                    for (off, _) in sz_vec.iter().enumerate() {
                         let r = register(reg0+(sz_vec.len() - off-1));
                         string.push_str(format!("\tpush {r}\n").as_str());
-                        off += 1;
                     }
                     
                     string.push_str(format!("\tmov {r0}, {r2}\n\tadd {r0}, 8\n\tadd {r0}, {r1}\n").as_str());
-                    let mut off = 0;
                     let mut offset = 0;
-                    for sz in sz_vec {
+                    for (off, sz) in sz_vec.iter().enumerate() {
                         let r = register(reg0+off+1);
-                        let rs = register_sz(reg0+off+1, sz);
+                        let rs = register_sz(reg0+off+1, *sz);
                         string.push_str(format!("\tpop {r}\n\tmov [{r0}+{}], {rs}\n", offset).as_str());
-                        off += 1;
                         offset += sz;
                     }
 
@@ -3374,7 +3568,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     ret.push_str("_end:\n;; EXIT\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n");
 
     for a in global_strings {
-        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len() - a.matches("\\").count()).as_str());
+        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len() - a.matches('\\').count()).as_str());
     }
 
     for (ind, a) in global_arrays.into_iter().enumerate() {
@@ -3387,8 +3581,11 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     
     ret
 }
+type PosArgs = Vec<String>;
+type GnuArgs = HashMap<String, String>;
+type UnixArgs = HashMap<char, String>;
 
-fn parse_args(vec: Vec<String>) -> Result<(Vec<String>, HashMap<String, String>, HashMap<char, String>), String> {    
+fn parse_args(vec: Vec<String>) -> Result<(PosArgs, GnuArgs, UnixArgs), String> {    
     let mut pos_args = vec![];
     let mut gnu_args = HashMap::new();
     let mut unix_args = HashMap::new();
@@ -3402,16 +3599,14 @@ fn parse_args(vec: Vec<String>) -> Result<(Vec<String>, HashMap<String, String>,
 
     let mut state = NONE;
     
-    for i in 0..vec.len() {
-        let a = &vec[i];
-        
+    for a in vec {
         if a.starts_with("--") {
             if a.len() == 2 {
                 continue;
             }
             tmp_gnu_name = a.strip_prefix("--").unwrap().to_string();
             state = GNU;
-        } else if a.starts_with("-") {
+        } else if a.starts_with('-') {
             if a.len() > 2 {
                 return Err(format!("short (unix-like) argument `{a}` should only be one character long (e. g. `-o`)"));
             }
@@ -3589,7 +3784,7 @@ fn main() {
             obj_path.push_str(&name);
             obj_path.push_str(".o");
 
-            let mut outfile = path.clone();
+            let mut outfile = path;
             outfile.push_str(&name);
             let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
             if ! ld.status.success() {
@@ -3598,7 +3793,7 @@ fn main() {
             }
 
             let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
-            
+
             println!("Compiled {filename} -> {outfile} in {time}s");
         }
     }
@@ -3608,4 +3803,3 @@ fn main() {
         exit(1);
     }
 }
-

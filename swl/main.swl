@@ -1,13 +1,39 @@
 include "std.swl";
 alias string = [char];
 
-func main() -> int {
-    <- "string".len();
-    
-/*    [char] ptr3 = malloc(10);
-    read(ptr3);
-    print(ptr3);*/
+// func fizzbuzz(int i) -> string {
+//     if (i % 15 == 0) {
+//         <- "fizzbuzz";
+//     }
+//     if (i % 5 == 0) {
+//         <- "buzz";
+//     }
+//     if (i % 15 == 0) {
+//         <- "fizz";
+//     }
+//     <- i;
+// }
 
- //    <- __unsafe_convert(str2[1]);
+func f(int a, int b) -> int {
+    <- a + b;
 }
 
+func a(int a) -> int {
+    <- a + 1;
+}
+
+func main() -> int {
+//    string a = itoa(139418349);
+
+    // FIXME: werid arrlen(old) after allocating new
+    // (only present in syscall3, not in return)
+
+    string old = alloc_array(4);
+    string new = alloc_array(5);
+
+//    print(old);
+//    print("HERE");
+    string s = "test";
+    syscall3(1, 1, arr2addr(s), arrlen(s));
+    <- 42;
+}

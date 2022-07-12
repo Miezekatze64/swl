@@ -12,7 +12,7 @@
 
 - [ ] implement lambda functions + make all functions first-class
 
-- [x] check for redefined functions
+- [ ] check for redefined functions
 
 - [ ] disallow redefinition of vars in same scope
 

@@ -1,0 +1,174 @@
+intrinsic syscall      as syscall1(int index, int val) -> int;
+intrinsic syscall      as syscall3(int index, int val, int val2, int val3);
+intrinsic str_to_ptr   as arr2addr(string str) -> int;
+intrinsic dereference  as arrlen(string str)   -> int;
+
+intrinsic convert      as ptr2arr(int ptr) -> [unchecked]
+intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
+
+intrinsic set_ptr      as set_ptr(int ptr, int val);
+
+func brk(int val) -> int {
+    <- syscall1(12, val);
+}
+
+func sbrk(int inc) -> int {
+    int newbrk;
+    int oldbrk = 0;
+    int curbrk = 0;
+    
+    if (oldbrk == 0) {
+        curbrk = brk(0);
+        oldbrk = curbrk;
+    }
+
+    if (inc == 0) {
+        <- curbrk;
+    }
+    
+    newbrk = curbrk + inc;
+    
+    if (brk(newbrk) == curbrk) {
+        <- (-1);
+    }
+    
+    oldbrk = curbrk;
+    curbrk = newbrk;
+    <- oldbrk;
+}
+
+
+int    _m_heap_start = 0;
+int    _m_location = 0;
+[_m_struct]  _m_blocks;
+[_m_struct]  _m_holes;
+
+struct _m_struct {
+    int ptr;
+    int size;
+}
+    
+func _malloc(int size) -> int {
+    if (_m_heap_start == 0) {
+        _m_heap_start = sbrk(0);
+        _m_blocks     = ptr2arr(sbrk(1000 * (8 + 8 + 1)));
+        _m_holes      = ptr2arr(sbrk(1000 * (8 + 8 + 1)));
+    }
+    
+    // TODO: search for holes
+
+    int i = 0;
+    while (i < _m_location) {
+        if (_m_holes[i].size >= size) {
+            print("FOUND HOLE\n");
+            // TODO: move hole to _m_blocks
+//            _m_tcache[0].is_block = true;
+            <- _m_holes[i].ptr;
+        }
+        i += 1;
+    }
+    
+    int ptr = sbrk(size);
+    int current = ptr + size;
+
+    _m_blocks[_m_location] = _m_struct {
+        ptr: ptr;
+        size: size;
+    };
+
+    _m_location += 1;
+    
+    <- ptr;
+}
+
+func _free(int ptr) {
+    int i = 0;
+    while (i < _m_location) {
+        print("searching...\n");
+        exit(_m_blocks[i].ptr);
+        if (ptr == _m_blocks[i].ptr) {
+            // free it
+            print("freed\n");
+            // TODO: move to holes
+//            _m_tcache[i].is_block = false;
+            //TODO: check if last one: -> decrement heap space
+        }
+        i += 1;
+    }
+}
+
+func malloc(int size) -> [unchecked] {
+    int ptr     = _malloc(size);
+    set_ptr(ptr, size);
+    [int] array = ptr2arr(ptr);
+    <- array;
+}
+
+func free([unchecked] ptr) {
+    _free(__unsafe_convert(ptr));
+}
+
+
+func ptr_to_string(int ptr, int sz) -> [int] {
+    set_ptr(ptr, sz);
+    <- ptr2arr(ptr);
+}
+
+func strcpy(string a, string b) {
+    // TODO: use loops for this...
+    _strcpy(a, b, 0);
+}
+
+func _strcpy(string a, string b, int index) {
+    if (index == arrlen(b)) {
+        <-;
+    }
+    a[index] = b[index];
+    _strcpy(a, b, index+1);
+}
+
+
+func exit(int code) {
+    syscall1(60, code);
+}
+
+func read([char] str) {
+    syscall3(0, 0, arr2addr(str), arrlen(str));
+}
+
+func print([char] str) {
+    syscall3(1, 1, arr2addr(str), arrlen(str));
+}
+
+func bool_to_string(bool b) -> [char] {
+    if (b) {
+        <- "true";
+    }
+    <- "false";
+}
+
+alias string = [char];
+
+struct Test {
+    int a;
+    int b;
+}
+
+Test test;
+// TODO: better struct Test {int a, int b,...} to_string...
+func f() -> Test {
+    <- test;
+}
+
+func ident(Test t) -> Test {
+    <- t;
+}
+
+func str() -> Test {
+    <- Test {
+        b: 1;
+        a: 2;
+    };
+}
+
+alias string = [char];

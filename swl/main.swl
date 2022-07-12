@@ -1,0 +1,15 @@
+include "std.swl";
+
+func main() -> int {
+    [char] ptr1 = malloc(10);
+    [char] ptr2 = malloc(10);
+    free(ptr1);
+    
+    <- 0;
+    [char] ptr3 = malloc(10);
+    read(ptr3);
+    print(ptr3);
+
+
+ //    <- __unsafe_convert(str2[1]);
+}

@@ -1,4 +1,4 @@
-use std::{fs, env::args, process::{exit, Command}, io, collections::HashMap};
+use std::{fs, env::args, process::{exit, Command}, io, collections::HashMap, time::SystemTime};
 
 type Error = (ErrorLevel, String);
 
@@ -3144,7 +3144,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     ret
 }
 
-fn parse_args(vec: Vec<String>) -> Result<(Vec<String>, HashMap<String, String>, HashMap<char, String>), String> {
+fn parse_args(vec: Vec<String>) -> Result<(Vec<String>, HashMap<String, String>, HashMap<char, String>), String> {    
     let mut pos_args = vec![];
     let mut gnu_args = HashMap::new();
     let mut unix_args = HashMap::new();
@@ -3196,6 +3196,8 @@ fn parse_args(vec: Vec<String>) -> Result<(Vec<String>, HashMap<String, String>,
 }
 
 fn main() {
+    let start_time = SystemTime::now();
+    
     let mut args_ = args();
     let arg0 = args_.next().unwrap_or_else(|| {"<program>".into()});
 
@@ -3351,9 +3353,9 @@ fn main() {
                 error = true;
             }
 
-            let time = "42.2348s";
+            let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
             
-            println!("Compiled {filename} -> {outfile} in {time}");
+            println!("Compiled {filename} -> {outfile} in {time}s");
         }
     }
 

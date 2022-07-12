@@ -1,3 +1,4 @@
 /target
-*/*
 swl/main
+swl/main.asm
+swl/main.o

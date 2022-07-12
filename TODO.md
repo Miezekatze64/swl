@@ -4,15 +4,19 @@
 
 - [ ] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities + `type**`  syntax fix
 
-- [ ] fix `unreachable!()` at line 1292 (struct literals as statement), should add error
+- [ ] implement else
+
+- [ ] implement for loop
+
+- [x] fix `unreachable!()` at line 1292 (struct literals as statement), should add error
 
 - [ ] implement lambda functions + make all functions first-class
 
-- [ ] check for redefined functions
+- [x] check for redefined functions
 
 - [ ] disallow redefinition of vars in same scope
 
-- [ ] ensure that innermost var definition is used
+- [x] ensure that innermost var definition is used
 
 - [ ] add some kind of generic types:
   
@@ -30,7 +34,7 @@
 
 - [ ] support floats
 
-- [ ] add support for member functions
+- [x] add support for member functions
   
   ```swl
   func as_cstr() -> char* from string {}
@@ -54,11 +58,11 @@
   
   ## SWL
 
-- [ ] complete malloc implementation + wrapper functions
+- [x] complete malloc implementation + wrapper functions
 
 - [ ] implement some kind of dynamic array / list / vector
 
-- [ ] create stdlib
+- [x] create stdlib
 
 - [ ] create stdmath library
 
@@ -68,6 +72,6 @@
 
 - [ ] add lazy evaluated list (infinite data structures)
 
-- [ ] add useful comments
+- [x] add useful comments
 
 - [ ] add some functional operators (requires custom operators)

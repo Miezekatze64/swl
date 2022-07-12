@@ -23,7 +23,7 @@
 
 (eval-and-compile
     (defconst swl-keywords
-        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "syntax" "include")
+        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "syntax" "include" "break" "<-" "from")
         ))
 
 (eval-and-compile
@@ -40,7 +40,7 @@
     ("func \\(.*?\\)[( \t\n]" 1 font-lock-function-name-face)
     ("->[ \t\n]*\\([^ \t\n]*\\)[ \t\n]*" 1 font-lock-type-face)
     ("\\([a-zA-Z_]*\\)[ \t\n]*{" 1 font-lock-type-face)
-    ("struct \\(.*?\\)[( \t\n)]" 1 font-lock-type-face))
+    ("[ \t\n]+struct \\(.*?\\)[( \t\n)]" 1 font-lock-type-face))
 )
 
 ;;;###autoload

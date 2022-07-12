@@ -54,8 +54,8 @@ intrinsic_set_ptr:
 	mov [rax], rbx
 	ret
 
-;; FUNCTION DECL brk
-brk:
+;; FUNCTION DECL _brk
+_brk:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -77,8 +77,8 @@ brk:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL sbrk
-sbrk:
+;; FUNCTION DECL _sbrk
+_sbrk:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -105,18 +105,18 @@ sbrk:
 	cmp rax, rbx
 	sete al
 	mov al, al
-;; IF 15 START
+;; IF 49152 START
 	cmp al, 1
-	jne .l2_15
-.l1_15:
+	jne .l2_49152
+.l1_49152:
 ;; VALUE 0
 	mov rax, 0
 ;; PUSH
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL brk
-	call brk
+;; FUNCTION CALL _brk
+	call _brk
 ;; SET VAR 32
 	sub rsp, 32
 	mov qword [rbp-32], rax
@@ -125,8 +125,8 @@ sbrk:
 ;; SET VAR 24
 	sub rsp, 24
 	mov qword [rbp-24], rax
-;; IF 15 END
-.l2_15:
+;; IF 49152 END
+.l2_49152:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
@@ -139,17 +139,17 @@ sbrk:
 	cmp rax, rbx
 	sete al
 	mov al, al
-;; IF 16 START
+;; IF 98304 START
 	cmp al, 1
-	jne .l2_16
-.l1_16:
+	jne .l2_98304
+.l1_98304:
 ;; GET VAR 32
 	mov rax, [rbp-32]
 ;; RETURN
 	leave
 	ret
-;; IF 16 END
-.l2_16:
+;; IF 98304 END
+.l2_98304:
 ;; GET VAR 32
 	mov rax, [rbp-32]
 ;; PUSH
@@ -169,8 +169,8 @@ sbrk:
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL brk
-	call brk
+;; FUNCTION CALL _brk
+	call _brk
 ;; PUSH
 	push rax
 ;; GET VAR 32
@@ -181,17 +181,17 @@ sbrk:
 	cmp rax, rbx
 	sete al
 	mov al, al
-;; IF 18 START
+;; IF 393216 START
 	cmp al, 1
-	jne .l2_18
-.l1_18:
+	jne .l2_393216
+.l1_393216:
 ;; VALUE -1
 	mov rax, -1
 ;; RETURN
 	leave
 	ret
-;; IF 18 END
-.l2_18:
+;; IF 393216 END
+.l2_393216:
 ;; GET VAR 32
 	mov rax, [rbp-32]
 ;; SET VAR 24
@@ -233,18 +233,18 @@ _malloc:
 	cmp rax, rbx
 	sete al
 	mov al, al
-;; IF 18 START
+;; IF 196608 START
 	cmp al, 1
-	jne .l2_18
-.l1_18:
+	jne .l2_196608
+.l1_196608:
 ;; VALUE 0
 	mov rax, 0
 ;; PUSH
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL sbrk
-	call sbrk
+;; FUNCTION CALL _sbrk
+	call _sbrk
 ;; SET GLOBAL
 	mov qword [global__m_heap_start+0], rax
 ;; VALUE 1000
@@ -277,8 +277,8 @@ _malloc:
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL sbrk
-	call sbrk
+;; FUNCTION CALL _sbrk
+	call _sbrk
 ;; PUSH
 	push rax
 ;; POP
@@ -286,56 +286,16 @@ _malloc:
 ;; FUNCTION CALL ptr2arr
 	call ptr2arr
 ;; SET GLOBAL
-	mov qword [global__m_blocks+0], rax
-;; VALUE 1000
-	mov rax, 1000
-;; PUSH
-	push rax
-;; VALUE 8
-	mov rbx, 8
-;; PUSH
-	push rbx
-;; VALUE 8
-	mov rcx, 8
-;; POP
-	pop rbx
-;; ADD
-	add rbx, rcx
-;; PUSH
-	push rbx
-;; VALUE 1
-	mov rcx, 1
-;; POP
-	pop rbx
-;; ADD
-	add rbx, rcx
-;; POP
-	pop rax
-;; MUL
-	imul rax, rbx
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL sbrk
-	call sbrk
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL ptr2arr
-	call ptr2arr
-;; SET GLOBAL
-	mov qword [global__m_holes+0], rax
-;; IF 18 END
-.l2_18:
+	mov qword [global__m_tcache+0], rax
+;; IF 196608 END
+.l2_196608:
 ;; VALUE 0
 	mov rax, 0
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; WHILE 20 START
-.while_20:
+;; WHILE 786432 START
+.loop_786432:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
@@ -348,74 +308,106 @@ _malloc:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; WHILE 20 CHECK
+;; WHILE 786432 CHECK
 	cmp rax, 1
-	jne .while_20_end
+	jne .loop_786432_end
 ;; GET VAR 16
 	mov rax, [rbp-16]
-;; VALUE 16
-	mov rbx, 16
+;; VALUE 17
+	mov rbx, 17
 ;; MUL
 	imul rax, rbx
 ;; PUSH
 	push rax
 ;; GET GLOBAL
-	mov rbx, [global__m_holes+0]
+	mov rbx, [global__m_tcache+0]
 ;; POP
 	pop rax
 ;; ARRAY INDEX
 	add rbx, 8
 	add rbx, rax
-	mov rax, rbx
+	mov rdx, rbx
+	mov al, [rdx+0]
+	mov rbx, [rdx+1]
+	mov rcx, [rdx+9]
+;; SET VAR 33
+	sub rsp, 33
+	mov byte [rbp-33], al
+;; SET VAR 32
+	sub rsp, 32
+	mov qword [rbp-32], rbx
+;; SET VAR 24
+	sub rsp, 24
+	mov qword [rbp-24], rcx
+;; GET VAR REF 33
+	mov rax, rbp
+	sub rax, 33
 ;; GET STRUCT FIELD
-	add rax, 8
+	add rax, 0
 	mov rax, [rax]
 ;; PUSH
 	push rax
-;; GET VAR 8
-	mov rbx, [rbp-8]
-;; POP
-	pop rax
-;; LESS
-	cmp rax, rbx
-	setge al
-	mov al, al
-;; IF 22 START
-	cmp al, 1
-	jne .l2_22
-.l1_22:
-;; VALUE FOUND HOLE\n
-	mov rax, str_found_hole_n
+;; NOT
+	test al, al
+	setz al
 ;; PUSH
 	push rax
+;; GET VAR REF 33
+	mov rbx, rbp
+	sub rbx, 33
+;; GET STRUCT FIELD
+	add rbx, 9
+	mov rbx, [rbx]
+;; PUSH
+	push rbx
+;; GET VAR 8
+	mov rcx, [rbp-8]
+;; POP
+	pop rbx
+;; LESS
+	cmp rbx, rcx
+	setge al
+	mov bl, al
 ;; POP
 	pop rax
-;; FUNCTION CALL print
-	call print
-;; GET VAR 16
-	mov rax, [rbp-16]
-;; VALUE 16
-	mov rbx, 16
+;; AND
+	and al, bl
+;; IF 9437184 START
+	cmp al, 1
+	jne .l2_9437184
+.l1_9437184:
+;; VALUE 0
+	mov rax, 0
+;; VALUE 17
+	mov rbx, 17
 ;; MUL
 	imul rax, rbx
 ;; PUSH
 	push rax
 ;; GET GLOBAL
-	mov rbx, [global__m_holes+0]
+	mov rbx, [global__m_tcache+0]
 ;; POP
 	pop rax
 ;; ARRAY INDEX
 	add rbx, 8
 	add rbx, rax
 	mov rax, rbx
-;; GET STRUCT FIELD
+;; VALUE true
+	mov rbx, 1
+;; SET STRUCT FIELD
 	add rax, 0
+	mov [rax], bl
+;; GET VAR REF 33
+	mov rax, rbp
+	sub rax, 33
+;; GET STRUCT FIELD
+	add rax, 1
 	mov rax, [rax]
 ;; RETURN
 	leave
 	ret
-;; IF 22 END
-.l2_22:
+;; IF 9437184 END
+.l2_9437184:
 ;; VALUE 1
 	mov rax, 1
 ;; GET VAR 16
@@ -425,22 +417,22 @@ _malloc:
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; WHILE 20 END
-	jmp .while_20
-.while_20_end:
+;; WHILE 786432 END
+	jmp .loop_786432
+.loop_786432_end:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL sbrk
-	call sbrk
-;; SET VAR 24
-	sub rsp, 24
-	mov qword [rbp-24], rax
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; FUNCTION CALL _sbrk
+	call _sbrk
+;; SET VAR 41
+	sub rsp, 41
+	mov qword [rbp-41], rax
+;; GET VAR 41
+	mov rax, [rbp-41]
 ;; PUSH
 	push rax
 ;; GET VAR 8
@@ -449,31 +441,36 @@ _malloc:
 	pop rax
 ;; ADD
 	add rax, rbx
-;; SET VAR 32
-	sub rsp, 32
-	mov qword [rbp-32], rax
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; SET VAR 49
+	sub rsp, 49
+	mov qword [rbp-49], rax
+;; VALUE true
+	mov rax, 1
+;; GET VAR 41
+	mov rbx, [rbp-41]
 ;; GET VAR 8
-	mov rbx, [rbp-8]
+	mov rcx, [rbp-8]
 ;; GET GLOBAL
-	mov rcx, [global__m_location+0]
-;; VALUE 16
-	mov rdx, 16
+	mov rdx, [global__m_location+0]
+;; VALUE 17
+	mov rdi, 17
 ;; MUL
-	imul rcx, rdx
+	imul rdx, rdi
 ;; GET GLOBAL
-	mov rdx, [global__m_blocks+0]
+	mov rdi, [global__m_tcache+0]
 ;; SET ARRAY INDEX
+	push rcx
 	push rbx
 	push rax
-	mov rax, rdx
+	mov rax, rdi
 	add rax, 8
-	add rax, rcx
+	add rax, rdx
 	pop rbx
-	mov [rax+0], rbx
+	mov [rax+0], bl
 	pop rcx
-	mov [rax+8], rcx
+	mov [rax+1], rcx
+	pop rdx
+	mov [rax+9], rdx
 ;; VALUE 1
 	mov rax, 1
 ;; GET GLOBAL
@@ -482,8 +479,8 @@ _malloc:
 	add rax, rbx
 ;; SET GLOBAL
 	mov qword [global__m_location+0], rax
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; GET VAR 41
+	mov rax, [rbp-41]
 ;; RETURN
 	leave
 	ret
@@ -498,8 +495,8 @@ _free:
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; WHILE 20 START
-.while_20:
+;; WHILE 786432 START
+.loop_786432:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
@@ -512,27 +509,124 @@ _free:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; WHILE 20 CHECK
+;; WHILE 786432 CHECK
 	cmp rax, 1
-	jne .while_20_end
-;; VALUE searching...\n
-	mov rax, str_searching____n
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL print
-	call print
+	jne .loop_786432_end
 ;; GET VAR 16
 	mov rax, [rbp-16]
-;; VALUE 16
-	mov rbx, 16
+;; VALUE 17
+	mov rbx, 17
 ;; MUL
 	imul rax, rbx
 ;; PUSH
 	push rax
 ;; GET GLOBAL
-	mov rbx, [global__m_blocks+0]
+	mov rbx, [global__m_tcache+0]
+;; POP
+	pop rax
+;; ARRAY INDEX
+	add rbx, 8
+	add rbx, rax
+	mov rdx, rbx
+	mov al, [rdx+0]
+	mov rbx, [rdx+1]
+	mov rcx, [rdx+9]
+;; SET VAR 33
+	sub rsp, 33
+	mov byte [rbp-33], al
+;; SET VAR 32
+	sub rsp, 32
+	mov qword [rbp-32], rbx
+;; SET VAR 24
+	sub rsp, 24
+	mov qword [rbp-24], rcx
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; GET VAR REF 33
+	mov rbx, rbp
+	sub rbx, 33
+;; GET STRUCT FIELD
+	add rbx, 1
+	mov rbx, [rbx]
+;; POP
+	pop rax
+;; EQ
+	cmp rax, rbx
+	sete al
+	mov al, al
+;; PUSH
+	push rax
+;; GET VAR REF 33
+	mov rbx, rbp
+	sub rbx, 33
+;; GET STRUCT FIELD
+	add rbx, 0
+	mov rbx, [rbx]
+;; POP
+	pop rax
+;; AND
+	and al, bl
+;; IF 9437184 START
+	cmp al, 1
+	jne .l2_9437184
+.l1_9437184:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; VALUE 17
+	mov rbx, 17
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_tcache+0]
+;; POP
+	pop rax
+;; ARRAY INDEX
+	add rbx, 8
+	add rbx, rax
+	mov rax, rbx
+;; VALUE false
+	mov rbx, 0
+;; SET STRUCT FIELD
+	add rax, 0
+	mov [rax], bl
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; VALUE 0
+	mov rbx, 0
+;; POP
+	pop rax
+;; GREATER
+	cmp rax, rbx
+	setg al
+	mov al, al
+;; IF 113246208 START
+	cmp al, 1
+	jne .l2_113246208
+.l1_113246208:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; VALUE 1
+	mov rbx, 1
+;; POP
+	pop rax
+;; SUB
+	sub rax, rbx
+;; VALUE 17
+	mov rbx, 17
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_tcache+0]
 ;; POP
 	pop rax
 ;; ARRAY INDEX
@@ -544,24 +638,63 @@ _free:
 	mov rax, [rax]
 ;; PUSH
 	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL exit
-	call exit
-;; GET VAR 8
-	mov rax, [rbp-8]
+;; NOT
+	test al, al
+	setz al
+;; IF 679477248 START
+	cmp al, 1
+	jne .l2_679477248
+.l1_679477248:
+;; VALUE UNIFY LEFT\n
+	mov rax, str_unify_left_n
 ;; PUSH
 	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL print
+	call print
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; VALUE 1
+	mov rbx, 1
+;; POP
+	pop rax
+;; SUB
+	sub rax, rbx
+;; VALUE 17
+	mov rbx, 17
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_tcache+0]
+;; POP
+	pop rax
+;; ARRAY INDEX
+	add rbx, 8
+	add rbx, rax
+	mov rax, rbx
 ;; GET VAR 16
 	mov rbx, [rbp-16]
-;; VALUE 16
-	mov rcx, 16
+;; PUSH
+	push rbx
+;; VALUE 1
+	mov rcx, 1
+;; POP
+	pop rbx
+;; SUB
+	sub rbx, rcx
+;; VALUE 17
+	mov rcx, 17
 ;; MUL
 	imul rbx, rcx
 ;; PUSH
 	push rbx
 ;; GET GLOBAL
-	mov rcx, [global__m_blocks+0]
+	mov rcx, [global__m_tcache+0]
 ;; POP
 	pop rbx
 ;; ARRAY INDEX
@@ -569,28 +702,255 @@ _free:
 	add rcx, rbx
 	mov rbx, rcx
 ;; GET STRUCT FIELD
-	add rbx, 0
+	add rbx, 9
 	mov rbx, [rbx]
+;; PUSH
+	push rbx
+;; GET VAR 16
+	mov rcx, [rbp-16]
+;; VALUE 17
+	mov rdx, 17
+;; MUL
+	imul rcx, rdx
+;; PUSH
+	push rcx
+;; GET GLOBAL
+	mov rdx, [global__m_tcache+0]
+;; POP
+	pop rcx
+;; ARRAY INDEX
+	add rdx, 8
+	add rdx, rcx
+	mov rcx, rdx
+;; GET STRUCT FIELD
+	add rcx, 9
+	mov rcx, [rcx]
+;; POP
+	pop rbx
+;; ADD
+	add rbx, rcx
+;; SET STRUCT FIELD
+	add rax, 9
+	mov [rax], rbx
+;; IF 679477248 END
+.l2_679477248:
+;; IF 113246208 END
+.l2_113246208:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_location+0]
+;; PUSH
+	push rbx
+;; VALUE 1
+	mov rcx, 1
+;; POP
+	pop rbx
+;; SUB
+	sub rbx, rcx
 ;; POP
 	pop rax
-;; EQ
+;; LESS
 	cmp rax, rbx
-	sete al
+	setl al
 	mov al, al
-;; IF 24 START
+;; IF 226492416 START
 	cmp al, 1
-	jne .l2_24
-.l1_24:
-;; VALUE freed\n
-	mov rax, str_freed_n
+	jne .l2_226492416
+.l1_226492416:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; VALUE 1
+	mov rbx, 1
+;; POP
+	pop rax
+;; ADD
+	add rax, rbx
+;; VALUE 17
+	mov rbx, 17
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_tcache+0]
+;; POP
+	pop rax
+;; ARRAY INDEX
+	add rbx, 8
+	add rbx, rax
+	mov rax, rbx
+;; GET STRUCT FIELD
+	add rax, 0
+	mov rax, [rax]
+;; PUSH
+	push rax
+;; NOT
+	test al, al
+	setz al
+;; IF 1358954496 START
+	cmp al, 1
+	jne .l2_1358954496
+.l1_1358954496:
+;; VALUE UNIFY RIGHT\n
+	mov rax, str_unify_right_n
 ;; PUSH
 	push rax
 ;; POP
 	pop rax
 ;; FUNCTION CALL print
 	call print
-;; IF 24 END
-.l2_24:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; VALUE 17
+	mov rbx, 17
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_tcache+0]
+;; POP
+	pop rax
+;; ARRAY INDEX
+	add rbx, 8
+	add rbx, rax
+	mov rax, rbx
+;; GET VAR 16
+	mov rbx, [rbp-16]
+;; PUSH
+	push rbx
+;; VALUE 1
+	mov rcx, 1
+;; POP
+	pop rbx
+;; ADD
+	add rbx, rcx
+;; VALUE 17
+	mov rcx, 17
+;; MUL
+	imul rbx, rcx
+;; PUSH
+	push rbx
+;; GET GLOBAL
+	mov rcx, [global__m_tcache+0]
+;; POP
+	pop rbx
+;; ARRAY INDEX
+	add rcx, 8
+	add rcx, rbx
+	mov rbx, rcx
+;; GET STRUCT FIELD
+	add rbx, 9
+	mov rbx, [rbx]
+;; PUSH
+	push rbx
+;; GET VAR 16
+	mov rcx, [rbp-16]
+;; VALUE 17
+	mov rdx, 17
+;; MUL
+	imul rcx, rdx
+;; PUSH
+	push rcx
+;; GET GLOBAL
+	mov rdx, [global__m_tcache+0]
+;; POP
+	pop rcx
+;; ARRAY INDEX
+	add rdx, 8
+	add rdx, rcx
+	mov rcx, rdx
+;; GET STRUCT FIELD
+	add rcx, 9
+	mov rcx, [rcx]
+;; POP
+	pop rbx
+;; ADD
+	add rbx, rcx
+;; SET STRUCT FIELD
+	add rax, 9
+	mov [rax], rbx
+;; IF 1358954496 END
+.l2_1358954496:
+;; IF 226492416 END
+.l2_226492416:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; GET GLOBAL
+	mov rbx, [global__m_location+0]
+;; PUSH
+	push rbx
+;; VALUE 1
+	mov rcx, 1
+;; POP
+	pop rbx
+;; SUB
+	sub rbx, rcx
+;; POP
+	pop rax
+;; EQ
+	cmp rax, rbx
+	sete al
+	mov al, al
+;; IF 452984832 START
+	cmp al, 1
+	jne .l2_452984832
+.l1_452984832:
+;; VALUE DECREMENT\n
+	mov rax, str_decrement_n
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL print
+	call print
+;; VALUE -1
+	mov rax, -1
+;; PUSH
+	push rax
+;; GET VAR 16
+	mov rbx, [rbp-16]
+;; VALUE 17
+	mov rcx, 17
+;; MUL
+	imul rbx, rcx
+;; PUSH
+	push rbx
+;; GET GLOBAL
+	mov rcx, [global__m_tcache+0]
+;; POP
+	pop rbx
+;; ARRAY INDEX
+	add rcx, 8
+	add rcx, rbx
+	mov rbx, rcx
+;; GET STRUCT FIELD
+	add rbx, 9
+	mov rbx, [rbx]
+;; POP
+	pop rax
+;; MUL
+	imul rax, rbx
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL _sbrk
+	call _sbrk
+;; IF 452984832 END
+.l2_452984832:
+;; RETURN
+	leave
+	ret
+;; IF 9437184 END
+.l2_9437184:
 ;; VALUE 1
 	mov rax, 1
 ;; GET VAR 16
@@ -600,14 +960,22 @@ _free:
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; WHILE 20 END
-	jmp .while_20
-.while_20_end:
+;; WHILE 786432 END
+	jmp .loop_786432
+.loop_786432_end:
+;; VALUE free: double free\n
+	mov rax, str_free__double_free_n
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL print
+	call print
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL malloc
-malloc:
+;; FUNCTION DECL alloc_array
+alloc_array:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -653,8 +1021,8 @@ malloc:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL free
-free:
+;; FUNCTION DECL free_array
+free_array:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -676,82 +1044,27 @@ free:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL ptr_to_string
-ptr_to_string:
+;; FUNCTION DECL strcpy
+strcpy:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
 	sub rsp, 16
 	mov [rbp-16], rbx
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; GET VAR 16
-	mov rax, [rbp-16]
-;; PUSH
-	push rax
-;; POP
-	pop rbx
-;; POP
-	pop rax
-;; FUNCTION CALL set_ptr
-	call set_ptr
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL ptr2arr
-	call ptr2arr
-;; RETURN
-	leave
-	ret
-;; FUNCTION DECL strcpy
-strcpy:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 16
-	mov [rbp-16], rax
-	sub rsp, 8
-	mov [rbp-8], rbx
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; GET VAR 16
-	mov rax, [rbp-16]
-;; PUSH
-	push rax
 ;; VALUE 0
 	mov rax, 0
+;; SET VAR 24
+	sub rsp, 24
+	mov qword [rbp-24], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
 ;; PUSH
 	push rax
 ;; POP
-	pop rcx
-;; POP
-	pop rbx
-;; POP
 	pop rax
-;; FUNCTION CALL _strcpy
-	call _strcpy
-;; RETURN
-	leave
-	ret
-;; FUNCTION DECL _strcpy
-_strcpy:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 8
-	mov [rbp-8], rax
-	sub rsp, 24
-	mov [rbp-24], rbx
-	sub rsp, 16
-	mov [rbp-16], rcx
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; FUNCTION CALL arrlen
+	call arrlen
 ;; PUSH
 	push rax
 ;; GET VAR 16
@@ -764,21 +1077,34 @@ _strcpy:
 	call arrlen
 ;; GET RETURN VALUE
 	mov rbx, rax
+;; PUSH
+	push rbx
+;; POP
+	pop rbx
 ;; POP
 	pop rax
-;; EQ
+;; FUNCTION CALL min
+	call min
+;; SET VAR 32
+	sub rsp, 32
+	mov qword [rbp-32], rax
+;; WHILE 12582912 START
+.loop_12582912:
+;; GET VAR 24
+	mov rax, [rbp-24]
+;; PUSH
+	push rax
+;; GET VAR 32
+	mov rbx, [rbp-32]
+;; POP
+	pop rax
+;; LESS
 	cmp rax, rbx
-	sete al
+	setl al
 	mov al, al
-;; IF 24 START
-	cmp al, 1
-	jne .l2_24
-.l1_24:
-;; RETURN
-	leave
-	ret
-;; IF 24 END
-.l2_24:
+;; WHILE 12582912 CHECK
+	cmp rax, 1
+	jne .loop_12582912_end
 ;; GET VAR 24
 	mov rax, [rbp-24]
 ;; VALUE 1
@@ -794,7 +1120,8 @@ _strcpy:
 ;; ARRAY INDEX
 	add rbx, 8
 	add rbx, rax
-	mov rax, [rbx]
+	mov rbx, rbx
+	mov al, [rbx+0]
 ;; GET VAR 24
 	mov rbx, [rbp-24]
 ;; VALUE 1
@@ -807,37 +1134,21 @@ _strcpy:
 	push rax
 	mov rax, rcx
 	add rax, 8
-	add rax, rbx
+	add al, bl
 	pop rbx
-	mov [rax], rbx
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; GET VAR 16
-	mov rax, [rbp-16]
-;; PUSH
-	push rax
-;; GET VAR 24
-	mov rax, [rbp-24]
-;; PUSH
-	push rax
+	mov [rax], bl
 ;; VALUE 1
-	mov rbx, 1
-;; POP
-	pop rax
+	mov rax, 1
+;; GET VAR 24
+	mov rbx, [rbp-24]
 ;; ADD
 	add rax, rbx
-;; PUSH
-	push rax
-;; POP
-	pop rcx
-;; POP
-	pop rbx
-;; POP
-	pop rax
-;; FUNCTION CALL _strcpy
-	call _strcpy
+;; SET VAR 24
+	sub rsp, 24
+	mov qword [rbp-24], rax
+;; WHILE 12582912 END
+	jmp .loop_12582912
+.loop_12582912_end:
 ;; RETURN
 	leave
 	ret
@@ -966,55 +1277,72 @@ bool_to_string:
 	mov [rbp-1], al
 ;; GET VAR 1
 	mov al, [rbp-1]
-;; IF 28 START
+;; IF 50331648 START
 	cmp al, 1
-	jne .l2_28
-.l1_28:
+	jne .l2_50331648
+.l1_50331648:
 ;; VALUE true
 	mov rax, str_true
 ;; RETURN
 	leave
 	ret
-;; IF 28 END
-.l2_28:
+;; IF 50331648 END
+.l2_50331648:
 ;; VALUE false
 	mov rax, str_false
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL f
-f:
+;; FUNCTION DECL min
+min:
 	push rbp
 	mov rbp,rsp
-;; GET GLOBAL
-	mov rax, [global_test+0]
-;; GET GLOBAL
-	mov rbx, [global_test+8]
+	sub rsp, 8
+	mov [rbp-8], rax
+	sub rsp, 16
+	mov [rbp-16], rbx
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; GET VAR 16
+	mov rbx, [rbp-16]
+;; POP
+	pop rax
+;; LESS
+	cmp rax, rbx
+	setl al
+	mov al, al
+;; IF 201326592 START
+	cmp al, 1
+	jne .l2_201326592
+.l1_201326592:
+;; GET VAR 8
+	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL ident
-ident:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 16
-	mov [rbp-16], rax
-	sub rsp, 24
-	mov [rbp-24], rax
+;; IF 201326592 END
+.l2_201326592:
 ;; GET VAR 16
 	mov rax, [rbp-16]
-	mov rbx, [rbp-24]
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL str
-str:
+;; FUNCTION DECL len
+len:
 	push rbp
 	mov rbp,rsp
-;; VALUE 2
-	mov rax, 2
-;; VALUE 1
-	mov rbx, 1
+	sub rsp, 8
+	mov [rbp-8], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL arrlen
+	call arrlen
 ;; RETURN
 	leave
 	ret
@@ -1022,96 +1350,43 @@ str:
 main:
 	push rbp
 	mov rbp,rsp
-;; VALUE 10
-	mov rax, 10
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL malloc
-	call malloc
-;; SET VAR 8
-	sub rsp, 8
-	mov qword [rbp-8], rax
-;; VALUE 10
-	mov rax, 10
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL malloc
-	call malloc
-;; SET VAR 16
-	sub rsp, 16
-	mov qword [rbp-16], rax
-;; GET VAR 8
-	mov rax, [rbp-8]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL free
-	call free
-;; VALUE 0
-	mov rax, 0
+;; VALUE string
+	mov rax, str_string
+;; FUNCTION CALL len
+	call len
 ;; RETURN
 	leave
 	ret
-;; VALUE 10
-	mov rax, 10
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL malloc
-	call malloc
-;; SET VAR 24
-	sub rsp, 24
-	mov qword [rbp-24], rax
-;; GET VAR 24
-	mov rax, [rbp-24]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL read
-	call read
-;; GET VAR 24
-	mov rax, [rbp-24]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL print
-	call print
 _end:
 ;; EXIT
 	mov rdi, rax
 	mov rax, 60
 	syscall
 section .data
-str_found_hole_n:
+str_unify_left_n:
 	dq 11
-	db `FOUND HOLE\n`
-str_searching____n:
-	dq 13
-	db `searching...\n`
-str_freed_n:
-	dq 6
-	db `freed\n`
+	db `UNIFY LEFT\n`
+str_unify_right_n:
+	dq 12
+	db `UNIFY RIGHT\n`
+str_decrement_n:
+	dq 10
+	db `DECREMENT\n`
+str_free__double_free_n:
+	dq 18
+	db `free: double free\n`
 str_true:
 	dq 4
 	db `true`
 str_false:
 	dq 5
 	db `false`
+str_string:
+	dq 6
+	db `string`
 global__m_location:
+	resb 8
+global__m_tcache:
 	resb 8
 global__m_heap_start:
 	resb 8
-global__m_blocks:
-	resb 8
-global__m_holes:
-	resb 8
-global_test:
-	resb 16

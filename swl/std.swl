@@ -1,3 +1,5 @@
+/* SWL STANDARD LIBRARY */
+// used intrinsics
 intrinsic syscall      as syscall1(int index, int val) -> int;
 intrinsic syscall      as syscall3(int index, int val, int val2, int val3);
 intrinsic str_to_ptr   as arr2addr(string str) -> int;
@@ -8,17 +10,34 @@ intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
 
 intrinsic set_ptr      as set_ptr(int ptr, int val);
 
-func brk(int val) -> int {
+// the default string type (an array of characters)
+alias string = [char];
+
+
+// calls the brk (break) system call, to change the current program break (start of heap) to given location
+// -------
+// args:
+//   val <- the next break location (pointer)
+// returns:
+//   if > 0: the number of bytes the break moved.
+//   if 0: the current program break
+func _brk(int val) -> int {
     <- syscall1(12, val);
 }
 
-func sbrk(int inc) -> int {
+// moves the current program's break (start of heap) a given number of bytes
+// -------
+// args:
+//   inc <- the number of bytes to increment
+// returns:
+//   the new loctaion of the break
+func _sbrk(int inc) -> int {
     int newbrk;
     int oldbrk = 0;
     int curbrk = 0;
     
     if (oldbrk == 0) {
-        curbrk = brk(0);
+        curbrk = _brk(0);
         oldbrk = curbrk;
     }
 
@@ -28,7 +47,7 @@ func sbrk(int inc) -> int {
     
     newbrk = curbrk + inc;
     
-    if (brk(newbrk) == curbrk) {
+    if (_brk(newbrk) == curbrk) {
         <- (-1);
     }
     
@@ -37,43 +56,59 @@ func sbrk(int inc) -> int {
     <- oldbrk;
 }
 
-
+// fields used by _malloc and _free
+// _m_heap_start:
+//   contains the current start of the heap (program break)
+// _m_location:
+//   contains the last used index of the tcache
+// _m_tcache:
+//   contains current allocated (and freed + blocked) blocks of the malloc() and free() functions
 int    _m_heap_start = 0;
 int    _m_location = 0;
-[_m_struct]  _m_blocks;
-[_m_struct]  _m_holes;
+[_m_struct]  _m_tcache;
 
+// the structure of the tcache (one allocated or blocked block)
+// ptr:
+//    the memory location of the block
+// size:
+//    the size (in bytes) of the block
+// is_block:
+//    true if block, false if hole
 struct _m_struct {
     int ptr;
     int size;
+    bool is_block;
 }
-    
+
+
+// allocates given number of bytes
+// ------
+// args:
+//   size <- the number of bytes to allocate
+// returns: the address of the allocated space
 func _malloc(int size) -> int {
     if (_m_heap_start == 0) {
-        _m_heap_start = sbrk(0);
-        _m_blocks     = ptr2arr(sbrk(1000 * (8 + 8 + 1)));
-        _m_holes      = ptr2arr(sbrk(1000 * (8 + 8 + 1)));
+        _m_heap_start = _sbrk(0);
+        _m_tcache     = ptr2arr(_sbrk(1000 * (8 + 8 + 1)));
     }
-    
-    // TODO: search for holes
 
     int i = 0;
     while (i < _m_location) {
-        if (_m_holes[i].size >= size) {
-            print("FOUND HOLE\n");
-            // TODO: move hole to _m_blocks
-//            _m_tcache[0].is_block = true;
-            <- _m_holes[i].ptr;
+        _m_struct index = _m_tcache[i];
+        if (!index.is_block && index.size >= size) {
+            _m_tcache[0].is_block = true;
+            <- index.ptr;
         }
         i += 1;
     }
     
-    int ptr = sbrk(size);
+    int ptr = _sbrk(size);
     int current = ptr + size;
 
-    _m_blocks[_m_location] = _m_struct {
+    _m_tcache[_m_location] = _m_struct {
         ptr: ptr;
         size: size;
+        is_block: true;
     };
 
     _m_location += 1;
@@ -81,65 +116,108 @@ func _malloc(int size) -> int {
     <- ptr;
 }
 
+// frees an earlier allocated block
+// ------
+// args:
+//   ptr <- the address of the block to free
 func _free(int ptr) {
     int i = 0;
     while (i < _m_location) {
-        print("searching...\n");
-        exit(_m_blocks[i].ptr);
-        if (ptr == _m_blocks[i].ptr) {
+        _m_struct index = _m_tcache[i];
+        if (ptr == index.ptr && index.is_block) {
             // free it
-            print("freed\n");
-            // TODO: move to holes
-//            _m_tcache[i].is_block = false;
-            //TODO: check if last one: -> decrement heap space
+            _m_tcache[i].is_block = false;
+            // test for merge left
+            if (i > 0) {
+                if (!_m_tcache[i - 1].is_block) {
+                    print("UNIFY LEFT\n");
+                    _m_tcache[i - 1].size = _m_tcache[i - 1].size + _m_tcache[i].size;
+                }
+            }
+
+            if (i < _m_location - 1) {
+                if (!_m_tcache[i + 1].is_block) {
+                    print("UNIFY RIGHT\n");
+                    _m_tcache[i].size = _m_tcache[i + 1].size + _m_tcache[i].size;
+                }
+            }
+
+            if (i == _m_location - 1) {
+                print("DECREMENT\n");
+                // decrement heap space
+                _sbrk(-_m_tcache[i].size);
+            }
+            <-;
         }
         i += 1;
     }
+
+    print("free: double free\n");
 }
 
-func malloc(int size) -> [unchecked] {
+// allocates an array with a given number of bytes on the heap
+// ------
+// args:
+//   size <- the number of bytes to allocate
+// returns: an array at the newly allocated space
+func alloc_array(int size) -> [unchecked] {
     int ptr     = _malloc(size);
     set_ptr(ptr, size);
     [int] array = ptr2arr(ptr);
     <- array;
 }
 
-func free([unchecked] ptr) {
-    _free(__unsafe_convert(ptr));
+// frees an earlier allocated array
+// ------
+// args:
+//   a <- the array to free
+func free_array([unchecked] a) {
+    _free(__unsafe_convert(a));
 }
 
-
-func ptr_to_string(int ptr, int sz) -> [int] {
-    set_ptr(ptr, sz);
-    <- ptr2arr(ptr);
-}
-
+// copies the contents of string b to string a (without overflow)
+// ------
+// args:
+//   a <- the destination string
+//   b <- the source string
 func strcpy(string a, string b) {
-    // TODO: use loops for this...
-    _strcpy(a, b, 0);
-}
-
-func _strcpy(string a, string b, int index) {
-    if (index == arrlen(b)) {
-        <-;
+    int i = 0;
+    int len = min(arrlen(a), arrlen(b));
+    while (i < len) {
+        a[i] = b[i];
+        i += 1;
     }
-    a[index] = b[index];
-    _strcpy(a, b, index+1);
 }
 
-
+// exits the program with given exit code
+// ------
+// args:
+//   code <- the exit code
 func exit(int code) {
     syscall1(60, code);
 }
 
-func read([char] str) {
-    syscall3(0, 0, arr2addr(str), arrlen(str));
+// reads contents from stdin in a given array buffer, until it is full
+// ------
+// args:
+//   buf <- the buffer
+func read([char] buf) {
+    syscall3(0, 0, arr2addr(buf), arrlen(buf));
 }
 
+// prints a given string to stdout
+// ------
+// args:
+//   str <- the string to print
 func print([char] str) {
     syscall3(1, 1, arr2addr(str), arrlen(str));
 }
 
+// converts a boolean to a string (true -> "true", false -> "false")
+// ------
+// args:
+//   b <- the boolean
+// returns: the strings
 func bool_to_string(bool b) -> [char] {
     if (b) {
         <- "true";
@@ -147,28 +225,38 @@ func bool_to_string(bool b) -> [char] {
     <- "false";
 }
 
-alias string = [char];
-
-struct Test {
-    int a;
-    int b;
+// returns the length of the string
+// ------
+// returns: the length
+func len(string self) -> int from string {
+    <- arrlen(self);
 }
 
-Test test;
-// TODO: better struct Test {int a, int b,...} to_string...
-func f() -> Test {
-    <- test;
+// returns the smaller of two numbers
+// ------
+// args:
+//   a <- the first number
+//   b <- the second number
+// returns: the smaller number
+func min(int a, int b) -> int {
+    if (a < b) {
+        <- a;
+    }
+    <- b;
 }
 
-func ident(Test t) -> Test {
-    <- t;
+// returns the bigger of two numbers
+// ------
+// args:
+//   a <- the first number
+//   b <- the second number
+// returns: the bigger number
+func max(int a, int b) {
+    if (a > b) {
+        <- a;
+    }
+    <- b;
 }
 
-func str() -> Test {
-    <- Test {
-        b: 1;
-        a: 2;
-    };
-}
 
-alias string = [char];
+

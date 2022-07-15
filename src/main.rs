@@ -570,8 +570,14 @@ impl Lexer {
                     },
                     '0'..='9'|'.' => {
                         if ttype == TokenType::Float ||
-                            ((ttype == TokenType::Undef
-                              || ttype == TokenType::Int) && ch == '.') {
+                            ((ttype == TokenType::Int) && ch == '.') {
+                                if ttype != TokenType::Float && self.pos + 1 < self.source.len() && ! self.source[self.pos+1].is_numeric() {
+                                    return Ok(Token {
+                                        pos: token_pos,
+                                        ttype,
+                                        value: val,
+                                    });
+                                }
                                 ttype = TokenType::Float;
                                 val.push(ch);
                             } else if ttype == TokenType::Undef ||
@@ -1303,6 +1309,7 @@ impl Parser {
 
             // parse operation
             let tk_op = get_peek_token!(self.lexer, errors);
+            
             let op = if tk_op.ttype == TokenType::Operator {
                 match Op::from_str(tk_op.value) {
                     Ok(a) => a,
@@ -1314,15 +1321,16 @@ impl Parser {
                 }
             } else if tk_op.ttype == TokenType::Eof ||
                 (tk_op.ttype == TokenType::Special &&
-                 seperators.contains(&tk_op.value.as_str())) {
+                 (seperators.contains(&tk_op.value.as_str()) || tk_op.value == ".")) {
                     self.lexer.next_token().unwrap();
                     return Ok((*nleft_expr, tk_op));
-                } else {
-                    let val = tk_op.value;
+            } else {
+                    let val = tk_op.clone().value;
                     errors.push((ErrorLevel::Err, error!(
                         self.lexer, tk_op.pos, "invalid token `{val}`")));
                     return Err(errors);
                 };
+
 
             self.lexer.next_token().unwrap();
 
@@ -1346,7 +1354,7 @@ impl Parser {
 
         let mut errors: Vec<Error> = vec![];
         let mut token = get_token!(self.lexer, errors);
-        let val = token.value;
+        let val = token.clone().value;
 
 
         fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool)
@@ -1376,9 +1384,9 @@ impl Parser {
                 TokenType::Operator => {
                     if next_token.value == "=" {
                         // variable initialization
-                        let expr = parser.parse_expr(&[";"])?;
+                        let expr = parser.parse_expr(&[";"])?.0;
                         Ok(Some(ASTNode(pos, ASTNodeR::VarDecInit(
-                            is_root, typ, ident, expr.0))))
+                            is_root, typ, ident, expr))))
                     } else {
                         Err(vec![(ErrorLevel::Err, error!(
                             parser.lexer, next_token.pos,
@@ -1424,7 +1432,7 @@ impl Parser {
                     args.insert(args.len(), (t, nval));
 
                     let token = get_token!(parser.lexer, errors);
-                    let val = token.value;
+                    let val = token.clone().value;
                     if token.ttype != TokenType::Special {
                         errors.push((
                             ErrorLevel::Err,error!(
@@ -1474,6 +1482,7 @@ impl Parser {
             Ok((args, ret_type))
         }
 
+
         match token.ttype {
             TokenType::Int | TokenType::Float | TokenType::Char |
             TokenType::String | TokenType::Bool => {
@@ -1493,7 +1502,7 @@ impl Parser {
 
                         if var_token.ttype == TokenType::Operator &&
                             var_val == "=" {
-                            let expr = self.parse_expr(&[";"])?.0;
+                                let expr = self.parse_expr(&[";"])?.0;
                                 return Ok(Some(ASTNode(
                                     token.pos,ASTNodeR::VarInit(
                                         val, expr, None))));
@@ -1641,6 +1650,7 @@ impl Parser {
             },
             TokenType::Operator => {},
             TokenType::Type => {
+                
                 self.lexer.pos = start_pos;
                 let typ = err_ret!(self.parse_type(), errors);
                 
@@ -1760,8 +1770,9 @@ impl Parser {
                     let file = err_ret!(self.expect(Some(TokenType::String), None), errors).value;
                     filename.push_str(&file);
                     err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors).value;
-                    if verbose > 2 {
-                        println!("FILE: {filename}");
+
+                    if verbose > 0 {
+                        eprintln!("[*] generatinng AST for included file `{filename}`");
                     }
                     let mut file_parser = match Parser::new(filename.clone()) {
                         Ok(a) => a,
@@ -1782,14 +1793,8 @@ impl Parser {
                         },
                     };
 
-                    if verbose > 0 {
-                        eprintln!("-- GENERATINNG INCLUDED AST: {filename} --");
-                    }
                     if verbose > 1 {
                         eprintln!("{:#?}", ast);
-                    }
-                    if verbose > 0 {
-                        eprintln!("-- GENERATED INCLUDED AST: {filename} --");
                     }
                     if verbose > 2 {
                         eprintln!("-- INCLUDED AST: {filename} (converted) --");
@@ -1839,7 +1844,7 @@ impl Parser {
                     // expect `=`
                     let next_token = get_token!(self.lexer, errors);
                     if next_token.ttype != TokenType::Operator || next_token.value != "=" {
-                        let ntv = next_token.value;
+                        let ntv = next_token.clone().value;
                         errors.push((ErrorLevel::Err, error!(self.lexer, next_token.pos, "unexpected token `{ntv}`, identifier expect")));
                         return Err(errors);
                     }
@@ -1889,7 +1894,7 @@ impl Parser {
         let mut errors: Vec<Error> = vec![];
 
         let token = get_peek_token!(self.lexer, errors);
-        let val = token.value;
+        let val = token.clone().value;
         
         let res = match token.ttype {
             TokenType::Int | TokenType::Float | TokenType::Ident | TokenType::Type | TokenType::Keyword | TokenType::String | TokenType::Char | TokenType::Bool => {
@@ -2124,7 +2129,7 @@ impl Parser {
         // expect ]
         let next_token = self.lexer.next_token()?;
         if next_token.ttype != TokenType::Special || next_token.value != "]" {
-            let val = next_token.value;
+            let val = next_token.clone().value;
             return Err((ErrorLevel::Err, error!(self.lexer, next_token.pos, "invalid token `{val}`, `]` expect")));
         }
 
@@ -2133,7 +2138,7 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<Type, Error> {
         let nt = self.lexer.next_token()?;
-        let val = nt.value;
+        let val = nt.clone().value;
 
         let mut tmp_tp = if nt.ttype == TokenType::Type {
             match parse_type(val.clone()) {
@@ -2170,7 +2175,7 @@ impl Parser {
 
             if ! is_valid {
                 let exp_val = ival;
-                let val = token.value;
+                let val = token.clone().value;
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, `{exp_val}` expected")))
             } else {
                 Ok(token)
@@ -2178,7 +2183,7 @@ impl Parser {
         } else if let Some(t) = typ {
             let is_valid: bool = token.ttype == t;
             if ! is_valid {
-                let val = token.value;
+                let val = token.clone().value;
                 let ttype = t.to_string();
                 Err((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`, {ttype} expected")))
             } else {
@@ -2453,10 +2458,10 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
             let vars_sub = &mut vars.clone();
             for mut a in arr {
                 match a {
-                    ASTNode(_, ASTNodeR::FunctionDecl(tp, func, args, _, block)) => {
+                    ASTNode(pos, ASTNodeR::FunctionDecl(tp, func, args, _, block)) => {
                         for arg in args.clone() {
                             if let Type::Custom(t) = arg.0.dealias(aliases) {
-                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "use of undefined type `{t}`")));
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
                                 continue;
                             }
                             vars_sub.insert(arg.1, arg.0);
@@ -2554,7 +2559,7 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{ret_type}`, found `{tp}`, because of return type")));
                         }
                     },
-                    ASTNode(_, ASTNodeR::ArrIndexInit(lexpr, ref mut ind, ref mut expr, _)) => {
+                    ASTNode(pos, ASTNodeR::ArrIndexInit(lexpr, ref mut ind, ref mut expr, _)) => {
                         let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                         if type_r == &Type::Invalid {
                             continue;
@@ -2569,21 +2574,21 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                         if let Type::Array(_) = type_l {} else if let Type::Custom(ref inner) = type_l {
                             if aliases.contains_key(inner) {
                                 if let Type::Array(_) = aliases.get(inner).unwrap() {} else {
-                                    errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                                    errors.push((ErrorLevel::Err, error!(lexer, *pos, "{type_l} used in array indexing is not an array type")));
                                 }
                             } else {
-                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "{type_l} used in array indexing is not an array type")));
                             }
                         } else {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "{type_l} used in array indexing is not an array type")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "{type_l} used in array indexing is not an array type")));
                         }
                         
                         if ! type_l.is_compatible(&Type::Array(Box::new(type_r.clone())), aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expected `{type_l}`, found `{type_r}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{type_l}`, found `{type_r}`")));
                         }
                         
                         if ! Type::Primitive(PrimitiveType::Int).is_compatible(type_ind, aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expected int, found `{type_ind}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected int, found `{type_ind}`")));
                         }
                         if let Type::Struct(_, map) = type_r {
                             let mut vector_: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
@@ -2596,9 +2601,9 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                         }
                         
                     },
-                    ASTNode(_, ASTNodeR::VarInit(var, ref mut expr, _)) => {
+                    ASTNode(pos, ASTNodeR::VarInit(var, ref mut expr, _)) => {
                         if ! vars_sub.contains_key(var) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to variable `{var}`")));
                         } else {
                             let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                             if type_r == &Type::Invalid {
@@ -2606,14 +2611,14 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                             }
                             let type_l = vars_sub.get(var).unwrap().dealias(aliases);
                             if ! type_l.is_compatible(type_r, aliases) {
-                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expected `{type_l}`, found `{type_r}`")));
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{type_l}`, found `{type_r}`")));
                             }
                             a.1 = ASTNodeR::VarInit(var.clone(), expr.clone(), Some(type_l));
                         }
                     },
-                    ASTNode(_, ASTNodeR::VarOp(var, op, ref mut expr)) => {
+                    ASTNode(pos, ASTNodeR::VarOp(var, op, ref mut expr)) => {
                         if ! vars_sub.contains_key(var) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "undefined reference to variable `{var}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to variable `{var}`")));
                         } else {
                             let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
                             if type_r == &Type::Invalid {
@@ -2621,25 +2626,25 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                             }
                             let type_l = vars_sub.get(var).unwrap();
                             if ! type_l.is_compatible(type_r, aliases) {
-                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expected `{type_l}`, found `{type_r}`")));
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{type_l}`, found `{type_r}`")));
                             }
 
                             if Op::combine_type(&Op::Binary(*op), type_l, type_l, aliases) == Type::Invalid {
-                                errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types `{type_l}` and `{type_r}` for operation `{op}`")));
+                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types `{type_l}` and `{type_r}` for operation `{op}`")));
                             }
                             
                         }
                     },
-                    ASTNode(_, ASTNodeR::VarDec(_, tp, name)) => {
+                    ASTNode(pos, ASTNodeR::VarDec(_, tp, name)) => {
                         if let Type::Custom(t) = tp.dealias(aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "use of undefined type `{t}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
                             continue;
                         }
                         vars_sub.insert(name.clone(), tp.clone());
                     },
-                    ASTNode(_, ASTNodeR::VarDecInit(_, tp, name, expr)) => {
+                    ASTNode(pos, ASTNodeR::VarDecInit(_, tp, name, expr)) => {
                         if let Type::Custom(t) = tp.dealias(aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "use of undefined type `{t}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
                             continue;
                         }
                         let type_r = &check_references_expr(expr, functions, vars_sub, aliases, errors, lexer);
@@ -2648,13 +2653,13 @@ fn check(ast: &mut ASTNode, mut lexer: Lexer) -> Result<(Globals, Aliases, Funct
                         }
                         let typ = tp.dealias(aliases);
                         if ! typ.is_compatible(type_r, aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "incompatible types: expected `{typ}`, found `{type_r}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typ}`, found `{type_r}`")));
                         }
                         vars_sub.insert(name.clone(), typ.clone());
                     },
-                    ASTNode(_, ASTNodeR::Break()) => {
+                    ASTNode(pos, ASTNodeR::Break()) => {
                         if ! is_loop {
-                            errors.push((ErrorLevel::Err, error!(lexer, a.0, "break outside of loop")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "break outside of loop")));
                         }
                     },
                     ASTNode(_, ASTNodeR::TypeAlias(_, _)) => {},
@@ -3656,7 +3661,7 @@ fn main() {
     } else if unix_args.contains_key(&'v') {
         &unix_args[&'v']
     } else {
-        "0"
+        "1"
     }.parse::<usize>().unwrap_or(0);
 
     let filename: String = match pos_args.get(0) {
@@ -3685,7 +3690,7 @@ fn main() {
     });
 
     if verbose > 0 {
-        eprintln!("---  START PARSING ---");
+        eprintln!("[*] generating AST");
     }
 
     let mut a = parser.parse(verbose);
@@ -3702,9 +3707,6 @@ fn main() {
     let mut globals: HashMap<String, usize> = HashMap::new();
     
     if let Ok(ref mut ast) = a {
-        if verbose > 0 {
-            eprintln!("--- END PARSING ---");
-        }
         if verbose > 1 {
             eprintln!("\nAST NODE: \n{:#?}", ast);
         }
@@ -3712,7 +3714,7 @@ fn main() {
             eprintln!("--- AST (converted back to code) ---\n{}\n", ast);
         }
         if verbose > 0 {
-            eprintln!("--- STARTING TYPECHECKING ---:");
+            eprintln!("[*] type-checking");
         }
         match check(ast, parser.lexer) {
             Err(e) => {
@@ -3735,31 +3737,22 @@ fn main() {
     }
 
     if checked {
-        if verbose > 0 {
-            eprintln!("--- FINISHED CHECKING ---");
-        }
         if let Ok(ast) = a {
             if verbose > 0 {
-                println!("--- GENERATING INTERMEDIATE REPRESANTATION ---");
+                println!("[*] generating intermediate represantation");
             }
+            
             let (intermediate, globals) = intermediate(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
             if verbose > 2 {
                 println!("{:#?}", intermediate);
             }
+            
             if verbose > 0 {
-                println!("--- GENERATED INTERMEDIATE REPRESANTATION ---");
-            }
-
-            if verbose > 0 {
-                println!("--- START ASSEMBLY ---");
+                println!("[*] generating assembly");
             }
             let asm = generate(intermediate, &globals);
             if verbose > 1 {
                 println!("{}", asm);
-            }
-
-            if verbose > 0 {
-                println!("--- END ASSEMBY ---");
             }
 
             let mut asm_path = path.clone();
@@ -3774,6 +3767,10 @@ fn main() {
             };
 
             // call nasm and ld
+            if verbose > 0 {
+                println!("[*] CMD: nasm -felf64 {asm_path}");
+            }
+            
             let nasm =  Command::new("nasm").arg("-felf64").arg(asm_path).output().unwrap();
             if ! nasm.status.success() {
                 eprintln!("ERROR executing nasm: \n{}", std::str::from_utf8(&nasm.stderr).unwrap());
@@ -3786,6 +3783,11 @@ fn main() {
 
             let mut outfile = path;
             outfile.push_str(&name);
+
+            if verbose > 0 {
+                println!("[*] CMD: ld -o {outfile} {obj_path}");
+            }
+            
             let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
             if ! ld.status.success() {
                 eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
@@ -3794,7 +3796,7 @@ fn main() {
 
             let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
 
-            println!("Compiled {filename} -> {outfile} in {time}s");
+            println!("[!] compiled {filename} -> {outfile} in {time}s");
         }
     }
 

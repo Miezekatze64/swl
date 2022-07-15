@@ -2,7 +2,9 @@
 
 ## Compiler
 
-- [ ] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities + `type**`  syntax fix
+- [x] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities
+
+- [ ] `type**`  syntax fix + allow `deref a = val;` instead of `set_ptr(__unsafe_convert(a), val);`
 
 - [ ] implement else
 
@@ -26,7 +28,7 @@
 
 - [ ] type inference -> multiple function generation 
 
-- [ ] add support for operator overloading and create of own operators:
+- [ ] add support for operator overloading and creation of own operators:
   
   ```cpp
   operator +(other_num a, other_num b) -> other_num) {}
@@ -64,9 +66,9 @@
 
 - [x] create stdlib
 
-- [ ] create stdmath library
+- [ ] create math library (important functions in `std.swl`, extras in `math.swl`)
 
-- [ ] test sample programs (e.g. fizzbuzz)
+- [x] test sample programs (e.g. fizzbuzz)
 
 - [ ] check turing completeness (maybe implement RULE 110)
 

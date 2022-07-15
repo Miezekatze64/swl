@@ -162,7 +162,7 @@ func _free(int ptr) {
 //   size <- the number of bytes to allocate
 // returns: an array at the newly allocated space
 func alloc_array(int size) -> [unchecked] {
-    int ptr     = _malloc(size);
+    int ptr     = _malloc(8+size);
     set_addr(ptr, size);
     [int] array = ptr2arr(ptr);
     <- array;
@@ -222,14 +222,36 @@ func println([char] str) {
 
 /** STRING UTILS **/
 
-// TODO: finish
+// converts the char to ASCII char code
+// -------
+// returns: the char code
+func char_code(char self) -> int from char {
+    <- __unsafe_convert(self);
+}
+
+// convert given char code (ASCII) to a character
+// -------
+// returns: the char
+func to_char(int self) -> char from int {
+    <- __unsafe_convert(self);
+}
+
+// converts a single digit to (0-9) to corresponding ASCII character ('0'-'9')
+// -------
+// args:
+//   i <- the digit
+// returns: the character
 func digit_to_ascii(int i) -> char {
-    <- 'a';
+    <- ('0'.char_code() + i).to_char();
 }
     
-// TODO: finish
-func itoa(int i) -> string {
-    int len = 1;
+// converts an integer to its string representation
+// -------
+// args:
+//   i <- the integer
+// returns: the string
+func itoa(int i) -> string{
+    int len = 0;
     int num = i;
     while (num >= 10) {
         num /= 10;
@@ -237,8 +259,7 @@ func itoa(int i) -> string {
     }
 
     string result = alloc_array(len + 1);
-    
-    int index = len - 1;
+    int index = len;
     int num = i;
     while (index >= 0) {
         result[index] = digit_to_ascii(num % 10);
@@ -247,6 +268,10 @@ func itoa(int i) -> string {
     }
     
     <- result;
+}
+
+func to_string(int self) -> string from int {
+    <- itoa(self);
 }
     
 // converts a boolean to a string (true -> "true", false -> "false")

@@ -959,8 +959,16 @@ alloc_array:
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
+;; VALUE 8
+	mov rax, 8
+;; PUSH
+	push rax
 ;; GET VAR 8
-	mov rax, [rbp-8]
+	mov rbx, [rbp-8]
+;; POP
+	pop rax
+;; ADD
+	add rax, rbx
 ;; PUSH
 	push rax
 ;; POP
@@ -1274,14 +1282,60 @@ println:
 ;; RETURN
 	leave
 	ret
+;; FUNCTION DECL char_code
+char_code:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 1
+	mov [rbp-1], al
+;; GET VAR 1
+	mov al, [rbp-1]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL __unsafe_convert
+	call __unsafe_convert
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL to_char
+to_char:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL __unsafe_convert
+	call __unsafe_convert
+;; RETURN
+	leave
+	ret
 ;; FUNCTION DECL digit_to_ascii
 digit_to_ascii:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
-;; VALUE a
-	mov rax, 97
+;; VALUE 0
+	mov rax, 48
+;; FUNCTION CALL char_code
+	call char_code
+;; PUSH
+	push rax
+;; GET VAR 8
+	mov rbx, [rbp-8]
+;; POP
+	pop rax
+;; ADD
+	add rax, rbx
+;; FUNCTION CALL to_char
+	call to_char
 ;; RETURN
 	leave
 	ret
@@ -1291,8 +1345,8 @@ itoa:
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
-;; VALUE 1
-	mov rax, 1
+;; VALUE 0
+	mov rax, 0
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
@@ -1301,8 +1355,8 @@ itoa:
 ;; SET VAR 24
 	sub rsp, 24
 	mov qword [rbp-24], rax
-;; WHILE 3221225472 START
-.loop_3221225472:
+;; WHILE 12884901888 START
+.loop_12884901888:
 ;; GET VAR 24
 	mov rax, [rbp-24]
 ;; PUSH
@@ -1315,9 +1369,9 @@ itoa:
 	cmp rax, rbx
 	setge al
 	mov al, al
-;; WHILE 3221225472 CHECK
+;; WHILE 12884901888 CHECK
 	cmp al, 1
-	jne .loop_3221225472_end
+	jne .loop_12884901888_end
 ;; VALUE 10
 	mov rbx, 10
 ;; GET VAR 24
@@ -1338,9 +1392,9 @@ itoa:
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
-;; WHILE 3221225472 END
-	jmp .loop_3221225472
-.loop_3221225472_end:
+;; WHILE 12884901888 END
+	jmp .loop_12884901888
+.loop_12884901888_end:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
@@ -1362,14 +1416,6 @@ itoa:
 	mov qword [rbp-32], rax
 ;; GET VAR 16
 	mov rax, [rbp-16]
-;; PUSH
-	push rax
-;; VALUE 1
-	mov rbx, 1
-;; POP
-	pop rax
-;; SUB
-	sub rax, rbx
 ;; SET VAR 40
 	sub rsp, 40
 	mov qword [rbp-40], rax
@@ -1378,8 +1424,8 @@ itoa:
 ;; SET VAR 48
 	sub rsp, 48
 	mov qword [rbp-48], rax
-;; WHILE 51539607552 START
-.loop_51539607552:
+;; WHILE 206158430208 START
+.loop_206158430208:
 ;; GET VAR 40
 	mov rax, [rbp-40]
 ;; PUSH
@@ -1392,9 +1438,9 @@ itoa:
 	cmp rax, rbx
 	setge al
 	mov al, al
-;; WHILE 51539607552 CHECK
+;; WHILE 206158430208 CHECK
 	cmp al, 1
-	jne .loop_51539607552_end
+	jne .loop_206158430208_end
 ;; GET VAR 48
 	mov rax, [rbp-48]
 ;; PUSH
@@ -1449,11 +1495,28 @@ itoa:
 ;; SET VAR 40
 	sub rsp, 40
 	mov qword [rbp-40], rax
-;; WHILE 51539607552 END
-	jmp .loop_51539607552
-.loop_51539607552_end:
+;; WHILE 206158430208 END
+	jmp .loop_206158430208
+.loop_206158430208_end:
 ;; GET VAR 32
 	mov rax, [rbp-32]
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL to_string
+to_string:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL itoa
+	call itoa
 ;; RETURN
 	leave
 	ret
@@ -1465,17 +1528,17 @@ bool_to_string:
 	mov [rbp-1], al
 ;; GET VAR 1
 	mov al, [rbp-1]
-;; IF 1610612736 START
+;; IF 12884901888 START
 	cmp al, 1
-	jne .l2_1610612736
-.l1_1610612736:
+	jne .l2_12884901888
+.l1_12884901888:
 ;; VALUE true
 	mov rax, str_true
 ;; RETURN
 	leave
 	ret
-;; IF 1610612736 END
-.l2_1610612736:
+;; IF 12884901888 END
+.l2_12884901888:
 ;; VALUE false
 	mov rax, str_false
 ;; RETURN
@@ -1592,17 +1655,17 @@ startsWith:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 12884901888 START
+;; IF 103079215104 START
 	cmp al, 1
-	jne .l2_12884901888
-.l1_12884901888:
+	jne .l2_103079215104
+.l1_103079215104:
 ;; VALUE false
 	mov rax, 0
 ;; RETURN
 	leave
 	ret
-;; IF 12884901888 END
-.l2_12884901888:
+;; IF 103079215104 END
+.l2_103079215104:
 ;; VALUE 0
 	mov rax, 0
 ;; VALUE 1
@@ -1655,17 +1718,17 @@ endsWith:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 25769803776 START
+;; IF 206158430208 START
 	cmp al, 1
-	jne .l2_25769803776
-.l1_25769803776:
+	jne .l2_206158430208
+.l1_206158430208:
 ;; VALUE false
 	mov rax, 0
 ;; RETURN
 	leave
 	ret
-;; IF 25769803776 END
-.l2_25769803776:
+;; IF 206158430208 END
+.l2_206158430208:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; FUNCTION CALL len
@@ -1726,17 +1789,17 @@ min:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 51539607552 START
+;; IF 412316860416 START
 	cmp al, 1
-	jne .l2_51539607552
-.l1_51539607552:
+	jne .l2_412316860416
+.l1_412316860416:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
-;; IF 51539607552 END
-.l2_51539607552:
+;; IF 412316860416 END
+.l2_412316860416:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; RETURN
@@ -1762,59 +1825,213 @@ max:
 	cmp rax, rbx
 	setg al
 	mov al, al
-;; IF 103079215104 START
+;; IF 824633720832 START
 	cmp al, 1
-	jne .l2_103079215104
-.l1_103079215104:
+	jne .l2_824633720832
+.l1_824633720832:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
-;; IF 103079215104 END
-.l2_103079215104:
+;; IF 824633720832 END
+.l2_824633720832:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL f
-f:
+;; FUNCTION DECL fizzbuzz_
+fizzbuzz_:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
-	sub rsp, 16
-	mov [rbp-16], rbx
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
-;; GET VAR 16
-	mov rbx, [rbp-16]
+;; VALUE 15
+	mov rbx, 15
 ;; POP
 	pop rax
-;; ADD
-	add rax, rbx
+;; MOD
+	mov rax, rax
+	xor rdx, rdx
+	idiv rbx
+	mov rax, rdx
+;; PUSH
+	push rax
+;; VALUE 0
+	mov rbx, 0
+;; POP
+	pop rax
+;; EQ
+	cmp rax, rbx
+	sete al
+	mov al, al
+;; IF 48 START
+	cmp al, 1
+	jne .l2_48
+.l1_48:
+;; VALUE FizzBuzz
+	mov rax, str_fizzbuzz
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL a
-a:
-	push rbp
-	mov rbp,rsp
-	sub rsp, 8
-	mov [rbp-8], rax
+;; IF 48 END
+.l2_48:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
-;; VALUE 1
-	mov rbx, 1
+;; VALUE 5
+	mov rbx, 5
 ;; POP
 	pop rax
+;; MOD
+	mov rax, rax
+	xor rdx, rdx
+	idiv rbx
+	mov rax, rdx
+;; PUSH
+	push rax
+;; VALUE 0
+	mov rbx, 0
+;; POP
+	pop rax
+;; EQ
+	cmp rax, rbx
+	sete al
+	mov al, al
+;; IF 96 START
+	cmp al, 1
+	jne .l2_96
+.l1_96:
+;; VALUE Buzz
+	mov rax, str_buzz
+;; RETURN
+	leave
+	ret
+;; IF 96 END
+.l2_96:
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; VALUE 3
+	mov rbx, 3
+;; POP
+	pop rax
+;; MOD
+	mov rax, rax
+	xor rdx, rdx
+	idiv rbx
+	mov rax, rdx
+;; PUSH
+	push rax
+;; VALUE 0
+	mov rbx, 0
+;; POP
+	pop rax
+;; EQ
+	cmp rax, rbx
+	sete al
+	mov al, al
+;; IF 192 START
+	cmp al, 1
+	jne .l2_192
+.l1_192:
+;; VALUE Fizz
+	mov rax, str_fizz
+;; RETURN
+	leave
+	ret
+;; IF 192 END
+.l2_192:
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; FUNCTION CALL to_string
+	call to_string
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL fizzbuzz
+fizzbuzz:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; VALUE 1
+	mov rax, 1
+;; SET VAR 16
+	sub rsp, 16
+	mov qword [rbp-16], rax
+;; WHILE 192 START
+.loop_192:
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; GET VAR 8
+	mov rbx, [rbp-8]
+;; POP
+	pop rax
+;; LESS
+	cmp rax, rbx
+	setl al
+	mov al, al
+;; WHILE 192 CHECK
+	cmp al, 1
+	jne .loop_192_end
+;; GET VAR 16
+	mov rax, [rbp-16]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL fizzbuzz_
+	call fizzbuzz_
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL print
+	call print
+;; VALUE , 
+	mov rax, str___
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL print
+	call print
+;; VALUE 1
+	mov rbx, 1
+;; GET VAR 16
+	mov rax, [rbp-16]
 ;; ADD
 	add rax, rbx
+;; SET VAR 16
+	sub rsp, 16
+	mov qword [rbp-16], rax
+;; WHILE 192 END
+	jmp .loop_192
+.loop_192_end:
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL fizzbuzz_
+	call fizzbuzz_
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL println
+	call println
 ;; RETURN
 	leave
 	ret
@@ -1822,73 +2039,16 @@ a:
 main:
 	push rbp
 	mov rbp,rsp
-;; VALUE 4
-	mov rax, 4
+;; VALUE 1000
+	mov rax, 1000
 ;; PUSH
 	push rax
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
-;; SET VAR 8
-	sub rsp, 8
-	mov qword [rbp-8], rax
-;; VALUE 5
-	mov rax, 5
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
-;; SET VAR 16
-	sub rsp, 16
-	mov qword [rbp-16], rax
-;; VALUE test
-	mov rax, str_test
-;; SET VAR 24
-	sub rsp, 24
-	mov qword [rbp-24], rax
-;; VALUE 1
-	mov rax, 1
-;; PUSH
-	push rax
-;; VALUE 1
-	mov rax, 1
-;; PUSH
-	push rax
-;; GET VAR 24
-	mov rax, [rbp-24]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL arr2addr
-	call arr2addr
-;; PUSH
-	push rax
-;; GET VAR 24
-	mov rax, [rbp-24]
-;; PUSH
-	push rax
-;; POP
-	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
-;; PUSH
-	push rax
-;; POP
-	pop rdx
-;; POP
-	pop rcx
-;; POP
-	pop rbx
-;; POP
-	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
-;; VALUE 42
-	mov rax, 42
+;; FUNCTION CALL fizzbuzz
+	call fizzbuzz
+;; VALUE 0
+	mov rax, 0
 ;; RETURN
 	leave
 	ret
@@ -1907,9 +2067,18 @@ str_true:
 str_false:
 	dq 5
 	db `false`
-str_test:
+str_fizzbuzz:
+	dq 8
+	db `FizzBuzz`
+str_buzz:
 	dq 4
-	db `test`
+	db `Buzz`
+str_fizz:
+	dq 4
+	db `Fizz`
+str___:
+	dq 2
+	db `, `
 global__m_heap_start:
 	resb 8
 global__m_tcache:

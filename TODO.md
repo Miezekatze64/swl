@@ -2,6 +2,8 @@
 
 ## Compiler
 
+- [ ] IMPORTANT -- FIX ORDER OF STRUCT FIELDS!!! -- IMPORTANT
+
 - [x] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities
 
 - [ ] `type**`  syntax fix + allow `deref a = val;` instead of `set_ptr(__unsafe_convert(a), val);`

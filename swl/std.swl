@@ -1,21 +1,115 @@
 /* SWL STANDARD LIBRARY */
 // used intrinsics
-intrinsic syscall      as syscall1(int index, int val) -> int;
-intrinsic syscall      as syscall3(int index, int val, int val2, int val3);
-intrinsic str_to_ptr   as arr2addr(string str) -> int;
-intrinsic dereference  as arrlen(string str)   -> int;
+intrinsic syscall      as syscall0(int index)                               -> int;
+intrinsic syscall      as syscall1(int index, int val)                      -> int;
+intrinsic syscall      as syscall2(int index, int val, int val2)            -> int;
+intrinsic syscall      as syscall3(int index, int val, int val2, int val3)  -> int;
+intrinsic str_to_ptr   as arr2addr(string str)                              -> int;
+intrinsic dereference  as arrlen([unchecked] str)                           -> int;
 
-intrinsic convert      as ptr2arr(int ptr) -> [unchecked]
-intrinsic convert      as __unsafe_convert(unchecked i)     -> unchecked;
+intrinsic convert      as ptr2arr(int ptr)                                  -> [unchecked]
+intrinsic convert      as __unsafe_convert(unchecked i)                     -> unchecked;
 
 intrinsic set_ptr      as set_ptr(unchecked* ptr, int val);
 intrinsic set_ptr      as set_addr(int ptr, int val);
+
+intrinsic get_args     as __get_args()                                      -> [char*];
 
 // the default string type (an array of characters)
 // strings are fixed-sized arrays and so immutable
 // member-functions always return a new instance
 alias string = [char];
 
+/** ARGUMENTS **/
+
+// calculates the length of a null-terminated, c-like string
+// -----
+// args:
+//   ptr <- the pointer to the string
+// returns: the length
+func cstrlen(char *ptr) -> int {
+    int i    = 0;
+    while (true) {
+        bool* _ptr = __unsafe_convert(__unsafe_convert(ptr) + i);
+        if (!(deref _ptr)) {
+            break;
+        }
+        i += 1;
+    }
+    <- i;
+}
+
+// converts a null-terminated, c-like string to a char array
+// --------
+// args:
+//   cstr <- the pointer to the string
+// returns: the char array
+func cstr_to_str(char *cstr) -> string {
+    string str = alloc_array(cstrlen(cstr));
+    int i = 0;
+    while (i < cstrlen(cstr)) {
+        char* _ptr = __unsafe_convert(__unsafe_convert(cstr) + i);
+        char c = deref _ptr;
+        str[i] = c;
+        i += 1;
+    }
+    <- str;
+}
+
+func to_cstr(string self) -> char* from string {
+    int ptr = _malloc(self.len() + 1);
+    int i = 0;
+    while (i < self.len()) {
+        set_addr(ptr+i, __unsafe_convert(self[i]));
+        i += 1;
+    }
+    set_addr(ptr+self.len(), 0);
+    <- __unsafe_convert(ptr);
+}
+
+// returns the program's arguments as a char* array
+// -----
+// returns: the args
+func args() -> [char*] {
+    [char*] _args = __get_args();
+    <- _args;
+}
+
+// returns the program's environment as a char* array
+// -----
+// returns: the environment
+func env() -> [char*] {
+    [char*] _args = __get_args();
+    int argc = arrlen(_args);
+    int i = 0;
+    
+    while (true) {
+        char *ptr = _args[i + argc + 1];
+        int iptr  = __unsafe_convert(ptr);
+        if (iptr == 0) {
+            break;
+        }
+        i += 1;
+    }
+
+    int envc = i;
+    [char*] envp = alloc_array(envc * (8 + 8));
+    int i  = 0;
+    while (i < envc) {
+        char *env = _args[i + argc + 1]; 
+        envp[i] = env;
+        i += 1;
+    }
+    <- envp;
+}
+
+// returns the program's environment as a char* pointer
+// -----
+// returns: the environment
+func envp() -> char* * {
+    <- __unsafe_convert(__unsafe_convert(env()) + 8);
+}
+    
 /** MEMORY UTILS **/
 
 // calls the brk (break) system call, to change the current program break (start of heap) to given location
@@ -204,8 +298,8 @@ func exit(int code) {
 // ------
 // args:
 //   buf <- the buffer
-func read([char] buf) {
-    syscall3(0, 0, arr2addr(buf), arrlen(buf));
+func read([char] buf) -> int {
+    <- syscall3(0, 0, arr2addr(buf), arrlen(buf));
 }
 
 // prints a given string to stdout
@@ -216,8 +310,70 @@ func print([char] str) {
     syscall3(1, 1, arr2addr(str), arrlen(str));
 }
 
+// prints a given string to stdout, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
 func println([char] str) {
     print(str.append('\n'));
+}
+
+// forks the current process (creates a new process with a copy of current program state)
+// ------
+// returns: 0 for the new process, PID of fork for the old process
+func fork() -> int {
+    <- syscall0(57);
+}
+
+// replaces the current process with the given process
+// -----
+// args:
+//   filename <- the filename of the process
+//   argv     <- args of the process
+//   envp     <- environment of the process
+func execve(string filename, [char*] argv, [char*] envp) {
+    syscall3(59, __unsafe_convert(filename.to_cstr()), __unsafe_convert(argv) + 8, __unsafe_convert(envp) + 8);
+}
+
+// runs a given command
+// -----
+// args:
+//   command <- the command
+func system(string command) {
+    [char*] args = alloc_array(8*4);
+    args[0] = "/usr/bin/sh".to_cstr();
+    args[1] = "-c".to_cstr();
+    args[2] = command.to_cstr();
+    args[3] = __unsafe_convert(0);
+    print("INIT PID = ");
+    println(syscall0(39).to_string());
+    
+    int pid = fork();
+    if (pid == 0) {
+        execve("/usr/bin/sh", args, env());
+        exit(0);
+    }
+    while (true) {
+       sleep(10);
+       int ret = syscall1(121, pid);
+       if (ret < 0) {
+           break;
+       }
+       println(ret.to_string());
+    }
+}
+
+struct timespec {
+    int _secs;
+    int nanos;
+}
+
+func sleep(int millis) {
+    timespec time = timespec {
+        _secs: millis / 1000;
+        nanos: (millis % 1000) * 1000000;
+    };
+    syscall2(35, __unsafe_convert(ref time),  0);
 }
 
 /** STRING UTILS **/
@@ -270,6 +426,9 @@ func itoa(int i) -> string{
     <- result;
 }
 
+// converts the integer to a string
+// -----
+// returns: the string
 func to_string(int self) -> string from int {
     <- itoa(self);
 }

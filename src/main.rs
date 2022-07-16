@@ -1300,6 +1300,10 @@ impl Parser {
         // parse left side
         let subexpr = self.parse_subexpr(seperators)?;
         let mut nleft_expr = subexpr.0;
+        if let ExpressionR::Undef =  nleft_expr.1  {
+            return Ok((*nleft_expr, subexpr.1));
+        }
+
 
         loop {
             if let Expression(_, ExpressionR::Undef, _) = *nleft_expr {
@@ -1895,7 +1899,7 @@ impl Parser {
 
         let token = get_peek_token!(self.lexer, errors);
         let val = token.clone().value;
-        
+
         let res = match token.ttype {
             TokenType::Int | TokenType::Float | TokenType::Ident | TokenType::Type | TokenType::Keyword | TokenType::String | TokenType::Char | TokenType::Bool => {
                 errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected identifier `{ident}`, type expected")));
@@ -1921,7 +1925,7 @@ impl Parser {
                             break;
                         }
                     }
-                    let func_expr: Expression = Expression(ident_pos, ExpressionR::F(ident, args), None);
+                    let func_expr: Expression = Expression(ident_pos, ExpressionR::F(ident.clone(), args), None);
                     Ok(Box::new(func_expr))
                 },
                 "{" => {
@@ -1946,7 +1950,9 @@ impl Parser {
                     Ok(Box::new(Expression(token.pos, ExpressionR::Var(ident), None)))
                 },
                 a => if seperators.contains(&a) {
-                    Ok(Box::new(Expression(ident_pos, ExpressionR::Var(ident), None)))
+                    let expr_ = Expression(ident_pos, ExpressionR::Var(ident), None);
+                    let expr = self.parse_member(expr_, seperators)?;
+                    Ok(Box::new(expr))
                 } else {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
                     Err(errors.clone())
@@ -1971,7 +1977,7 @@ impl Parser {
         let token = get_token!(self.lexer, errors);
         let val = token.clone().value;
 
-        let mut res = match token.ttype {
+        let res = match token.ttype {
             TokenType::Type | TokenType::Eof | TokenType::Undef => {
                 errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
                 Err(errors.clone())
@@ -2008,27 +2014,34 @@ impl Parser {
                 }
             },
             TokenType::Int => {
-                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None)), token))
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None);
+                Ok((Box::new(self.parse_member(expr_, seperators)?), token))
+
             },
             TokenType::Bool => {
-                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val), None)), token))
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), val), None);
+                    Ok((Box::new(self.parse_member(expr_, seperators)?), token))
             },
             TokenType::Float => {
-                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val), None)), token))
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Float), val), None);
+                Ok((Box::new(self.parse_member(expr_, seperators)?), token))
             },
             TokenType::Char => {
-                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val), None)), token))
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Char), val), None);
+                Ok((Box::new(self.parse_member(expr_, seperators)?), token))
             },
             TokenType::String => {
-                Ok((Box::new(Expression(token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val), None)), token))
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Array(Box::new(Type::Primitive(PrimitiveType::Char))), val), None);
+                Ok((Box::new(self.parse_member(expr_, seperators)?), token))
             },
             TokenType::Ident => {
-                let ident = self.parse_ident_expr(val, token.pos, seperators)?;
-                Ok((ident, token))
+                let expr_ = self.parse_ident_expr(val, token.pos, seperators)?;
+                Ok((Box::new(self.parse_member(*expr_, seperators)?), token))
             },
             TokenType::Special => match val.as_str() {
                 "(" => {
-                    Ok((Box::new(self.parse_expr(&[")"])?.0), token))
+                    let expr_ = self.parse_expr(&[")"])?.0;
+                    Ok((Box::new(self.parse_member(expr_, seperators)?), token))
                 },
                 "{" => {
                     // expect array definition
@@ -2080,7 +2093,6 @@ impl Parser {
                 }
             },
         }?;
-        res.0 = Box::new(self.parse_member(*res.0, seperators)?);
         Ok(res)
     }
 
@@ -2938,7 +2950,8 @@ fn intrinsics() -> HashMap<&'static str, &'static str> {
      ("convert", "\tret\n"),
      ("str_to_ptr", "\tadd rax, 8\n\tret\n"),
      ("dereference", "\tmov rax, [rax]\n\tret\n"),
-     ("set_ptr", "\tmov [rax], rbx\n\tret\n")
+     ("set_ptr", "\tmov [rax], rbx\n\tret\n"),
+     ("get_args", "\tmov rax, [ARGS]\n\tret\n")
     ]
         .iter()
         .cloned()
@@ -3331,6 +3344,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     global _start\n\
     section .text\n\
     _start:\n\
+    \tmov [ARGS], rsp\n\
     \tpush rbp\n\
     \tmov rbp, rsp\n\
     ".into();
@@ -3510,7 +3524,6 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     }
 
                     string                  
-//                    format!(";; ARRAY INDEX\n\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {r0}, [{r1}]\n")
                 }
             },
             Inst::ArraySet(reg0, reg1, reg2, sz_vec) => {
@@ -3570,7 +3583,7 @@ fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
             
         }.as_str())
     }
-    ret.push_str("_end:\n;; EXIT\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\n");
+    ret.push_str("_end:\n;; EXIT\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\nARGS:\n\tresb 8\n");
 
     for a in global_strings {
         ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len() - a.matches('\\').count()).as_str());

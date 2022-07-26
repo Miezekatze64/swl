@@ -14,7 +14,9 @@
 
 - [x] fix `unreachable!()` at line 1292 (struct literals as statement), should add error
 
-- [ ] implement lambda functions + make all functions first-class
+- [x] make all functions first-class
+
+- [ ] implement lambda functions
 
 - [ ] check for redefined functions
 
@@ -78,4 +80,4 @@
 
 - [x] add useful comments
 
-- [ ] add some functional operators (requires custom operators)
+- [ ] add some functional operators (requires custom operators ↑)

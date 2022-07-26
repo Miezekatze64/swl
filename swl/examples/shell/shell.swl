@@ -1,0 +1,12 @@
+include "../../std.swl";
+char NULL = __unsafe_convert(0);
+    
+func main() -> int {
+    string buf = arr[char, 100];
+    while (true) {
+        int bytes = read(buf);
+        buf[bytes] = NULL;
+        system(buf);
+    }
+    <- 0;
+}

@@ -4,6 +4,16 @@ _start:
 	mov [ARGS], rsp
 	push rbp
 	mov rbp, rsp
+;; VALUE 0
+	mov rax, 0
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL __unsafe_convert
+	call __unsafe_convert
+;; SET GLOBAL
+	mov byte [global_NULL+0], al
 ;; FUNCTION CALL main
 	call main
 ;; JUMP
@@ -2878,12 +2888,73 @@ max:
 ;; RETURN
 	leave
 	ret
+;; VALUE 0
+	mov rax, 0
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL __unsafe_convert
+	call __unsafe_convert
+;; SET GLOBAL
+	mov byte [global_NULL+0], al
 ;; FUNCTION DECL main
 main:
 	push rbp
 	mov rbp,rsp
-;; VALUE 1
+;; GET ARRAY
+	mov rax, arr_0
+;; SET VAR 8
+	sub rsp, 8
+	mov qword [rbp-8], rax
+;; WHILE 96 START
+.loop_96:
+;; VALUE true
 	mov rax, 1
+;; WHILE 96 CHECK
+	cmp al, 1
+	jne .loop_96_end
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL read
+	call read
+;; SET VAR 16
+	sub rsp, 16
+	mov qword [rbp-16], rax
+;; GET GLOBAL
+	mov rax, [global_NULL+0]
+;; GET VAR 16
+	mov rbx, [rbp-16]
+;; VALUE 1
+	mov rcx, 1
+;; MUL
+	imul rbx, rcx
+;; GET VAR 8
+	mov rcx, [rbp-8]
+;; SET ARRAY INDEX
+	push rax
+	mov rax, rcx
+	add rax, 8
+	add al, bl
+	pop rbx
+	mov [rax], bl
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL system
+	call system
+;; WHILE 96 END
+	jmp .loop_96
+.loop_96_end:
+;; VALUE 0
+	mov rax, 0
 ;; RETURN
 	leave
 	ret
@@ -2910,9 +2981,14 @@ str_true:
 str_false:
 	dq 5
 	db `false`
+arr_0:
+	dq 100
+	resb 100
 global__m_tcache:
 	resb 8
-global__m_location:
-	resb 8
+global_NULL:
+	resb 1
 global__m_heap_start:
+	resb 8
+global__m_location:
 	resb 8

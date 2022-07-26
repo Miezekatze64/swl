@@ -11,6 +11,35 @@ pub enum ErrorLevel {
     Fatal
 }
 
+#[macro_export]
+macro_rules! error_str {
+    ($lexer:expr, $pos:expr) => {
+        | | -> String {
+            let (l, c) = $lexer.pos_to_line_char($pos);
+            return format!("{file}:{line}:{ch}: ",
+                           file = $lexer.filename,
+                           line = l+1,
+                           ch = c+1,
+            )
+        }()
+    };
+}
+
+#[macro_export]
+macro_rules! error_arrow {
+    ($lexer:expr, $pos:expr, $offset:expr, $msg:expr, $len:expr) => {
+        | | -> String {
+            let mut rep_len = ErrorLevel::Err.to_string().chars().count() + 2 + crate::error_str!($lexer, $pos).chars().count() + $offset;
+            if $msg.chars().count() < rep_len {
+                rep_len -= $msg.chars().count();
+                $msg.to_owned() + &" ".repeat(rep_len) + &("^".repeat($len))
+            } else {
+                $msg.to_owned() + &"\n" + &" ".repeat(rep_len) + &("^".repeat($len))
+            }
+        }()
+    }
+}
+
 /// return an error string in the following format:
 ///     ERR: This is a error at ~/file.name:430
 /// argument 2 (msg_fmt) is a format string
@@ -18,12 +47,11 @@ pub enum ErrorLevel {
 macro_rules! error {
     ($lexer:expr, $pos:expr, $msg_fmt:literal) => {
         | | -> String {
-            let (l, c) = $lexer.pos_to_line_char($pos);
-            return format!("{file}:{line}:{ch}: {msg}",
+            return format!("{err}{msg} (at {f}:{l})",
+                           err = crate::error_str!($lexer, $pos),
                            msg = format!($msg_fmt),
-                           file = $lexer.filename,
-                           line = l+1,
-                           ch = c+1
+                           f = file!(),
+                           l = line!()
             )
         }()
     }

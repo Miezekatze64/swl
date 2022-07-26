@@ -178,6 +178,7 @@ impl std::fmt::Display for ExpressionR {
             },
             ExpressionR::Val(tp, val) => {
                 match tp {
+                    Type::Primitive(PrimitiveType::Char) => write!(f, "'{}'", val.escape_default()),
                     Type::Primitive(_) => write!(f, "{val}"),
                     Type::Custom(_) => write!(f, "{val}[INVALID]"),
                     Type::Array(a) => match **a {

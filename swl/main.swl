@@ -1,6 +1,6 @@
 include "std.swl";
 
-
 func main() -> int {
-    <- 1;
+    println("Hello, World!");
+    <- 0;
 }

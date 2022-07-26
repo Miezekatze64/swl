@@ -313,12 +313,28 @@ func print([char] str) {
     syscall3(1, 1, arr2addr(str), arrlen(str));
 }
 
+// prints a given string to stderr
+// ------
+// args:
+//   str <- the string to print
+func eprint([char] str) {
+    syscall3(1, 2, arr2addr(str), arrlen(str));
+}
+
 // prints a given string to stdout, followed by a line feed
 // ------
 // args:
 //   str <- the string to print
 func println([char] str) {
     print(str.append('\n'));
+}
+
+// prints a given string to stderr, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
+func eprintln([char] str) {
+    eprint(str.append('\n'));
 }
 
 // forks the current process (creates a new process with a copy of current program state)
@@ -412,11 +428,21 @@ func digit_to_ascii(int i) -> char {
 // args:
 //   i <- the integer
 // returns: the string
-func itoa(int i) -> string{
+func itoa(int i) -> string {
+    bool negative = false;
+    if (i < 0) {
+        negative = true;
+        i = -i;
+    }
+    
     int len = 0;
     int num = i;
     while (num >= 10) {
         num /= 10;
+        len += 1;
+    }
+
+    if (negative) {
         len += 1;
     }
 
@@ -427,6 +453,10 @@ func itoa(int i) -> string{
         result[index] = digit_to_ascii(num % 10);
         num /= 10;
         index -= 1;
+    }
+
+    if (negative) {
+        result[0] = '-';
     }
     
     <- result;
@@ -522,4 +552,19 @@ func max(int a, int b) -> int {
         <- a;
     }
     <- b;
+}
+
+
+// asserts a given condition is true and panics if not
+// @TODO: replace this with a macro
+// -----
+// args:
+//   cond <- the condition to be checked
+//   msg  <- the message to display
+func assert(bool cond, string msg) {
+    if (!cond) {
+        eprint("Assertion failed: ");
+        eprintln(msg);
+        exit(1);
+    }
 }

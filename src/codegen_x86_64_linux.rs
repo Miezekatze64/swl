@@ -3,7 +3,7 @@ use {crate::{intermediate::Inst, util::{Type, PrimitiveType, UnaryOp, BinaryOp}}
 pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 
     let datatype = |a: usize| match a {
-        1 => "byte",
+        0|1 => "byte",
         2 => "word",
         4 => "word",
         8 => "qword",
@@ -25,28 +25,28 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 
     let register_sz = |reg: usize, sz: usize| match register(reg) {
         "rax" => match sz {
-            1 => "al",
+            0|1 => "al",
             2 => "ax",
             4 => "eax",
             8 => "rax",
             _ => "__invalid__"
         },
         "rbx" => match sz {
-            1 => "bl",
+            0|1 => "bl",
             2 => "bx",
             4 => "ebx",
             8 => "rbx",
             _ => "__invalid__"
         },
         "rcx" => match sz {
-            1 => "cl",
+            0|1 => "cl",
             2 => "cx",
             4 => "ecx",
             8 => "rcx",
             _ => "__invalid__"
         },
         "rdx" => match sz {
-            1 => "dl",
+            0|1 => "dl",
             2 => "dx",
             4 => "edx",
             8 => "rdx",

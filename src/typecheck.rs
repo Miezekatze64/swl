@@ -1,3 +1,5 @@
+use crate::error_arrow;
+
 use {std::collections::HashMap, crate::{error, lexer::Lexer, parser::{ASTNodeR, ExpressionR, ASTNode, Expression}, util::{Error, ErrorLevel, PrimitiveType, Type, Op}}};
 
 type Globals = HashMap<String, usize>;
@@ -61,7 +63,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         }
 
                         if ! typa.is_compatible(&typb, aliases) {
-                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typb}`, found `{typa}`")));
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible argument type for function call to `{name}`:\n\texpected `{typb}`, found `{typa}`")));
                             break;
                         }
                     }
@@ -228,7 +230,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     }
                     let typ = tp.dealias(aliases);
                     if ! typ.is_compatible(type_r, aliases) {
-                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `{typ}`, found `{type_r}`")));
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible type for variable `{name}`:\n\texpected `{typ}`, found `{type_r}`")));
                     }
                     vars_sub.insert(name.clone(), typ.clone());
                 },
@@ -306,6 +308,7 @@ fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String
 fn typecheck_expr(expr: &mut Expression, functions: &Functions, vars: &HashMap<String, Type>, aliases: &Aliases, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
     
     let tp = | | -> Type {
+        let exp = expr.clone();
         let pos = expr.0;
         match &mut expr.1 {
             ExpressionR::T(ref mut left, op, ref mut right, _) => {
@@ -386,17 +389,55 @@ fn typecheck_expr(expr: &mut Expression, functions: &Functions, vars: &HashMap<S
 
                 let len_a = func_args.len();
                 let len_b = vec.len();
-                if len_a != len_b {
-                    errors.push((ErrorLevel::Err, error!(lexer, pos, "expected `{len_a}` arguments, got `{len_b}`")));
+                if len_a > len_b {
+                    let start = "missing argument in function call: ";
+                    let offset = start.chars().count() + exp.to_string().chars().count() - 1;
+                    let tp = &func_args[len_b];
+                    let msg = format!("    expected argument of type {tp}");
+                    let line = error_arrow!(lexer, pos, offset, msg, 1);
+
+                    errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
+                    return functions.get(&(None, name.clone())).unwrap().1.clone();
+                } else if len_a < len_b {
+                    let start = "unexpected argument(s) in function call: ";
+                    let mut expr_off = 0;
+                    for (i, a) in vec.iter().enumerate() {
+                        expr_off += a.to_string().chars().count();
+                        if i == len_a-1 {
+                            break;
+                        } else {
+                            expr_off += 2;
+                        }
+                    }
+                    let offset = start.chars().count() + name.chars().count() + 1 + expr_off;
+                    let msg = format!("    expected ')', found argument(s)");
+                    let line = error_arrow!(lexer, pos, offset, msg, exp.to_string().chars().count() - expr_off - name.chars().count() - 2);
+
+                    errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
                     return functions.get(&(None, name.clone())).unwrap().1.clone();
                 };
+
+                let orig_vec = vec.clone();
                 
                 for (index, a) in vec.iter_mut().enumerate() {
                     let typa = typecheck_expr(a, functions, vars, aliases, errors, lexer);
                     let typb = func_args.get(index).unwrap().clone();
                     
                     if ! typa.is_compatible(&typb, aliases) {
-                        errors.push((ErrorLevel::Err, error!(lexer, pos, "incompatible types: expected `{typb}`, found `{typa}`")));
+                        let mut args_pos = 0;
+                        for (ind, arg) in orig_vec.iter().enumerate() {
+                            if ind == index {
+                                break;
+                            }
+                            args_pos += arg.to_string().chars().count() + 2;
+                        }
+                        
+                        let first = "incompatible types in function call: ";
+                        let offset = first.chars().count() + 1 + name.chars().count() + 1 + args_pos;
+                        let msg = format!("    expected `{typb}`, found `{typa}`");
+                        let line = error_arrow!(lexer, pos, offset, msg, a.to_string().chars().count());
+
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "{first}`{exp}`:\n{line}")));
                         break;
                     }
                 }
@@ -454,7 +495,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &Functions, vars: &HashMap<S
             ExpressionR::ArrAlloc(tp, _) => {
                 Type::Array(Box::new(tp.clone()))
             },
-            ExpressionR::Index(ident, ref mut a, _) => {
+            ExpressionR::Index(ref mut ident, ref mut a, _) => {
 
                 let inner_type = typecheck_expr(a, functions, vars, aliases, errors, lexer);
                 if ! Type::Primitive(PrimitiveType::Int).is_compatible(&inner_type, aliases) {

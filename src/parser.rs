@@ -15,7 +15,7 @@ pub enum ASTNodeR {
     VarInit(String, Expression, Option<Type>),
     VarOp(String, BinaryOp, Expression),
     VarDecInit(bool, Type, String, Expression),
-    FunctionCall(String, Vec<Expression>),
+    FunctionCall(Box<Expression>, Vec<Expression>),
     If(Expression, Box<ASTNode>),
     FunctionDecl(Option<Type>, String, Vec<(Type, String)>, Type, Box<ASTNode>),
     Return(Expression),
@@ -27,7 +27,7 @@ pub enum ASTNodeR {
     SetField(Expression, String, Expression, Option<Type>),
     Include(String, Box<ASTNode>, Lexer),
     Break(),
-    MemberFunction(Expression, String, Vec<Expression>),
+    MemberFunction(Type, Expression, String, Vec<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +38,7 @@ pub enum ExpressionR {
     T(Box<Expression>, Op, Box<Expression>, u32),
     Val(Type, String),
     Var(String),
-    F(String, Vec<Expression>),
+    F(Box<Expression>, Vec<Expression>),
     Arr(Vec<Expression>),
     Undef,
     ArrAlloc(Type, usize),
@@ -48,7 +48,7 @@ pub enum ExpressionR {
     StructField(Box<Expression>, String, Option<Type>),
     Ref(Box<Expression>),
     Deref(Box<Expression>),
-    MemberFunction(Box<Expression>, String, Vec<Expression>),
+    MemberFunction(Type, Box<Expression>, String, Vec<Expression>),
 }
 
 
@@ -150,7 +150,7 @@ impl std::fmt::Display for ASTNodeR {
             ASTNodeR::Break() => {
                 write!(f, "break;")
             }
-            ASTNodeR::MemberFunction(lexpr, name, args) => {
+            ASTNodeR::MemberFunction(_, lexpr, name, args) => {
                 write!(f, "{lexpr}.{name}(")?;
                 for (index, arg) in args.iter().enumerate() {
                     write!(f, "{arg}")?;
@@ -192,6 +192,7 @@ impl std::fmt::Display for ExpressionR {
                         write!(f,
                                "{name}[INVALID, SHOULD BE A STRUCT LITERAL]"),
                     Type::Function(_, _) => write!(f, "[INVALID] This sould be a lambda functino not a 'function literal'..."),
+                    Type::Var(val) => write!(f, "{val}[INVALID, TYPE VARIABLE]"),
                 }
             },
             ExpressionR::Var(var) => {
@@ -207,7 +208,7 @@ impl std::fmt::Display for ExpressionR {
                 }
                 write!(f, ")")
             },
-            ExpressionR::MemberFunction(lexpr, name, args) => {
+            ExpressionR::MemberFunction(_, lexpr, name, args) => {
                 write!(f, "{lexpr}.{name}(")?;
                 for (index, arg) in args.iter().enumerate() {
                     write!(f, "{arg}")?;
@@ -379,9 +380,9 @@ macro_rules! err_add {
 }
 
 impl Parser {
-    pub fn new(filename: String) -> Result<Self, io::Error> {
+    pub fn new(filename: String, verbose: usize) -> Result<Self, io::Error> {
         Ok(Parser {
-            lexer: Lexer::new(filename)?
+            lexer: Lexer::new(filename, verbose)?
         })
     }
 
@@ -545,7 +546,23 @@ impl Parser {
                  (seperators.contains(&tk_op.value.as_str()) || tk_op.value == ".")) {
                     self.lexer.next_token().unwrap();
                     return Ok((*nleft_expr, tk_op));
-            } else {
+                } else if tk_op.ttype == TokenType::Special && tk_op.value == "(" {
+                    self.lexer.next_token().unwrap();
+                    // parse args
+                    let mut args: Vec<Expression> = vec![];
+                    loop {
+                        let ret = self.parse_expr(&[")", ","])?;
+                        let token: Token = ret.1;
+                        if let Expression(_, ExpressionR::Undef, _) = ret.0 {
+                            break;
+                        }
+                        args.insert(args.len(), ret.0);
+                        if token.value == ")" {
+                            break;
+                        }
+                    }
+                    return Ok((Expression(nleft_expr.0, ExpressionR::F(nleft_expr, args), None), tk_op));
+                } else {
                     let val = tk_op.clone().value;
                     errors.push((ErrorLevel::Err, error!(
                         self.lexer, tk_op.pos, "invalid token `{val}`")));
@@ -599,7 +616,7 @@ impl Parser {
                     } else {
                         Err(vec![(ErrorLevel::Err, error!(
                             parser.lexer, next_token.pos,
-                            "unexpected token `{ntv}`"))])
+                            "unexpected token `{ntv}`:\n\t`;` or `=` expected."))])
                     }
                 },
                 TokenType::Operator => {
@@ -611,12 +628,12 @@ impl Parser {
                     } else {
                         Err(vec![(ErrorLevel::Err, error!(
                             parser.lexer, next_token.pos,
-                            "unexpected token `{ntv}`"))])
+                            "unexpected token `{ntv}`:\n\t`;` or `=` expected."))])
                     }
                 },
                 _ => Err(vec![(ErrorLevel::Err, error!(
                     parser.lexer, next_token.pos,
-                    "unexpected token `{ntv}`"))]),
+                    "unexpected token `{ntv}`:\n\t`;` or `=` expected."))]),
             }
         }
 
@@ -627,12 +644,12 @@ impl Parser {
             (self.lexer.peek_token().unwrap().ttype == TokenType::Ident ||
              self.lexer.peek_token().unwrap().value == "*") {
                 token.ttype = TokenType::Type;
-        }
-
+            }
+        
         type Args = Vec<(Type, String)>;
 
         fn parse_function_decl(parser: &mut Parser,
-                               errors: &mut Vec<(ErrorLevel, String)>)
+                               mut errors: Vec<(ErrorLevel, String)>)
                                -> Result<(Args, Type), Vec<Error>> {
             // parse args
             let mut args: Args = vec![];
@@ -650,6 +667,7 @@ impl Parser {
 
                     let nval = err_break!(parser.expect(Some(TokenType::Ident)
                                                         , None), errors).value;
+
                     args.insert(args.len(), (t, nval));
 
                     let token = get_token!(parser.lexer, errors);
@@ -687,20 +705,25 @@ impl Parser {
             let next_token = get_peek_token!(parser.lexer, errors);
             if next_token.ttype == TokenType::Special &&
                 next_token.value == "->" {
-                parser.lexer.next_token().unwrap();
-                // expect return type
+                    parser.lexer.next_token().unwrap();
+                    // expect return type
+                    
+                    let tp = match parser.parse_type() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            errors.push(e);
+                            return Err(errors.clone());
+                        },
+                    };
+                    ret_type = tp;
+                }
 
-                let tp = match parser.parse_type() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        errors.push(e);
-                        return Err(errors.clone());
-                    },
-                };
-                ret_type = tp;
+
+            if errors.is_empty() {
+                Ok((args, ret_type))
+            } else {
+                Err(errors.to_owned())
             }
-
-            Ok((args, ret_type))
         }
 
 
@@ -776,8 +799,8 @@ impl Parser {
                         let expr = self.parse_expr(&[";"])?.0;
                         return Ok(Some(ASTNode(token.pos, ASTNodeR::SetField(*strct, field, expr, None))));
                     },
-                    ExpressionR::MemberFunction(expr, name, args) => {
-                        return Ok(Some(ASTNode(token.pos, ASTNodeR::MemberFunction(*expr, name, args))));
+                    ExpressionR::MemberFunction(tp, expr, name, args) => {
+                        return Ok(Some(ASTNode(token.pos, ASTNodeR::MemberFunction(tp, *expr, name, args))));
                     },
                     ExpressionR::Val(..) => unreachable!(),
                     ExpressionR::Ref(..) => unreachable!(),
@@ -815,7 +838,7 @@ impl Parser {
             TokenType::Special => match val.as_str() {
                 "}" => {
                     if is_root {
-                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexprected  token '}}'")));
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unmatched '}}':\n\tno curresponding '{{' foud")));
                     }
                     return if errors.is_empty() {
                         Ok(None)
@@ -967,7 +990,7 @@ impl Parser {
 
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
                     
-                    let (args, ret_type) = err_add!(parse_function_decl(self, &mut errors), errors);
+                    let (args, ret_type) = err_add!(parse_function_decl(self, errors.clone()), errors);
 
                     let mut from_type = None;
                     
@@ -1002,7 +1025,7 @@ impl Parser {
                     if verbose > 0 {
                         eprintln!("[*] generatinng AST for included file `{filename}`");
                     }
-                    let mut file_parser = match Parser::new(filename.clone()) {
+                    let mut file_parser = match Parser::new(filename.clone(), verbose) {
                         Ok(a) => a,
                         Err(e) => {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "ERROR during loading of file: {e}")));
@@ -1106,7 +1129,7 @@ impl Parser {
                     // expect `(`
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
 
-                    let (args, ret_val) = err_add!(parse_function_decl(self, &mut errors), errors);
+                    let (args, ret_val) = err_add!(parse_function_decl(self, errors.clone()), errors);
 
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
                 },
@@ -1126,7 +1149,7 @@ impl Parser {
 
         let res = match token.ttype {
             TokenType::Int | TokenType::Float | TokenType::Ident | TokenType::Type | TokenType::Keyword | TokenType::String | TokenType::Char | TokenType::Bool => {
-                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected identifier `{ident}`, type expected")));
+                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected construct `{ident} {val}`, BlockStatement expected")));
                 Err(errors.clone())
             }
             TokenType::Eof => {
@@ -1149,7 +1172,9 @@ impl Parser {
                             break;
                         }
                     }
-                    let func_expr: Expression = Expression(ident_pos, ExpressionR::F(ident, args), None);
+
+                    let var = Expression(ident_pos, ExpressionR::Var(ident), None);
+                    let func_expr: Expression = Expression(ident_pos, ExpressionR::F(Box::new(var), args), None);
                     Ok(Box::new(func_expr))
                 },
                 "{" => {
@@ -1329,6 +1354,12 @@ impl Parser {
                 // array indexing
                 self.lexer.next_token().unwrap();
                 let index = self.parse_expr(&["]"])?;
+
+                if index.0.1 == ExpressionR::Undef {
+                    errors.push((ErrorLevel::Err, error!(self.lexer, tk.pos, "Unexpected token `]`, index expected")));
+                    return Err(errors);
+                }
+
                 res = Expression(ident_expr.0, ExpressionR::Index(Box::new(ident_expr.clone()), Box::new(index.0), vec![]), None);
             } else if tk.ttype == TokenType::Special && tk.value == "." {
                 self.lexer.next_token().unwrap();
@@ -1340,10 +1371,14 @@ impl Parser {
                         res = expr;
                         continue;
                     },
-                    ExpressionR::F(ref name, ref args) => {
-                        let expr = Expression(ident_expr.0, ExpressionR::MemberFunction(Box::new(res.clone()), name.clone(), args.clone()), None);
-                        res = expr;
-                        continue;
+                    ExpressionR::F(ref var, ref args) => {
+                        if let Expression(_, ExpressionR::Var(ref name), _) = **var {
+                            let expr = Expression(ident_expr.0, ExpressionR::MemberFunction(Type::Invalid, Box::new(res.clone()), name.clone(), args.clone()), None);
+                            res = expr;
+                            continue;
+                        } else {
+                            unreachable!("memberfunction is not a name...");
+                        }
                     },
                     a => {
                         errors.push((ErrorLevel::Err, error!(self.lexer, tk.pos, "invalid token `{a}`, struct field or function expected")));
@@ -1384,7 +1419,11 @@ impl Parser {
         } else if nt.ttype == TokenType::Special && val == "[" {
             self.parse_array()
         } else if nt.ttype == TokenType::Ident {
-            Ok(Type::Custom(val))
+            if val.starts_with("_") {
+                Ok(Type::Var(val))
+            } else {
+                Ok(Type::Custom(val))
+            }
         } else if nt.ttype == TokenType::Keyword || nt.value == "func" {
             self.expect(Some(TokenType::Operator), Some("<".into()))?;
             self.expect(Some(TokenType::Special), Some("(".into()))?;
@@ -1423,9 +1462,11 @@ impl Parser {
 
         loop {
             let ptr_check = self.lexer.peek_token()?;
-            if ptr_check.ttype == TokenType::Operator && ptr_check.value == "*" {
+            if ptr_check.ttype == TokenType::Operator && ptr_check.value.chars().all(|x| x == '*') {
                 self.lexer.next_token().unwrap();
-                tmp_tp = Type::Pointer(Box::new(tmp_tp));
+                for _ in ptr_check.value.chars() {
+                    tmp_tp = Type::Pointer(Box::new(tmp_tp));
+                }
             } else {
                 return Ok(tmp_tp);
             }

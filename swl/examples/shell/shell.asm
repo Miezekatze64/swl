@@ -1906,6 +1906,53 @@ print:
 ;; RETURN
 	leave
 	ret
+;; FUNCTION DECL eprint
+eprint:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; VALUE 1
+	mov rax, 1
+;; PUSH
+	push rax
+;; VALUE 2
+	mov rax, 2
+;; PUSH
+	push rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL arr2addr
+	call arr2addr
+;; PUSH
+	push rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL arrlen
+	call arrlen
+;; PUSH
+	push rax
+;; POP
+	pop rdx
+;; POP
+	pop rcx
+;; POP
+	pop rbx
+;; POP
+	pop rax
+;; FUNCTION CALL syscall3
+	call syscall3
+;; RETURN
+	leave
+	ret
 ;; FUNCTION DECL println
 println:
 	push rbp
@@ -1929,6 +1976,32 @@ println:
 	pop rax
 ;; FUNCTION CALL print
 	call print
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL eprintln
+eprintln:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; VALUE 
+
+	mov rbx, 10
+;; PUSH
+	push rbx
+;; POP
+	pop rbx
+;; FUNCTION CALL append
+	call append
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL eprint
+	call eprint
 ;; RETURN
 	leave
 	ret
@@ -2144,10 +2217,10 @@ system:
 	cmp rax, rbx
 	sete al
 	mov al, al
-;; IF 105553116266496 START
+;; IF 422212465065984 START
 	cmp al, 1
-	jne .l2_105553116266496
-.l1_105553116266496:
+	jne .l2_422212465065984
+.l1_422212465065984:
 ;; VALUE /usr/bin/sh
 	mov rax, str__usr_bin_sh
 ;; PUSH
@@ -2176,15 +2249,15 @@ system:
 	pop rax
 ;; FUNCTION CALL exit
 	call exit
-;; IF 105553116266496 END
-.l2_105553116266496:
-;; WHILE 211106232532992 START
-.loop_211106232532992:
+;; IF 422212465065984 END
+.l2_422212465065984:
+;; WHILE 844424930131968 START
+.loop_844424930131968:
 ;; VALUE true
 	mov rax, 1
-;; WHILE 211106232532992 CHECK
+;; WHILE 844424930131968 CHECK
 	cmp al, 1
-	jne .loop_211106232532992_end
+	jne .loop_844424930131968_end
 ;; VALUE 61
 	mov rax, 61
 ;; PUSH
@@ -2232,14 +2305,14 @@ system:
 	cmp rax, rbx
 	setle al
 	mov al, al
-;; IF 2533274790395904 START
+;; IF 10133099161583616 START
 	cmp al, 1
-	jne .l2_2533274790395904
-.l1_2533274790395904:
-;; BREAK 211106232532992
-	jmp .loop_211106232532992_end
-;; IF 2533274790395904 END
-.l2_2533274790395904:
+	jne .l2_10133099161583616
+.l1_10133099161583616:
+;; BREAK 844424930131968
+	jmp .loop_844424930131968_end
+;; IF 10133099161583616 END
+.l2_10133099161583616:
 ;; VALUE 10
 	mov rax, 10
 ;; PUSH
@@ -2248,9 +2321,9 @@ system:
 	pop rax
 ;; FUNCTION CALL sleep
 	call sleep
-;; WHILE 211106232532992 END
-	jmp .loop_211106232532992
-.loop_211106232532992_end:
+;; WHILE 844424930131968 END
+	jmp .loop_844424930131968
+.loop_844424930131968_end:
 ;; RETURN
 	leave
 	ret
@@ -2392,20 +2465,61 @@ itoa:
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
-;; VALUE 0
+;; VALUE false
 	mov rax, 0
-;; SET VAR 16
-	sub rsp, 16
-	mov qword [rbp-16], rax
+;; SET VAR 9
+	sub rsp, 9
+	mov byte [rbp-9], al
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; SET VAR 24
-	sub rsp, 24
-	mov qword [rbp-24], rax
-;; WHILE 422212465065984 START
-.loop_422212465065984:
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; PUSH
+	push rax
+;; VALUE 0
+	mov rbx, 0
+;; POP
+	pop rax
+;; LESS
+	cmp rax, rbx
+	setl al
+	mov al, al
+;; IF 844424930131968 START
+	cmp al, 1
+	jne .l2_844424930131968
+.l1_844424930131968:
+;; VALUE true
+	mov rax, 1
+;; SET VAR 9
+	sub rsp, 9
+	mov byte [rbp-9], al
+;; VALUE -1
+	mov rax, -1
+;; PUSH
+	push rax
+;; GET VAR 8
+	mov rbx, [rbp-8]
+;; POP
+	pop rax
+;; MUL
+	imul rax, rbx
+;; SET VAR 8
+	sub rsp, 8
+	mov qword [rbp-8], rax
+;; IF 844424930131968 END
+.l2_844424930131968:
+;; VALUE 0
+	mov rax, 0
+;; SET VAR 17
+	sub rsp, 17
+	mov qword [rbp-17], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
+;; SET VAR 25
+	sub rsp, 25
+	mov qword [rbp-25], rax
+;; WHILE 6755399441055744 START
+.loop_6755399441055744:
+;; GET VAR 25
+	mov rax, [rbp-25]
 ;; PUSH
 	push rax
 ;; VALUE 10
@@ -2416,34 +2530,51 @@ itoa:
 	cmp rax, rbx
 	setge al
 	mov al, al
-;; WHILE 422212465065984 CHECK
+;; WHILE 6755399441055744 CHECK
 	cmp al, 1
-	jne .loop_422212465065984_end
+	jne .loop_6755399441055744_end
 ;; VALUE 10
 	mov rbx, 10
-;; GET VAR 24
-	mov rax, [rbp-24]
+;; GET VAR 25
+	mov rax, [rbp-25]
 ;; DIV
 	xor rdx, rdx
 	mov rax, rax
 	idiv rbx
-;; SET VAR 24
-	sub rsp, 24
-	mov qword [rbp-24], rax
+;; SET VAR 25
+	sub rsp, 25
+	mov qword [rbp-25], rax
 ;; VALUE 1
 	mov rbx, 1
-;; GET VAR 16
-	mov rax, [rbp-16]
+;; GET VAR 17
+	mov rax, [rbp-17]
 ;; ADD
 	add rax, rbx
-;; SET VAR 16
-	sub rsp, 16
-	mov qword [rbp-16], rax
-;; WHILE 422212465065984 END
-	jmp .loop_422212465065984
-.loop_422212465065984_end:
-;; GET VAR 16
-	mov rax, [rbp-16]
+;; SET VAR 17
+	sub rsp, 17
+	mov qword [rbp-17], rax
+;; WHILE 6755399441055744 END
+	jmp .loop_6755399441055744
+.loop_6755399441055744_end:
+;; GET VAR 9
+	mov al, [rbp-9]
+;; IF 13510798882111488 START
+	cmp al, 1
+	jne .l2_13510798882111488
+.l1_13510798882111488:
+;; VALUE 1
+	mov rbx, 1
+;; GET VAR 17
+	mov rax, [rbp-17]
+;; ADD
+	add rax, rbx
+;; SET VAR 17
+	sub rsp, 17
+	mov qword [rbp-17], rax
+;; IF 13510798882111488 END
+.l2_13510798882111488:
+;; GET VAR 17
+	mov rax, [rbp-17]
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -2458,23 +2589,23 @@ itoa:
 	pop rax
 ;; FUNCTION CALL alloc_array
 	call alloc_array
-;; SET VAR 32
-	sub rsp, 32
-	mov qword [rbp-32], rax
-;; GET VAR 16
-	mov rax, [rbp-16]
-;; SET VAR 40
-	sub rsp, 40
-	mov qword [rbp-40], rax
+;; SET VAR 33
+	sub rsp, 33
+	mov qword [rbp-33], rax
+;; GET VAR 17
+	mov rax, [rbp-17]
+;; SET VAR 41
+	sub rsp, 41
+	mov qword [rbp-41], rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; SET VAR 48
-	sub rsp, 48
-	mov qword [rbp-48], rax
-;; WHILE 6755399441055744 START
-.loop_6755399441055744:
-;; GET VAR 40
-	mov rax, [rbp-40]
+;; SET VAR 49
+	sub rsp, 49
+	mov qword [rbp-49], rax
+;; WHILE 216172782113783808 START
+.loop_216172782113783808:
+;; GET VAR 41
+	mov rax, [rbp-41]
 ;; PUSH
 	push rax
 ;; VALUE 0
@@ -2485,11 +2616,11 @@ itoa:
 	cmp rax, rbx
 	setge al
 	mov al, al
-;; WHILE 6755399441055744 CHECK
+;; WHILE 216172782113783808 CHECK
 	cmp al, 1
-	jne .loop_6755399441055744_end
-;; GET VAR 48
-	mov rax, [rbp-48]
+	jne .loop_216172782113783808_end
+;; GET VAR 49
+	mov rax, [rbp-49]
 ;; PUSH
 	push rax
 ;; VALUE 10
@@ -2507,14 +2638,14 @@ itoa:
 	pop rax
 ;; FUNCTION CALL digit_to_ascii
 	call digit_to_ascii
-;; GET VAR 40
-	mov rbx, [rbp-40]
+;; GET VAR 41
+	mov rbx, [rbp-41]
 ;; VALUE 1
 	mov rcx, 1
 ;; MUL
 	imul rbx, rcx
-;; GET VAR 32
-	mov rcx, [rbp-32]
+;; GET VAR 33
+	mov rcx, [rbp-33]
 ;; SET ARRAY INDEX
 	push rax
 	mov rax, rcx
@@ -2524,29 +2655,54 @@ itoa:
 	mov [rax], bl
 ;; VALUE 10
 	mov rbx, 10
-;; GET VAR 48
-	mov rax, [rbp-48]
+;; GET VAR 49
+	mov rax, [rbp-49]
 ;; DIV
 	xor rdx, rdx
 	mov rax, rax
 	idiv rbx
-;; SET VAR 48
-	sub rsp, 48
-	mov qword [rbp-48], rax
+;; SET VAR 49
+	sub rsp, 49
+	mov qword [rbp-49], rax
 ;; VALUE 1
 	mov rbx, 1
-;; GET VAR 40
-	mov rax, [rbp-40]
+;; GET VAR 41
+	mov rax, [rbp-41]
 ;; SUB
 	sub rax, rbx
-;; SET VAR 40
-	sub rsp, 40
-	mov qword [rbp-40], rax
-;; WHILE 6755399441055744 END
-	jmp .loop_6755399441055744
-.loop_6755399441055744_end:
-;; GET VAR 32
-	mov rax, [rbp-32]
+;; SET VAR 41
+	sub rsp, 41
+	mov qword [rbp-41], rax
+;; WHILE 216172782113783808 END
+	jmp .loop_216172782113783808
+.loop_216172782113783808_end:
+;; GET VAR 9
+	mov al, [rbp-9]
+;; IF 432345564227567616 START
+	cmp al, 1
+	jne .l2_432345564227567616
+.l1_432345564227567616:
+;; VALUE -
+	mov rax, 45
+;; VALUE 0
+	mov rbx, 0
+;; VALUE 1
+	mov rcx, 1
+;; MUL
+	imul rbx, rcx
+;; GET VAR 33
+	mov rcx, [rbp-33]
+;; SET ARRAY INDEX
+	push rax
+	mov rax, rcx
+	add rax, 8
+	add al, bl
+	pop rbx
+	mov [rax], bl
+;; IF 432345564227567616 END
+.l2_432345564227567616:
+;; GET VAR 33
+	mov rax, [rbp-33]
 ;; RETURN
 	leave
 	ret
@@ -2575,17 +2731,17 @@ bool_to_string:
 	mov [rbp-1], al
 ;; GET VAR 1
 	mov al, [rbp-1]
-;; IF 422212465065984 START
+;; IF 1688849860263936 START
 	cmp al, 1
-	jne .l2_422212465065984
-.l1_422212465065984:
+	jne .l2_1688849860263936
+.l1_1688849860263936:
 ;; VALUE true
 	mov rax, str_true
 ;; RETURN
 	leave
 	ret
-;; IF 422212465065984 END
-.l2_422212465065984:
+;; IF 1688849860263936 END
+.l2_1688849860263936:
 ;; VALUE false
 	mov rax, str_false
 ;; RETURN
@@ -2702,17 +2858,17 @@ startsWith:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 3377699720527872 START
+;; IF 13510798882111488 START
 	cmp al, 1
-	jne .l2_3377699720527872
-.l1_3377699720527872:
+	jne .l2_13510798882111488
+.l1_13510798882111488:
 ;; VALUE false
 	mov rax, 0
 ;; RETURN
 	leave
 	ret
-;; IF 3377699720527872 END
-.l2_3377699720527872:
+;; IF 13510798882111488 END
+.l2_13510798882111488:
 ;; VALUE 0
 	mov rax, 0
 ;; VALUE 1
@@ -2765,17 +2921,17 @@ endsWith:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 6755399441055744 START
+;; IF 27021597764222976 START
 	cmp al, 1
-	jne .l2_6755399441055744
-.l1_6755399441055744:
+	jne .l2_27021597764222976
+.l1_27021597764222976:
 ;; VALUE false
 	mov rax, 0
 ;; RETURN
 	leave
 	ret
-;; IF 6755399441055744 END
-.l2_6755399441055744:
+;; IF 27021597764222976 END
+.l2_27021597764222976:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; FUNCTION CALL len
@@ -2836,17 +2992,17 @@ min:
 	cmp rax, rbx
 	setl al
 	mov al, al
-;; IF 13510798882111488 START
+;; IF 54043195528445952 START
 	cmp al, 1
-	jne .l2_13510798882111488
-.l1_13510798882111488:
+	jne .l2_54043195528445952
+.l1_54043195528445952:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
-;; IF 13510798882111488 END
-.l2_13510798882111488:
+;; IF 54043195528445952 END
+.l2_54043195528445952:
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; RETURN
@@ -2872,19 +3028,67 @@ max:
 	cmp rax, rbx
 	setg al
 	mov al, al
-;; IF 27021597764222976 START
+;; IF 108086391056891904 START
 	cmp al, 1
-	jne .l2_27021597764222976
-.l1_27021597764222976:
+	jne .l2_108086391056891904
+.l1_108086391056891904:
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
-;; IF 27021597764222976 END
-.l2_27021597764222976:
+;; IF 108086391056891904 END
+.l2_108086391056891904:
 ;; GET VAR 16
 	mov rax, [rbp-16]
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL assert
+assert:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 1
+	mov [rbp-1], al
+	sub rsp, 9
+	mov [rbp-9], rbx
+;; GET VAR 1
+	mov al, [rbp-1]
+;; PUSH
+	push rax
+;; NOT
+	test al, al
+	setz al
+;; IF 216172782113783808 START
+	cmp al, 1
+	jne .l2_216172782113783808
+.l1_216172782113783808:
+;; VALUE Assertion failed: 
+	mov rax, str_assertion_failed__
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL eprint
+	call eprint
+;; GET VAR 9
+	mov rax, [rbp-9]
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL eprintln
+	call eprintln
+;; VALUE 1
+	mov rax, 1
+;; PUSH
+	push rax
+;; POP
+	pop rax
+;; FUNCTION CALL exit
+	call exit
+;; IF 216172782113783808 END
+.l2_216172782113783808:
 ;; RETURN
 	leave
 	ret
@@ -2981,14 +3185,17 @@ str_true:
 str_false:
 	dq 5
 	db `false`
+str_assertion_failed__:
+	dq 18
+	db `Assertion failed: `
 arr_0:
 	dq 100
 	resb 100
-global__m_tcache:
-	resb 8
 global_NULL:
 	resb 1
-global__m_heap_start:
+global__m_tcache:
 	resb 8
 global__m_location:
+	resb 8
+global__m_heap_start:
 	resb 8

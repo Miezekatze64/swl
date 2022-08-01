@@ -9,7 +9,8 @@ pub struct Lexer {
     source       : Vec<char>,
     pub pos      : usize,
     line         : usize,
-    ch           : usize
+    ch           : usize,
+    verbose      : usize,
 }
 
 #[derive(Debug, Clone)]
@@ -53,14 +54,24 @@ const KEYWORDS: &[&str] = &[
     "from"
 ];
 
+macro_rules! ret {
+    ($a:expr, $verbose:expr) => {
+        if ($verbose >= 4) {
+            eprintln!("TOKEN: {:?}", $a);
+        }
+        return $a;
+    }
+}
+
 impl Lexer {
-    pub fn new(filename: String) -> Result<Self, io::Error> {
+    pub fn new(filename: String, verbose: usize) -> Result<Self, io::Error> {
         Ok(Lexer {
             source: fs::read_to_string(filename.clone())?.chars().collect(),
             pos: 0,
             filename,
             line: 0,
             ch: 0,
+            verbose
         })
     }
 
@@ -117,11 +128,11 @@ impl Lexer {
                 TokenType::Char => {
                     if val.len() == 1 && ch == '\'' {
                         self.pos += 1;
-                        return Ok(Token {
+                        ret!(Ok::<Token, Error>(Token {
                             pos: token_pos,
                             ttype,
-                            value: val,
-                        })
+                            value: val.clone(),
+                        }), self.verbose);
                     }
                     if val.len() == 2 && val.starts_with('\\') && ch == '\'' {
                         val = match val.chars().nth(1).unwrap() {
@@ -136,11 +147,11 @@ impl Lexer {
                             }
                         }.to_string();
                         self.pos += 1;
-                        return Ok(Token {
+                        ret!(Ok::<Token, Error>(Token {
                             pos: token_pos,
                             ttype,
-                            value: val,
-                        })
+                            value: val.clone(),
+                        }), self.verbose);
                     }
                     
                     if val.len() == 1 && val.starts_with('\\') {
@@ -160,11 +171,11 @@ impl Lexer {
                     if ch == '"' {
                         self.pos += 1;
 
-                        return Ok(Token {
+                        ret!(Ok::<Token, Error>(Token {
                             pos: token_pos,
                             ttype,
-                            value: val,
-                        })
+                            value: val.clone(),
+                        }), self.verbose);
                     }
                     val.push(ch);
                     false
@@ -180,11 +191,11 @@ impl Lexer {
                             ttype = check_keywords_and_types(val.as_str(),
                                                              ttype);
 
-                            return Ok(Token {
+                            ret!(Ok::<Token, Error>(Token {
                                 pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
+                                value: val.clone(),
+                            }), self.verbose);
                         }
                     },
                     '"' => {
@@ -195,11 +206,11 @@ impl Lexer {
                             ttype = check_keywords_and_types(val.as_str(),
                                                              ttype);
 
-                            return Ok(Token {
+                            ret!(Ok::<Token, Error>(Token {
                                 pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
+                                value: val.clone(),
+                            }), self.verbose);
                         }
                     },
                     'a'..='z'|'_'|'A'..='Z' => {
@@ -216,22 +227,22 @@ impl Lexer {
                                 ttype = TokenType::Special;
                             }
 
-                            return Ok(Token {
+                            ret!(Ok::<Token, Error>(Token {
                                 pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
+                                value: val.clone(),
+                            }), self.verbose);
                         }
                     },
                     '0'..='9'|'.' => {
                         if ttype == TokenType::Float ||
                             ((ttype == TokenType::Int) && ch == '.') {
                                 if ttype != TokenType::Float && self.pos + 1 < self.source.len() && ! self.source[self.pos+1].is_numeric() {
-                                    return Ok(Token {
+                                    ret!(Ok::<Token, Error>(Token {
                                         pos: token_pos,
                                         ttype,
-                                        value: val,
-                                    });
+                                        value: val.clone(),
+                                    }), self.verbose);
                                 }
                                 ttype = TokenType::Float;
                                 val.push(ch);
@@ -255,11 +266,11 @@ impl Lexer {
                                     ttype = TokenType::Special;
                                 }
 
-                                return Ok(Token {
+                                ret!(Ok::<Token, Error>(Token {
                                     pos: token_pos,
-                                ttype,
-                                    value: val,
-                                });
+                                    ttype,
+                                    value: val.clone(),
+                                }), self.verbose);
                             }
                     },
                     '!'|'='|'+'|'-'|'*'|'/'|'<'|'>'|'%'|'|'|'&' => {
@@ -307,11 +318,11 @@ impl Lexer {
                                 ttype = check_keywords_and_types(
                                     val.as_str(), ttype);
 
-                                return Ok(Token {
+                                ret!(Ok::<Token, Error>(Token {
                                     pos: token_pos,
                                     ttype,
-                                    value: val,
-                                });
+                                    value: val.clone(),
+                                }), self.verbose);
                             }
                     },
                     ';' | '(' | ')' | ',' | '{' | '}' | '[' | ']' | ':' => {
@@ -329,11 +340,11 @@ impl Lexer {
                                 ttype = check_keywords_and_types(
                                     val.as_str(), ttype);
 
-                            return Ok(Token {
+                            ret!(Ok::<Token, Error>(Token {
                                 pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
+                                value: val.clone(),
+                            }), self.verbose);
                         }
                     },
                     ' '|'\t'|'\n' => {
@@ -342,11 +353,11 @@ impl Lexer {
                             ttype = check_keywords_and_types(
                                 val.as_str(), ttype);
 
-                            return Ok(Token{
+                            ret!(Ok::<Token, Error>(Token{
                                 pos: token_pos,
                                 ttype,
-                                value: val,
-                            });
+                                value: val.clone(),
+                            }), self.verbose);
                         } else {
                             token_pos = self.pos+1;
                         }
@@ -362,11 +373,11 @@ impl Lexer {
 
             self.pos += 1;
             if self.pos >= self.source.len() {
-                return Ok(Token {
+                ret!(Ok::<Token, Error>(Token {
                     pos: token_pos,
                     ttype,
-                    value: val,
-                })
+                    value: val.clone(),
+                }), self.verbose);
             }
 
             (self.line, self.ch) = self.pos_to_line_char(self.pos);

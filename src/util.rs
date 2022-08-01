@@ -1,14 +1,17 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
 
 pub type Error = (ErrorLevel, String);
 
 #[allow(unused)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLevel {
     Warn,
     Err,
-    Fatal
+    Fatal,
+    Note,
 }
 
 #[macro_export]
@@ -61,6 +64,7 @@ macro_rules! error {
 impl std::fmt::Display for ErrorLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match self {
+            ErrorLevel::Note => "note",
             ErrorLevel::Warn => "warning",
             ErrorLevel::Err => "error",
             ErrorLevel::Fatal => "FATAL Error",
@@ -84,6 +88,7 @@ pub enum Type {
     Function(Vec<Type>, Box<Type>),
     Invalid,
     Struct(String, HashMap<String, (Type, usize)>),
+    Var(String),
 }
 
 impl PartialEq for Type {
@@ -116,6 +121,7 @@ impl std::hash::Hash for Type {
                 args.hash(state);
                 ret.hash(state);
             },
+            Type::Var(a) => ("_".to_string() + a).hash(state),
         }
     }
 }
@@ -180,6 +186,7 @@ impl std::fmt::Display for Type {
                 write!(s, "{ret_type}>")?;
                 s
             },
+            Type::Var(a) => format!("_{a}"),
         }.as_str())
     }
 }
@@ -197,7 +204,7 @@ impl Type {
     }
 
     pub fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>)
-                     -> bool {
+                -> bool {
         let a = self.dealias(aliases);
         let b = type_r.dealias(aliases);
 
@@ -280,7 +287,17 @@ impl Type {
             },
             // = pointer -> 8
             Type::Function(_, _) => 8,
+            Type::Var(a) => {
+                unreachable!("unevavluated type-variable `{a}`")
+            },
         }
+    }
+
+    pub fn to_label(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
+        "__member__".to_string() + &hash + "_"
     }
 }
 

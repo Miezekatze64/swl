@@ -10,5 +10,3 @@ publish = false
 name = "lang"
 path = "src/main.rs"
 
-[target.x86_64-pc-linux-gcc]
-rustflags = ["-C", "target-feature=+crt-static"]

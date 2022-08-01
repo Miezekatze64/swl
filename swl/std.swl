@@ -166,7 +166,7 @@ func _sbrk(int inc) -> int {
 //   contains current allocated (and freed + blocked) blocks of the malloc() and free() functions
 int    _m_heap_start = 0;
 int    _m_location = 0;
-[_m_struct]  _m_tcache;
+[m_struct]  _m_tcache;
 
 // the structure of the tcache (one allocated or blocked block)
 // ptr:
@@ -175,7 +175,7 @@ int    _m_location = 0;
 //    the size (in bytes) of the block
 // is_block:
 //    true if block, false if hole
-struct _m_struct {
+struct m_struct {
     int ptr;
     int size;
     bool is_block;
@@ -195,7 +195,7 @@ func _malloc(int size) -> int {
 
     int i = 0;
     while (i < _m_location) {
-        _m_struct index = _m_tcache[i];
+        m_struct index = _m_tcache[i];
         if (!index.is_block && index.size >= size) {
             _m_tcache[0].is_block = true;
             <- index.ptr;
@@ -206,7 +206,7 @@ func _malloc(int size) -> int {
     int ptr = _sbrk(size);
     int current = ptr + size;
 
-    _m_tcache[_m_location] = _m_struct {
+    _m_tcache[_m_location] = m_struct {
         ptr: ptr;
         size: size;
         is_block: true;
@@ -224,7 +224,7 @@ func _malloc(int size) -> int {
 func _free(int ptr) {
     int i = 0;
     while (i < _m_location) {
-        _m_struct index = _m_tcache[i];
+        m_struct index = _m_tcache[i];
         if (ptr == index.ptr && index.is_block) {
             // free it
             _m_tcache[i].is_block = false;

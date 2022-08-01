@@ -96,10 +96,12 @@ cstrlen:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 16
@@ -110,10 +112,12 @@ cstrlen:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; SET VAR 24
 	sub rsp, 24
 	mov qword [rbp-24], rax
@@ -161,16 +165,20 @@ cstr_to_str:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, cstrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL cstrlen
-	call cstrlen
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, alloc_array
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
+;; CALL PTR
+	call rbx
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
@@ -189,10 +197,12 @@ cstr_to_str:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, cstrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL cstrlen
-	call cstrlen
+;; CALL PTR
+	call rbx
 ;; GET RETURN VALUE
 	mov rbx, rax
 ;; POP
@@ -208,10 +218,12 @@ cstr_to_str:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 24
@@ -222,10 +234,12 @@ cstr_to_str:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; SET VAR 32
 	sub rsp, 32
 	mov qword [rbp-32], rax
@@ -270,16 +284,16 @@ cstr_to_str:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL to_cstr
-to_cstr:
+;; FUNCTION DECL __member__11876854719037224982_to_cstr
+__member__11876854719037224982_to_cstr:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
 	mov [rbp-8], rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -290,10 +304,12 @@ to_cstr:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _malloc
 ;; POP
 	pop rax
-;; FUNCTION CALL _malloc
-	call _malloc
+;; CALL PTR
+	call rbx
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
@@ -310,8 +326,8 @@ to_cstr:
 	push rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; GET RETURN VALUE
 	mov rbx, rax
 ;; POP
@@ -354,18 +370,22 @@ to_cstr:
 	mov al, [rbx+0]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rcx, set_addr
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL set_addr
-	call set_addr
+;; CALL PTR
+	call rcx
 ;; VALUE 1
 	mov rbx, 1
 ;; GET VAR 24
@@ -384,8 +404,8 @@ to_cstr:
 	push rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; GET RETURN VALUE
 	mov rbx, rax
 ;; POP
@@ -398,20 +418,24 @@ to_cstr:
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rcx, set_addr
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL set_addr
-	call set_addr
+;; CALL PTR
+	call rcx
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -419,8 +443,10 @@ to_cstr:
 args:
 	push rbp
 	mov rbp,rsp
-;; FUNCTION CALL __get_args
-	call __get_args
+;; FUNCTION ADRESS
+	mov rax, __get_args
+;; CALL PTR
+	call rax
 ;; SET VAR 8
 	sub rsp, 8
 	mov qword [rbp-8], rax
@@ -433,8 +459,10 @@ args:
 env:
 	push rbp
 	mov rbp,rsp
-;; FUNCTION CALL __get_args
-	call __get_args
+;; FUNCTION ADRESS
+	mov rax, __get_args
+;; CALL PTR
+	call rax
 ;; SET VAR 8
 	sub rsp, 8
 	mov qword [rbp-8], rax
@@ -442,10 +470,12 @@ env:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
@@ -501,10 +531,12 @@ env:
 	mov rax, [rbp-32]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; SET VAR 40
 	sub rsp, 40
 	mov qword [rbp-40], rax
@@ -565,10 +597,12 @@ env:
 	imul rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, alloc_array
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
+;; CALL PTR
+	call rbx
 ;; SET VAR 56
 	sub rsp, 56
 	mov qword [rbp-56], rax
@@ -668,14 +702,18 @@ env:
 envp:
 	push rbp
 	mov rbp,rsp
-;; FUNCTION CALL env
-	call env
+;; FUNCTION ADRESS
+	mov rax, env
+;; CALL PTR
+	call rax
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; VALUE 8
@@ -686,10 +724,12 @@ envp:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -707,12 +747,14 @@ _brk:
 	mov rbx, [rbp-8]
 ;; PUSH
 	push rbx
+;; FUNCTION ADRESS
+	mov rcx, syscall1
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall1
-	call syscall1
+;; CALL PTR
+	call rcx
 ;; RETURN
 	leave
 	ret
@@ -752,10 +794,12 @@ _sbrk:
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _brk
 ;; POP
 	pop rax
-;; FUNCTION CALL _brk
-	call _brk
+;; CALL PTR
+	call rbx
 ;; SET VAR 32
 	sub rsp, 32
 	mov qword [rbp-32], rax
@@ -806,10 +850,12 @@ _sbrk:
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _brk
 ;; POP
 	pop rax
-;; FUNCTION CALL _brk
-	call _brk
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 32
@@ -880,10 +926,12 @@ _malloc:
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _sbrk
 ;; POP
 	pop rax
-;; FUNCTION CALL _sbrk
-	call _sbrk
+;; CALL PTR
+	call rbx
 ;; SET GLOBAL
 	mov qword [global__m_heap_start+0], rax
 ;; VALUE 1000
@@ -914,16 +962,20 @@ _malloc:
 	imul rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _sbrk
 ;; POP
 	pop rax
-;; FUNCTION CALL _sbrk
-	call _sbrk
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, ptr2arr
 ;; POP
 	pop rax
-;; FUNCTION CALL ptr2arr
-	call ptr2arr
+;; CALL PTR
+	call rbx
 ;; SET GLOBAL
 	mov qword [global__m_tcache+0], rax
 ;; IF 805306368 END
@@ -1063,10 +1115,12 @@ _malloc:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _sbrk
 ;; POP
 	pop rax
-;; FUNCTION CALL _sbrk
-	call _sbrk
+;; CALL PTR
+	call rbx
 ;; SET VAR 41
 	sub rsp, 41
 	mov qword [rbp-41], rax
@@ -1555,10 +1609,12 @@ _free:
 	imul rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _sbrk
 ;; POP
 	pop rax
-;; FUNCTION CALL _sbrk
-	call _sbrk
+;; CALL PTR
+	call rbx
 ;; IF 1855425871872 END
 .l2_1855425871872:
 ;; RETURN
@@ -1582,10 +1638,12 @@ _free:
 	mov rax, str_free__double_free_n
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, print
 ;; POP
 	pop rax
-;; FUNCTION CALL print
-	call print
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -1607,10 +1665,12 @@ alloc_array:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _malloc
 ;; POP
 	pop rax
-;; FUNCTION CALL _malloc
-	call _malloc
+;; CALL PTR
+	call rbx
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
@@ -1622,20 +1682,24 @@ alloc_array:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rcx, set_addr
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL set_addr
-	call set_addr
+;; CALL PTR
+	call rcx
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, ptr2arr
 ;; POP
 	pop rax
-;; FUNCTION CALL ptr2arr
-	call ptr2arr
+;; CALL PTR
+	call rbx
 ;; SET VAR 24
 	sub rsp, 24
 	mov qword [rbp-24], rax
@@ -1654,16 +1718,20 @@ free_array:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, _free
 ;; POP
 	pop rax
-;; FUNCTION CALL _free
-	call _free
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -1684,30 +1752,36 @@ strcpy:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; GET RETURN VALUE
 	mov rbx, rax
 ;; PUSH
 	push rbx
+;; FUNCTION ADRESS
+	mov rcx, min
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL min
-	call min
+;; CALL PTR
+	call rcx
 ;; SET VAR 32
 	sub rsp, 32
 	mov qword [rbp-32], rax
@@ -1789,12 +1863,14 @@ exit:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rcx, syscall1
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall1
-	call syscall1
+;; CALL PTR
+	call rcx
 ;; RETURN
 	leave
 	ret
@@ -1816,10 +1892,12 @@ read:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arr2addr
 ;; POP
 	pop rax
-;; FUNCTION CALL arr2addr
-	call arr2addr
+;; CALL PTR
+	call rbx
 ;; GET RETURN VALUE
 	mov rcx, rax
 ;; PUSH
@@ -1828,14 +1906,18 @@ read:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; GET RETURN VALUE
 	mov rdx, rax
 ;; PUSH
 	push rdx
+;; FUNCTION ADRESS
+	mov rdi, syscall3
 ;; POP
 	pop rdx
 ;; POP
@@ -1844,8 +1926,8 @@ read:
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
+;; CALL PTR
+	call rdi
 ;; RETURN
 	leave
 	ret
@@ -1867,22 +1949,28 @@ print:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arr2addr
 ;; POP
 	pop rax
-;; FUNCTION CALL arr2addr
-	call arr2addr
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rdi, syscall3
 ;; POP
 	pop rdx
 ;; POP
@@ -1891,8 +1979,8 @@ print:
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
+;; CALL PTR
+	call rdi
 ;; RETURN
 	leave
 	ret
@@ -1914,22 +2002,28 @@ eprint:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arr2addr
 ;; POP
 	pop rax
-;; FUNCTION CALL arr2addr
-	call arr2addr
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rdi, syscall3
 ;; POP
 	pop rdx
 ;; POP
@@ -1938,8 +2032,8 @@ eprint:
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
+;; CALL PTR
+	call rdi
 ;; RETURN
 	leave
 	ret
@@ -1958,14 +2052,16 @@ println:
 	push rbx
 ;; POP
 	pop rbx
-;; FUNCTION CALL append
-	call append
+;; FUNCTION CALL __member__11876854719037224982_append
+	call __member__11876854719037224982_append
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, print
 ;; POP
 	pop rax
-;; FUNCTION CALL print
-	call print
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -1984,14 +2080,16 @@ eprintln:
 	push rbx
 ;; POP
 	pop rbx
-;; FUNCTION CALL append
-	call append
+;; FUNCTION CALL __member__11876854719037224982_append
+	call __member__11876854719037224982_append
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, eprint
 ;; POP
 	pop rax
-;; FUNCTION CALL eprint
-	call eprint
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -2003,10 +2101,12 @@ fork:
 	mov rax, 57
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, syscall0
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall0
-	call syscall0
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -2026,24 +2126,28 @@ execve:
 	push rax
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL to_cstr
-	call to_cstr
+;; FUNCTION CALL __member__11876854719037224982_to_cstr
+	call __member__11876854719037224982_to_cstr
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; GET VAR 16
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; VALUE 8
@@ -2058,10 +2162,12 @@ execve:
 	mov rax, [rbp-24]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; VALUE 8
@@ -2072,6 +2178,8 @@ execve:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rdi, syscall3
 ;; POP
 	pop rdx
 ;; POP
@@ -2080,8 +2188,8 @@ execve:
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall3
-	call syscall3
+;; CALL PTR
+	call rdi
 ;; RETURN
 	leave
 	ret
@@ -2103,17 +2211,19 @@ system:
 	imul rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, alloc_array
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
+;; CALL PTR
+	call rbx
 ;; SET VAR 16
 	sub rsp, 16
 	mov qword [rbp-16], rax
 ;; VALUE /usr/bin/sh
 	mov rax, str__usr_bin_sh
-;; FUNCTION CALL to_cstr
-	call to_cstr
+;; FUNCTION CALL __member__11876854719037224982_to_cstr
+	call __member__11876854719037224982_to_cstr
 ;; VALUE 0
 	mov rbx, 0
 ;; VALUE 8
@@ -2131,8 +2241,8 @@ system:
 	mov [rax], rbx
 ;; VALUE -c
 	mov rax, str__c
-;; FUNCTION CALL to_cstr
-	call to_cstr
+;; FUNCTION CALL __member__11876854719037224982_to_cstr
+	call __member__11876854719037224982_to_cstr
 ;; VALUE 1
 	mov rbx, 1
 ;; VALUE 8
@@ -2150,8 +2260,8 @@ system:
 	mov [rax], rbx
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL to_cstr
-	call to_cstr
+;; FUNCTION CALL __member__11876854719037224982_to_cstr
+	call __member__11876854719037224982_to_cstr
 ;; VALUE 2
 	mov rbx, 2
 ;; VALUE 8
@@ -2171,10 +2281,12 @@ system:
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; VALUE 3
 	mov rbx, 3
 ;; VALUE 8
@@ -2190,8 +2302,10 @@ system:
 	add rax, rbx
 	pop rbx
 	mov [rax], rbx
-;; FUNCTION CALL fork
-	call fork
+;; FUNCTION ADRESS
+	mov rax, fork
+;; CALL PTR
+	call rax
 ;; SET VAR 24
 	sub rsp, 24
 	mov qword [rbp-24], rax
@@ -2219,26 +2333,32 @@ system:
 	mov rax, [rbp-16]
 ;; PUSH
 	push rax
-;; FUNCTION CALL env
-	call env
+;; FUNCTION ADRESS
+	mov rax, env
+;; CALL PTR
+	call rax
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rdx, execve
 ;; POP
 	pop rcx
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL execve
-	call execve
+;; CALL PTR
+	call rdx
 ;; VALUE 0
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, exit
 ;; POP
 	pop rax
-;; FUNCTION CALL exit
-	call exit
+;; CALL PTR
+	call rbx
 ;; IF 422212465065984 END
 .l2_422212465065984:
 ;; WHILE 844424930131968 START
@@ -2268,6 +2388,8 @@ system:
 	mov rdi, 0
 ;; PUSH
 	push rdi
+;; FUNCTION ADRESS
+	mov rsi, syscall4
 ;; POP
 	pop rdi
 ;; POP
@@ -2278,8 +2400,8 @@ system:
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall4
-	call syscall4
+;; CALL PTR
+	call rsi
 ;; SET VAR 32
 	sub rsp, 32
 	mov qword [rbp-32], rax
@@ -2307,10 +2429,12 @@ system:
 	mov rax, 10
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, sleep
 ;; POP
 	pop rax
-;; FUNCTION CALL sleep
-	call sleep
+;; CALL PTR
+	call rbx
 ;; WHILE 844424930131968 END
 	jmp .loop_844424930131968
 .loop_844424930131968_end:
@@ -2371,29 +2495,33 @@ sleep:
 	sub rax, 24
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; PUSH
 	push rax
 ;; VALUE 0
 	mov rax, 0
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rdx, syscall2
 ;; POP
 	pop rcx
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL syscall2
-	call syscall2
+;; CALL PTR
+	call rdx
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL char_code
-char_code:
+;; FUNCTION DECL __member__11876854719037224982_char_code
+__member__11876854719037224982_char_code:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 1
@@ -2402,15 +2530,17 @@ char_code:
 	mov al, [rbp-1]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL to_char
-to_char:
+;; FUNCTION DECL __member__13646096770106105413_to_char
+__member__13646096770106105413_to_char:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2419,10 +2549,12 @@ to_char:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, __unsafe_convert
 ;; POP
 	pop rax
-;; FUNCTION CALL __unsafe_convert
-	call __unsafe_convert
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -2434,8 +2566,8 @@ digit_to_ascii:
 	mov [rbp-8], rax
 ;; VALUE 0
 	mov rax, 48
-;; FUNCTION CALL char_code
-	call char_code
+;; FUNCTION CALL __member__11876854719037224982_char_code
+	call __member__11876854719037224982_char_code
 ;; PUSH
 	push rax
 ;; GET VAR 8
@@ -2444,8 +2576,8 @@ digit_to_ascii:
 	pop rax
 ;; ADD
 	add rax, rbx
-;; FUNCTION CALL to_char
-	call to_char
+;; FUNCTION CALL __member__13646096770106105413_to_char
+	call __member__13646096770106105413_to_char
 ;; RETURN
 	leave
 	ret
@@ -2575,10 +2707,12 @@ itoa:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, alloc_array
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
+;; CALL PTR
+	call rbx
 ;; SET VAR 33
 	sub rsp, 33
 	mov qword [rbp-33], rax
@@ -2624,10 +2758,12 @@ itoa:
 	mov rax, rdx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, digit_to_ascii
 ;; POP
 	pop rax
-;; FUNCTION CALL digit_to_ascii
-	call digit_to_ascii
+;; CALL PTR
+	call rbx
 ;; GET VAR 41
 	mov rbx, [rbp-41]
 ;; VALUE 1
@@ -2696,8 +2832,8 @@ itoa:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL to_string
-to_string:
+;; FUNCTION DECL __member__13646096770106105413_to_string
+__member__13646096770106105413_to_string:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2706,10 +2842,12 @@ to_string:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, itoa
 ;; POP
 	pop rax
-;; FUNCTION CALL itoa
-	call itoa
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
@@ -2737,8 +2875,8 @@ bool_to_string:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL len
-len:
+;; FUNCTION DECL __member__11876854719037224982_len
+__member__11876854719037224982_len:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2747,15 +2885,17 @@ len:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, arrlen
 ;; POP
 	pop rax
-;; FUNCTION CALL arrlen
-	call arrlen
+;; CALL PTR
+	call rbx
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL append
-append:
+;; FUNCTION DECL __member__11876854719037224982_append
+__member__11876854719037224982_append:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2764,8 +2904,8 @@ append:
 	mov [rbp-9], bl
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -2776,10 +2916,12 @@ append:
 	add rax, rbx
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, alloc_array
 ;; POP
 	pop rax
-;; FUNCTION CALL alloc_array
-	call alloc_array
+;; CALL PTR
+	call rbx
 ;; SET VAR 17
 	sub rsp, 17
 	mov qword [rbp-17], rax
@@ -2791,16 +2933,18 @@ append:
 	mov rax, [rbp-8]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rcx, strcpy
 ;; POP
 	pop rbx
 ;; POP
 	pop rax
-;; FUNCTION CALL strcpy
-	call strcpy
+;; CALL PTR
+	call rcx
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; SET VAR 25
 	sub rsp, 25
 	mov qword [rbp-25], rax
@@ -2826,8 +2970,8 @@ append:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL startsWith
-startsWith:
+;; FUNCTION DECL __member__11876854719037224982_startsWith
+__member__11876854719037224982_startsWith:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2836,8 +2980,8 @@ startsWith:
 	mov [rbp-9], bl
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -2889,8 +3033,8 @@ startsWith:
 ;; RETURN
 	leave
 	ret
-;; FUNCTION DECL endsWith
-endsWith:
+;; FUNCTION DECL __member__11876854719037224982_endsWith
+__member__11876854719037224982_endsWith:
 	push rbp
 	mov rbp,rsp
 	sub rsp, 8
@@ -2899,8 +3043,8 @@ endsWith:
 	mov [rbp-9], bl
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -2924,8 +3068,8 @@ endsWith:
 .l2_27021597764222976:
 ;; GET VAR 8
 	mov rax, [rbp-8]
-;; FUNCTION CALL len
-	call len
+;; FUNCTION CALL __member__11876854719037224982_len
+	call __member__11876854719037224982_len
 ;; PUSH
 	push rax
 ;; VALUE 1
@@ -3057,28 +3201,45 @@ assert:
 	mov rax, str_assertion_failed__
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, eprint
 ;; POP
 	pop rax
-;; FUNCTION CALL eprint
-	call eprint
+;; CALL PTR
+	call rbx
 ;; GET VAR 9
 	mov rax, [rbp-9]
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, eprintln
 ;; POP
 	pop rax
-;; FUNCTION CALL eprintln
-	call eprintln
+;; CALL PTR
+	call rbx
 ;; VALUE 1
 	mov rax, 1
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, exit
 ;; POP
 	pop rax
-;; FUNCTION CALL exit
-	call exit
+;; CALL PTR
+	call rbx
 ;; IF 216172782113783808 END
 .l2_216172782113783808:
+;; RETURN
+	leave
+	ret
+;; FUNCTION DECL id
+id:
+	push rbp
+	mov rbp,rsp
+	sub rsp, 8
+	mov [rbp-8], rax
+;; GET VAR 8
+	mov rax, [rbp-8]
 ;; RETURN
 	leave
 	ret
@@ -3086,14 +3247,26 @@ assert:
 main:
 	push rbp
 	mov rbp,rsp
-;; VALUE Hello, World!
-	mov rax, str_hello__world_
+;; VALUE 1
+	mov rax, 1
 ;; PUSH
 	push rax
+;; FUNCTION ADRESS
+	mov rbx, id
 ;; POP
 	pop rax
-;; FUNCTION CALL println
-	call println
+;; CALL PTR
+	call rbx
+;; FUNCTION CALL __member__13646096770106105413_to_string
+	call __member__13646096770106105413_to_string
+;; PUSH
+	push rax
+;; FUNCTION ADRESS
+	mov rbx, println
+;; POP
+	pop rax
+;; CALL PTR
+	call rbx
 ;; VALUE 0
 	mov rax, 0
 ;; RETURN
@@ -3125,12 +3298,9 @@ str_false:
 str_assertion_failed__:
 	dq 18
 	db `Assertion failed: `
-str_hello__world_:
-	dq 13
-	db `Hello, World!`
+global__m_tcache:
+	resb 8
 global__m_location:
 	resb 8
 global__m_heap_start:
-	resb 8
-global__m_tcache:
 	resb 8

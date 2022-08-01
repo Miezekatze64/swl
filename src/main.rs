@@ -91,7 +91,7 @@ fn main() {
         println!("PATH: {path}, NAME: {name}");
     }
 
-    let mut parser = parser::Parser::new(filename.clone()).unwrap_or_else(|a| {
+    let mut parser = parser::Parser::new(filename.clone(), verbose).unwrap_or_else(|a| {
         eprintln!("Error reading file: {}", a);
         exit(1);
     });
@@ -125,12 +125,17 @@ fn main() {
         }
         match typecheck::check(ast, parser.lexer.clone(), intrinsics) {
             Err(e) => {
-                for a in e {
+                for a in e.iter() {
                     let (t, v) = a;
                     eprintln!("{}: {}", t, v);
                 };
-                checked = false;
-                error = true;
+                if e.into_iter().any(|(lvl, _)| lvl == util::ErrorLevel::Err) {
+                    checked = false;
+                    error = true;
+                } else {
+                    checked = true;
+                    error = false;
+                }
             },
             Ok((g, a, functions)) => {
                 if ! functions.contains_key(&(None, "main".into())) {

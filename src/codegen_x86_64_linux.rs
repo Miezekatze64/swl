@@ -207,8 +207,8 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     format!(";; GET VAR {index}\n{string}\tmov {}, [rbp-{}]\n", register_sz(reg+i/8, size), index+i)
                 }
             },
-            Inst::CallPtr(off) => {
-                format!(";; CALL PTR\n\tcall [rbp-{}]\n", off)
+            Inst::CallReg(reg) => {
+                format!(";; CALL PTR\n\tcall {}\n", register(reg))
             },
             Inst::Intrinsic(iname, fname) => {
                 if ! intrinsic_labels.contains(&iname) {

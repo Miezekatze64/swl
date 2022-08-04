@@ -92,10 +92,10 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     }
                     let _ = write!(string, "\tsub rsp, {ind}\n\tmov [rbp-{ind}], {}\n", register_sz(index, sz), ind = offsets[&vec[a].1].0 + add_off);
                 }
-                format!(";; FUNCTION DECL {name}\n{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
+                format!(";; FUNCTION DECL {name}\nf_{name}:\n\tpush rbp\n\tmov rbp,rsp\n{string}")
             },
             Inst::Call(name) => {
-                format!(";; FUNCTION CALL {name}\n\tcall {name}\n")
+                format!(";; FUNCTION CALL {name}\n\tcall f_{name}\n")
             },
             Inst::If(reg, id) => {
                 format!(";; IF {id} START\n\tcmp {}, 1\n\tjne .l2_{id}\n.l1_{id}:\n", register_sz(reg, 1))
@@ -213,9 +213,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
             Inst::Intrinsic(iname, fname) => {
                 if ! intrinsic_labels.contains(&iname) {
                     intrinsic_labels.push(iname.clone());
-                    format!(";; INTRINSIC {iname}\n{fname}: \n\tjmp intrinsic_{iname}\nintrinsic_{iname}: \n{}\n", intrinsics().get(iname.as_str()).unwrap())
+                    format!(";; INTRINSIC {iname}\nf_{fname}: \n\tjmp intrinsic_{iname}\nintrinsic_{iname}: \n{}\n", intrinsics().get(iname.as_str()).unwrap())
                 } else {
-                    format!(";; INTRINSIC {iname}\n{fname}: \n\tjmp intrinsic_{iname}\n")
+                    format!(";; INTRINSIC {iname}\nf_{fname}: \n\tjmp intrinsic_{iname}\n")
                 }
             },
             Inst::RetVal(reg) => {
@@ -305,7 +305,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 format!(";; DEREFERENCE\n\tmov {r}, [{r}]\n", r = register(reg))
             },
             Inst::FuncPtr(reg, func) => {
-                format!(";; FUNCTION ADRESS\n\tmov {r}, {func}\n", r = register(reg))
+                format!(";; FUNCTION ADRESS\n\tmov {r}, f_{func}\n", r = register(reg))
             },
             
         }.as_str())

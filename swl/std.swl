@@ -609,7 +609,6 @@ func max(int a, int b) -> int {
     <- b;
 }
 
-
 // asserts a given condition is true and panics if not
 // @TODO: replace this with a macro
 // -----

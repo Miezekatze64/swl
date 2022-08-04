@@ -1,6 +1,7 @@
 swl/main
 swl/main.asm
 swl/main.o
+*.asm
 
 # Added by cargo
 #

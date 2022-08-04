@@ -3,6 +3,7 @@
 !*/
 *.asm
 *.o
+!swlc
 
 
 # Added by cargo

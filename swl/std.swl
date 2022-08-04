@@ -370,7 +370,7 @@ func input([char] buf) -> int {
 // args:
 //   str <- the string to print
 func print([char] str) {
-    syscall3(1, 1, arr2addr(str), arrlen(str));
+    write(1, arr2addr(str), arrlen(str));
 }
 
 // prints a given string to stderr
@@ -378,7 +378,7 @@ func print([char] str) {
 // args:
 //   str <- the string to print
 func eprint([char] str) {
-    syscall3(1, 2, arr2addr(str), arrlen(str));
+    write(2, arr2addr(str), arrlen(str));
 }
 
 // prints a given string to stdout, followed by a line feed
@@ -386,7 +386,8 @@ func eprint([char] str) {
 // args:
 //   str <- the string to print
 func println([char] str) {
-    print(str.append('\n'));
+    print(str);
+    print("\n");
 }
 
 // prints a given string to stderr, followed by a line feed
@@ -394,14 +395,8 @@ func println([char] str) {
 // args:
 //   str <- the string to print
 func eprintln([char] str) {
-    eprint(str.append('\n'));
-}
-
-// forks the current process (creates a new process with a copy of current program state)
-// ------
-// returns: 0 for the new process, PID of fork for the old process
-func fork() -> int {
-    <- syscall0(57);
+    print(str);
+    print("\n");
 }
 
 // replaces the current process with the given process

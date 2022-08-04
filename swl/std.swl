@@ -250,7 +250,7 @@ func _free(int ptr) {
         i += 1;
     }
 
-    print("free: double free\n");
+    print("free: double free or corruption\n");
 }
 
 // allocates an array with a given number of bytes on the heap

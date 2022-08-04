@@ -1,12 +1,5 @@
 include "std.swl";
-
-alias t = int;
     
-func id(t i) -> t {
-    <- i;
-}
-
 func main() -> int {
-    println(id(1).to_string());
     <- 0;
 }

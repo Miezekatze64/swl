@@ -1,13 +1,9 @@
 *
+!*.*
+!*/
 *.asm
 *.o
 
-!*.el
-!*.md
-!*.swl
-!*.rs
-!Cargo.toml
-!Cargo.lock
 
 # Added by cargo
 #

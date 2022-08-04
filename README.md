@@ -13,5 +13,5 @@
 - run the compiler
 
 ```shell
-  ./swl <your file>
+  ./swlc <your file>
 ```

@@ -287,22 +287,82 @@ func strcpy(string a, string b) {
     }
 }
 
-/** IO UTILS **/
-    
-// exits the program with given exit code
+/** SYSCALL WRAPPER FUNCTIONS (LINUX x86_64) **/
+
+// reads a given number of bytes from a given file descriptor
 // ------
 // args:
-//   code <- the exit code
-func exit(int code) {
-    syscall1(60, code);
+//   fd     <- the file descriptor to read from
+//   buf    <- the buffer to read into
+//   nbytes <- the number of bytes to read
+// returns: the number of bytes read
+func read(int fd, int buf, int nbytes) -> int {
+    <- syscall3(0, fd, buf, nbytes);
 }
+
+// writes a given number of bytes to a given file descriptor
+// ------
+// args:
+//   fd     <- the file descriptor to write to
+//   buf    <- the buffer to write from
+//   nbytes <- the number of bytes to write
+// returns: the number of bytes written
+func write(int fd, int buf, int nbytes) -> int {
+    <- syscall3(1, fd, buf, nbytes);
+}
+
+// opens a file with a given path, mode, and flags
+// ------
+// args:
+//   path <- the path to the file to open
+//   mode <- the mode to open the file with
+//   flags <- the flags to open the file with
+// returns: the file descriptor of the opened file
+func open(string path, int flags, int mode) -> int {
+    <- syscall3(2, arr2addr(path), flags, mode);
+}
+
+// closes a given file descriptor
+// ------
+// args:
+//   fd <- the file descriptor to close   
+func close(int fd) {
+    syscall1(3, fd);
+}
+
+// sets the program break to a given address
+// ------
+// args:
+//   addr <- the address to set the program break to
+func brk(int addr) -> int {
+    <- syscall1(12, addr);
+}
+
+// forks a new process
+// ------
+// args:
+//   returns: the pid of the new process
+func fork() -> int {
+    <- syscall0(57);
+}
+
+// exits the current process
+// ------
+// args:
+//   status <- the status to exit with
+func exit(int status) {
+    syscall1(60, status);
+}
+
+
+/** IO UTILS **/
 
 // reads contents from stdin in a given array buffer, until it is full
 // ------
 // args:
 //   buf <- the buffer
-func read([char] buf) -> int {
-    <- syscall3(0, 0, arr2addr(buf), arrlen(buf));
+func input([char] buf) -> int {
+    <- read(0, arr2addr(buf), arrlen(buf));
 }
 
 // prints a given string to stdout

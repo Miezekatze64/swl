@@ -4,7 +4,7 @@ char NULL = __unsafe_convert(0);
 func main() -> int {
     string buf = arr[char, 100];
     while (true) {
-        int bytes = read(buf);
+        int bytes = input(buf);
         buf[bytes] = NULL;
         system(buf);
     }

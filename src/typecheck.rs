@@ -11,7 +11,7 @@ type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a Vec<Strin
 
 // check
 fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer) {
-    let (node, functions, vars, type_vars, aliases, globals, errors, intrinsics) = largs;
+    let (node, functions, vars, _type_vars, aliases, globals, errors, intrinsics) = largs;
     if let ASTNode(_, ASTNodeR::Block(ref mut arr)) = node {
         let vars_sub = &mut vars.clone();
         for mut a in arr {

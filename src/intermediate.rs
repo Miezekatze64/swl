@@ -287,7 +287,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         ASTNodeR::Block(a) => {
             let mut count: usize = index;
             for i in a {
-                count *= 2;
+                count += 3;
                 ret.append(&mut gen(i.1, offsets, globals, aliases.clone(), loop_idx, count, false).0);
             }
         },

@@ -108,13 +108,7 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
                 ret.push(Inst::Pop(ind));
             }
 
-            
-//            if indicies.contains_key(&name) {
             ret.push(Inst::CallReg(find));
-//            } else {
-//                ret.push(Inst::Call(name));
-//            }
-
 
             if is_ref {
                 let len = tp.unwrap().size(aliases);
@@ -522,6 +516,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             if rt == Type::Primitive(PrimitiveType::Void) {
                 ret.push(Inst::Ret(0));
             }
+            
         },
         ASTNodeR::Return(expr) => {
             ret.append(&mut gen_expr(expr, 0, offsets, globals, &aliases, false));

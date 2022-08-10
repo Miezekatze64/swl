@@ -1,11 +1,15 @@
-include "std.swl";
+//include "std.swl";
 
 func id(_a t) -> _a {
-    _a b = t;
-    <- b;
+    <- t;
 }
 
+//typeclass Writable from a {
+//    func to_string() from a;
+//}
+
+
 func main() -> int {
-    string a = id("Hello, World!");
-    <- id(69);
+//    id(42);
+    <- 0;
 }

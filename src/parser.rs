@@ -565,7 +565,7 @@ impl Parser {
                 } else {
                     let val = tk_op.clone().value;
                     errors.push((ErrorLevel::Err, error!(
-                        self.lexer, tk_op.pos, "invalid token `{val}`")));
+                        self.lexer, tk_op.pos, "invalid token `{val}`\n\t`.`, `(` or `;` expected")));
                     return Err(errors);
                 };
 

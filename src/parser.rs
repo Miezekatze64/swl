@@ -1419,7 +1419,7 @@ impl Parser {
         } else if nt.ttype == TokenType::Special && val == "[" {
             self.parse_array()
         } else if nt.ttype == TokenType::Ident {
-            if val.starts_with("_") {
+            if val.starts_with('_') {
                 Ok(Type::Var(val))
             } else {
                 Ok(Type::Custom(val))

@@ -32,7 +32,7 @@ macro_rules! error_str {
 macro_rules! error_arrow {
     ($lexer:expr, $pos:expr, $offset:expr, $msg:expr, $len:expr) => {
         | | -> String {
-            let mut rep_len = ErrorLevel::Err.to_string().chars().count() + 2 + crate::error_str!($lexer, $pos).chars().count() + $offset;
+            let mut rep_len = ErrorLevel::Err.to_string().chars().count() + 2 + $crate::error_str!($lexer, $pos).chars().count() + $offset;
             if $msg.chars().count() < rep_len {
                 rep_len -= $msg.chars().count();
                 $msg.to_owned() + &" ".repeat(rep_len) + &("^".repeat($len))
@@ -51,7 +51,7 @@ macro_rules! error {
     ($lexer:expr, $pos:expr, $msg_fmt:literal) => {
         | | -> String {
             return format!("{err}{msg} (at {f}:{l})",
-                           err = crate::error_str!($lexer, $pos),
+                           err = $crate::error_str!($lexer, $pos),
                            msg = format!($msg_fmt),
                            f = file!(),
                            l = line!()
@@ -186,7 +186,7 @@ impl std::fmt::Display for Type {
                 write!(s, "{ret_type}>")?;
                 s
             },
-            Type::Var(a) => format!("{a}"),
+            Type::Var(a) => a.to_string(),
         }.as_str())
     }
 }

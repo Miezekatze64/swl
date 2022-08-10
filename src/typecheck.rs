@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
@@ -34,7 +35,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     let mut has_vars: bool = false;
                     for arg in args.clone() {
                         if let Type::Custom(t) = arg.0.dealias(aliases) {
-                            if t.starts_with("_") {
+                            if t.starts_with('_') {
                                 has_vars = true;
                             } else {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
@@ -396,8 +397,8 @@ fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String
 }
 
 
-
-fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_functions: &mut HashMap<String, Vec<(String, Vec<Type>, Type)>>, vars: &HashMap<String, Type>, aliases: &Aliases, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
+type GenericFunc = Vec<(String, Vec<Type>, Type)>;
+fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_functions: &mut HashMap<String, GenericFunc>, vars: &HashMap<String, Type>, aliases: &Aliases, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
     
     let tp = | | -> Type {
         let exp = expr.clone();
@@ -491,32 +492,36 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
 
                 let len_a = func_args.len();
                 let len_b = vec.len();
-                if len_a > len_b {
-                    let start = "missing argument in function call: ";
-                    let offset = start.chars().count() + exp.to_string().chars().count() - 1;
-                    let tp = &func_args[len_b];
-                    let msg = format!("    expected argument of type {tp}");
-                    let line = error_arrow!(lexer, pos, offset, msg, 1);
-
-                    errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
-                    return ret_type.clone();
-                } else if len_a < len_b {
-                    let start = "unexpected argument(s) in function call: ";
-                    let mut expr_off = 0;
-                    for (i, a) in vec.iter().enumerate() {
-                        expr_off += a.to_string().chars().count();
-                        if i == len_a-1 {
-                            break;
-                        } else {
-                            expr_off += 2;
+                match len_a.cmp(&len_b) {
+                    Ordering::Greater => {
+                        let start = "missing argument in function call: ";
+                        let offset = start.chars().count() + exp.to_string().chars().count() - 1;
+                        let tp = &func_args[len_b];
+                        let msg = format!("    expected argument of type {tp}");
+                        let line = error_arrow!(lexer, pos, offset, msg, 1);
+                        
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
+                        return ret_type.clone();
+                    },
+                    Ordering::Less => {
+                        let start = "unexpected argument(s) in function call: ";
+                        let mut expr_off = 0;
+                        for (i, a) in vec.iter().enumerate() {
+                            expr_off += a.to_string().chars().count();
+                            if i == len_a-1 {
+                                break;
+                            } else {
+                                expr_off += 2;
+                            }
                         }
-                    }
-                    let offset = start.chars().count() + lexpr.to_string().chars().count() + 1 + expr_off;
-                    let msg = format!("    expected ')', found argument(s)");
-                    let line = error_arrow!(lexer, pos, offset, msg, exp.to_string().chars().count() - expr_off - lexpr.to_string().chars().count() - 2);
-
-                    errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
-                    return ret_type.clone();
+                        let offset = start.chars().count() + lexpr.to_string().chars().count() + 1 + expr_off;
+                        let msg = "    expected ')', found argument(s)";
+                        let line = error_arrow!(lexer, pos, offset, msg, exp.to_string().chars().count() - expr_off - lexpr.to_string().chars().count() - 2);
+                        
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "{start}{exp}\n{line}")));
+                        return ret_type.clone();
+                    },
+                    Ordering::Equal => {}
                 };
 
                 let orig_vec = vec.clone();
@@ -560,7 +565,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     }
                 }
 
-                let ret = if let Type::Var(ref name) = ret_type.clone() {
+                let ret = if let Type::Var(ref name) = ret_type {
                     if current_vars.contains_key(name) {
                         current_vars[name].clone()
                     } else {
@@ -591,7 +596,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     let hash = hasher.finish();
                     
                     new_func_name.push_str(hash.to_string().as_str());
-                    new_func_name.push_str("_");
+                    new_func_name.push('_');
                 }
 
                 if has_var {
@@ -764,7 +769,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                     let left_type = tp.clone().map(|x| x.dealias(&type_aliases));
 
                     if let Some(lt) = left_type.clone() {
-                        if args.len() == 0 {
+                        if args.is_empty() {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "member function should have a `{lt} self` argument as first arg.")));
                         } else {
                             let first_type = args[0].clone().0;
@@ -785,7 +790,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                         continue;
                     }
                     
-                    functions.insert((left_type, name.clone()), (args.into_iter().map(|(a, _)| a.clone()).collect(), ret_type.clone()));
+                    functions.insert((left_type, name.clone()), (args.iter().map(|(a, _)| a.clone()).collect(), ret_type.clone()));
                 },
                 ASTNode(_, ASTNodeR::VarDecInit(_, tp, name, _)) => {
                     vars.insert(name.clone(), tp.dealias(&type_aliases).clone());

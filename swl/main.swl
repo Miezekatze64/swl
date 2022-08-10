@@ -1,5 +1,11 @@
 include "std.swl";
-    
+
+func id(_a t) -> _a {
+    _a b = t;
+    <- b;
+}
+
 func main() -> int {
-    <- 0;
+    string a = id("Hello, World!");
+    <- id(69);
 }

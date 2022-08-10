@@ -186,7 +186,7 @@ impl std::fmt::Display for Type {
                 write!(s, "{ret_type}>")?;
                 s
             },
-            Type::Var(a) => format!("_{a}"),
+            Type::Var(a) => format!("{a}"),
         }.as_str())
     }
 }
@@ -200,6 +200,12 @@ impl Type {
                 ret = aliases.get(val).unwrap().clone();
             }
         }
+        if let Type::Var(val) = self {
+            if aliases.contains_key(val) {
+                ret = aliases.get(val).unwrap().clone();
+            }
+        }
+        
         ret
     }
 

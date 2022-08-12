@@ -1,17 +1,12 @@
 include "std.swl";
 
-func call(func<(string)> f, string a) {
-    f(a);
-}
-
 func main() -> int {
     string str = "y";
     if (arrlen(args()) > 1) {
         str = args()[1].to_string();
     }
-
     while (true) {
-        call(println, str);
+        println(str);
     }
-    <- 1;
+    <- 0;
 }

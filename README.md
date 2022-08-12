@@ -1,6 +1,10 @@
-# Getting started
+<span color="red">
+<b>WARNING: the compiler currently only supports LINUX x86_64 systems, for other compilation targets please add your own equivalent of [codegen_x86_64_linux.rs](https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs) and maybe even create a pull request</b>
+<br><br>
+<b>WARNING: this compiler is currently at a very, very early state of development, do not expect anything to work as you want it to....</b>
+</span>
 
-**WARNING: the compiler currently only supports LINUX x86_64 systems, for other compilation targets please add your own equivalent of [codegen_x86_64_linux.rs](https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs) and maybe even create a pull request**
+# Getting started
 
 - install the following dependencies:
   

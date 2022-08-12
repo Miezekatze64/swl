@@ -4,6 +4,7 @@
 *.asm
 *.o
 !swlc
+!LICENSE
 
 
 # Added by cargo

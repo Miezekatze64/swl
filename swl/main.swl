@@ -1,15 +1,17 @@
-//include "std.swl";
+include "std.swl";
 
-func id(_a t) -> _a {
-    <- t;
+func call(func<(string)> f, string a) {
+    f(a);
 }
 
-//typeclass Writable from a {
-//    func to_string() from a;
-//}
-
-
 func main() -> int {
-//    id(42);
-    <- 0;
+    string str = "y";
+    if (arrlen(args()) > 1) {
+        str = args()[1].to_string();
+    }
+
+    while (true) {
+        call(println, str);
+    }
+    <- 1;
 }

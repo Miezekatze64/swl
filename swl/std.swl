@@ -58,6 +58,16 @@ func cstr_to_str(char *cstr) -> string {
     <- str;
 }
 
+// converts a null-terminated, c-like string to a char array
+// --------
+// returns: the char array
+func to_string(char* self) -> string from char* {
+    <- cstr_to_str(self);
+}
+    
+// converts a char array to a null-terminated, c-like string
+// --------
+// returns: the pointer to the string
 func to_cstr(string self) -> char* from string {
     int ptr = _malloc(self.len() + 1);
     int i = 0;

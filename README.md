@@ -190,4 +190,4 @@ func main() -> int {
 }
 ```
 
-- more examples are location in the [examples](./examples) directory
+- more examples are located in the [examples](./examples) directory

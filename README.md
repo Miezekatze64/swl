@@ -88,6 +88,15 @@
   }
   ```
 
+- Return:
+  
+  ```go
+  func main() -> int {
+      // return 42
+      <- 42;
+  }
+  ```
+
 - Type-Aliases:
   
   ```bash
@@ -159,3 +168,20 @@
   ```
 
 - For future syntax / semantic changes look at [TODO.md](./TODO.md)
+  
+  # Hello World
+  
+  ```go
+  // include standard library
+  include "std.swl"
+  
+  // declaration of main entrypoint
+  func main() -> int {
+      // call `println` function
+      println("Hello, World!");
+      // return success
+      <- 0;
+  }
+  ```
+
+- more examples are location in the [examples](./examples) directory

@@ -171,17 +171,19 @@
 
 # Hello World
 
-	```go
-	// include standard library
-	include "std.swl"
-	
-	// declaration of main entrypoint
-	func main() -> int {
-	    // call `println` function
-	    println("Hello, World!");
-	    // return success
-	    <- 0;
-	}
-	```
+
+
+```go
+// include standard library
+include "std.swl"
+
+// declaration of main entrypoint
+func main() -> int {
+    // call `println` function
+    println("Hello, World!");
+    // return success
+    <- 0;
+}
+```
 
 - more examples are location in the [examples](./examples) directory

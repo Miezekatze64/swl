@@ -35,7 +35,7 @@
 - [ ] add support for operator overloading and creation of own operators:
   
   ```cpp
-  operator +(other_num a, other_num b) -> other_num) {}
+  operator +(other_num a, other_num b) -> other_num {}
   ```
 
 - [ ] support floats

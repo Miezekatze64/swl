@@ -1,5 +1,7 @@
 # Getting started
 
+**WARNING: the compiler currently only supports LINUX x86_64 systems, for other compilation targets please add your own equivalent of [codegen_x86_64_linux.rs](https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs) and maybe even create a pull request**
+
 - install the following dependencies:
   
   - nasm (netwide assembler)
@@ -170,8 +172,6 @@
 - For future syntax / semantic changes look at [TODO.md](./TODO.md)
 
 # Hello World
-
-
 
 ```go
 // include standard library

@@ -1,12 +1,26 @@
 include "std.swl";
 
+
+func map(func<(_a) -> _b> f, [_a] a) -> [_b] {
+    [_b] new_arr = alloc_array(arrlen(a));
+    int i = 0;
+    while (i < arrlen(a)) {
+        _b tmp     = f(a[i]);
+        new_arr[i] = tmp;
+        i += 1;
+    }
+    <- new_arr;
+}
+
+
+func toLowercase(char c) -> char {
+    if (c >= 'A' && c <= 'Z') {
+        <- c + 32;
+    }
+    <- c;
+}
+
 func main() -> int {
-    string str = "y";
-    if (arrlen(args()) > 1) {
-        str = args()[1].to_string();
-    }
-    while (true) {
-        println(str);
-    }
+    println(map(toLowercase, "TEST: this is a Message!"));
     <- 0;
 }

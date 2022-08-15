@@ -124,7 +124,7 @@ fn main() {
             eprintln!("[*] type-checking");
         }
         match typecheck::check(ast, parser.lexer.clone(), intrinsics) {
-            Err(e) => {
+            Err((e, a, g)) => {
                 for a in e.iter() {
                     let (t, v) = a;
                     eprintln!("{}: {}", t, v);
@@ -135,6 +135,8 @@ fn main() {
                 } else {
                     checked = true;
                     error = false;
+                    aliases = a;
+                    globals = g;
                 }
             },
             Ok((g, a, functions)) => {

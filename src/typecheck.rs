@@ -13,6 +13,31 @@ type Functions = HashMap<(Option<Type>, String), (Vec<Type>, Type)>;
 
 type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a mut HashMap<String, Vec<(String, Vec<Type>, Type)>>, &'a mut Aliases, &'a mut Globals, &'a mut Vec<(ErrorLevel, String)>, fn() -> HashMap<&'static str, &'static str>);
 
+fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut String) {
+    match tp {
+        Type::Primitive(_)                => {},
+        Type::Custom(_)                   => {},
+        Type::Array(ref a)                => hash_vars(*a.clone(), current_vars, new_func_name),
+        Type::Pointer(ref a)              => hash_vars(*a.clone(), current_vars, new_func_name),
+        Type::Function(ref args, ref ret) => {
+            for arg in args {
+                hash_vars(arg.clone(), current_vars.clone(), new_func_name);
+            }
+            hash_vars(*ret.clone(), current_vars.clone(), new_func_name);
+        },
+        Type::Invalid                     => {},
+        Type::Struct(_, _)                => todo!(),
+        Type::Var(ref a)                  => {
+            let mut hasher = DefaultHasher::new();
+            current_vars[a].hash(&mut hasher);
+            let hash = hasher.finish();
+            
+            new_func_name.push_str(hash.to_string().as_str());
+            new_func_name.push('_');
+        },
+    }
+}
+
 // check
 fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer) {
     let (node, functions, vars, generic_functions, aliases, globals, errors, intrinsics) = largs;
@@ -31,22 +56,20 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                             ));
                         }
                     }
-                    
-                    let mut has_vars: bool = false;
+
+                    let mut vars = true;
                     for arg in args.clone() {
                         if let Type::Custom(t) = arg.0.dealias(aliases) {
-                            if t.starts_with('_') {
-                                has_vars = true;
-                            } else {
-                                errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
-                                continue;
-                            }
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "use of undefined type `{t}`")));
+                            continue;
                         }
+                        vars &= has_vars(&arg.0);
                         vars_sub.insert(arg.1, arg.0);
                     }
                     let ac = aliases.clone();
 
-                    if ! has_vars {
+                    vars &= has_vars(ret);
+                    if ! vars {
                         typecheck((block, functions, vars_sub, generic_functions, aliases, globals, errors, intrinsics), (tp.as_ref().map(|x| x.dealias(&ac)), func.clone()), false, lexer);
                     }
                 },
@@ -78,21 +101,14 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         let typa = typecheck_expr(a, functions, generic_functions, vars_sub, aliases, errors, lexer);
                         let mut typb = func_args.get(index).unwrap().clone();
 
-                        if let Type::Var(ref name) = typb {
-                            // check for vars
-                            if current_vars.contains_key(name) {
-                                typb = current_vars[name].clone();
-                            } else {
-                                if let Type::Var(_) = typa {
-                                    errors.push((ErrorLevel::Err, error!(lexer, *pos, "could not infer type of argument `{a}`")));
-                                    return;
-                                }
-                                current_vars.insert(name.clone(), typa.clone());
-                                typb = typa.clone();
+                        if typb == typb.dealias(aliases) {
+                            let mut new_errs = infer_types(typa.clone().dealias(aliases), &mut typb, &mut current_vars, lexer, *pos, a.clone(), aliases);
+                            if ! new_errs.is_empty() {
+                                errors.append(&mut new_errs);
+                                return;
                             }
+                            new_args.push(typb.clone());
                         }
-                        new_args.push(typb.clone());
-
 
                         if typa == Type::Invalid || typb == Type::Invalid {
                             break;
@@ -104,19 +120,12 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         }
                     }
 
-                    let mut has_vars: bool = false;
                     let mut new_func_name: String = String::new();
                     for tp in func_args.iter() {
-                        if let Type::Var(name) = tp {
-                            has_vars = true;
-                            let mut hasher = DefaultHasher::new();
-                            current_vars[name].hash(&mut hasher);
-                            let hash = hasher.finish();
-                            
-                            new_func_name.push_str(hash.to_string().as_str());
-                            new_func_name.push('_');
-                        }
+                        hash_vars(tp.clone(), current_vars.clone(), &mut new_func_name);
                     }
+
+                    let has_vars = ! new_func_name.is_empty();
 
                     if has_vars {
                         let func_name: String;
@@ -337,7 +346,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(_, ASTNodeR::Include(_, ref mut ast, ref lexer_)) => {
                     let (g, a, f) = match check(ast, lexer_.clone(), intrinsics) {
                         Ok(a) => a,
-                        Err(vec) => {
+                        Err((vec, ..)) => {
                             for e in vec {
                                 errors.push(e);
                             }
@@ -396,6 +405,91 @@ fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String
     }
 }
 
+fn infer_types(typa: Type, typb: &mut Type, current_vars: &mut HashMap<String, Type>, lexer: &mut Lexer, pos: usize, expr: Expression, aliases: &Aliases) -> Vec<Error> {
+    let mut errors: Vec<Error> = vec![];
+    
+    match typb {
+        Type::Var(ref name) => {
+            // check for vars
+            if current_vars.contains_key(name) {
+                *typb = current_vars[name].clone();
+            } else {
+                if let Type::Var(_) = typa {
+                    errors.push((ErrorLevel::Err, error!(lexer, pos, "could not infer type of argument `{expr}`")));
+                    return errors;
+                }
+                current_vars.insert(name.clone(), typa.clone());
+                *typb = typa.clone();
+            }
+        },
+        Type::Primitive(_) => {},
+        Type::Custom(a) => todo!("TYPE: {a}"),
+        Type::Array(ref mut inner) => {
+            if inner.dealias(aliases) != **inner {
+                // nothing to infer
+                return errors;
+            }
+            
+            if let Type::Array(ref innera) = typa {
+                infer_types(innera.clone().dealias(aliases), inner, current_vars, lexer, pos, expr, aliases);
+            } else {
+                errors.push((ErrorLevel::Err, error!(lexer, pos, "`{expr}` is not an array, but an array was expected")));
+                return errors;
+            }
+        },
+        Type::Pointer(ref mut inner) => {
+            if inner.dealias(aliases) != **inner {
+                // nothing to infer
+                return errors;
+            }
+            
+            if let Type::Pointer(ref innera) = typa {
+                infer_types(innera.clone().dealias(aliases), inner, current_vars, lexer, pos, expr, aliases);
+            } else {
+                errors.push((ErrorLevel::Err, error!(lexer, pos, "`{expr}` is not a pointer, but a pointer was expected")));
+                return errors;
+            }
+        },
+        Type::Function(ref mut args, ref mut ret) => {
+            if let Type::Function(ref argsa, ref reta) = typa {
+                for (i, arg) in args.iter_mut().enumerate() {
+                    if arg.dealias(aliases) != *arg {
+                        // nothing to infer
+                        continue;
+                    }
+                    
+                    infer_types(argsa[i].clone().dealias(aliases), arg, current_vars, lexer, pos, expr.clone(), aliases);
+                }
+                infer_types(reta.clone().dealias(aliases), ret, current_vars, lexer, pos, expr.clone(), aliases);
+            } else {
+                errors.push((ErrorLevel::Err, error!(lexer, pos, "`{expr}` is not a function, but a function was expected")));
+                return errors;
+            }
+        },
+        Type::Invalid => todo!(),
+        Type::Struct(_, _) => todo!(),
+    }
+    errors
+}
+
+fn infer_ret(ret_type: Type, current_vars: HashMap<String, Type>) -> Option<Type> {
+    match ret_type {
+        Type::Primitive(_)     => Some(ret_type),
+        Type::Custom(_)        => Some(ret_type),
+        Type::Array(ref a)     => Some(Type::Array(Box::new(infer_ret(*a.clone(), current_vars)?))),
+        Type::Pointer(ref a)   => Some(Type::Pointer(Box::new(infer_ret(*a.clone(), current_vars)?)),),
+        Type::Function(_, _)   => todo!(),
+        Type::Invalid          => todo!(),
+        Type::Struct(_, _)     => todo!(),
+        Type::Var(ref name)    => {
+            if current_vars.contains_key(name) {
+                Some(current_vars[name].clone())
+            } else {
+                None
+            }
+        },
+    }
+}
 
 type GenericFunc = Vec<(String, Vec<Type>, Type)>;
 fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_functions: &mut HashMap<String, GenericFunc>, vars: &HashMap<String, Type>, aliases: &Aliases, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) -> Type {
@@ -531,20 +625,15 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     let typa = typecheck_expr(a, functions, generic_functions, vars, aliases, errors, lexer);
                     let mut typb = func_args.get(index).unwrap().clone();
 
-                    if let Type::Var(ref name) = typb {
-                        // check for vars
-                        if current_vars.contains_key(name) {
-                            typb = current_vars[name].clone();
-                        } else {
-                            if let Type::Var(_) = typa {
-                                errors.push((ErrorLevel::Err, error!(lexer, pos, "could not infer type of argument `{a}`")));
-                                return ret_type.clone();
-                            }
-                            current_vars.insert(name.clone(), typa.clone());
-                            typb = typa.clone();
+                    if typb == typb.dealias(aliases) {
+                        let mut new_errs = infer_types(typa.clone().dealias(aliases), &mut typb, &mut current_vars, lexer, pos, a.clone(), aliases);
+                        if ! new_errs.is_empty() {
+                            errors.append(&mut new_errs);
+                            return ret_type;
                         }
+
+                        new_args.push(typb.clone());
                     }
-                    new_args.push(typb.clone());
                     
                     if ! typa.is_compatible(&typb, aliases) {
                         let mut args_pos = 0;
@@ -565,39 +654,20 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     }
                 }
 
-                let ret = if let Type::Var(ref name) = ret_type {
-                    if current_vars.contains_key(name) {
-                        current_vars[name].clone()
-                    } else {
-                        errors.push((ErrorLevel::Err, error!(lexer, pos, "could not infer type of return value")));
-                        Type::Invalid
-                    }
-                } else {
-                    ret_type.clone()
+                let ret = match infer_ret(ret_type.clone(), current_vars.clone()) {
+                    Some(a) => a,
+                    None => {
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "could not infer return type")));
+                        return Type::Invalid;
+                    },
                 };
 
-                let mut has_var: bool = false;
                 let mut new_func_name: String = String::new();
                 for tp in func_args.iter() {
-                    if let Type::Var(name) = tp {
-                        has_var = true;
-                        let mut hasher = DefaultHasher::new();
-                        current_vars[name].hash(&mut hasher);
-                        let hash = hasher.finish();
-                        
-                        new_func_name.push_str(hash.to_string().as_str());
-                        new_func_name.push('_');
-                    }
+                    hash_vars(tp.clone(), current_vars.clone(), &mut new_func_name);
                 }
-                if let Type::Var(name) = ret_type {
-                    has_var = true;
-                    let mut hasher = DefaultHasher::new();
-                    current_vars[&name].hash(&mut hasher);
-                    let hash = hasher.finish();
-                    
-                    new_func_name.push_str(hash.to_string().as_str());
-                    new_func_name.push('_');
-                }
+                hash_vars(ret_type.clone(), current_vars.clone(), &mut new_func_name);
+                let has_var: bool = ! new_func_name.is_empty();
 
                 if has_var {
                     let func_name: String;
@@ -734,8 +804,53 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
     typ
 }
 
+fn add_generic_alias(left: &Type, right: &Type, new_aliases: &mut Aliases) {
+    match left {
+        Type::Primitive(_) => {},
+        Type::Custom(_) => {},
+        Type::Array(a) => {
+            if let Type::Array(inner) = right {
+                add_generic_alias(a, inner, new_aliases);
+            } else {
+                unreachable!()
+            }
+        },
+        Type::Pointer(a) => {
+            if let Type::Pointer(inner) = right {
+                add_generic_alias(a, inner, new_aliases);
+            } else {
+                unreachable!()
+            }
+        },
+        Type::Function(args, ret) => {
+            if let Type::Function(inner_args, inner_ret) = right {
+                for (i, arg) in args.iter().enumerate() {
+                    add_generic_alias(arg, &inner_args[i], new_aliases);
+                }
+                add_generic_alias(ret, inner_ret, new_aliases);
+            } else {
+                unreachable!()
+            }
+        },
+        Type::Invalid => {},
+        Type::Struct(_, _) => todo!(),
+        Type::Var(nm) => {
+            new_aliases.insert(nm.to_string(), right.clone());
+        },
+    }
+}
 
-pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>) -> Result<(Globals, Aliases, Functions), Vec<Error>> {
+fn add_generic_aliases(args: Vec<(Type, String)>, new_aliases: &mut Aliases, a: (String, Vec<Type>, Type), ret: Type) {
+    // add generic function arguments to new_aliases
+    for (i, (v, _)) in args.iter().enumerate() {
+        add_generic_alias(v, &a.1[i], new_aliases);
+    }
+
+    add_generic_alias(&ret, &a.2, new_aliases);
+}
+
+
+pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>) -> Result<(Globals, Aliases, Functions), (Vec<Error>, Aliases, Globals)> {
     let mut errors: Vec<Error> = vec![];
     
     // collect all aliases + functions
@@ -838,19 +953,9 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
         for a in vec {
             let new_block = block.clone();
             let mut new_aliases = type_aliases.clone();
-            
-            // add generic function arguments to new_aliases
-            for (i, (v, _)) in args.iter().enumerate() {
-                if let Type::Var(nm) = v {
-                    new_aliases.insert(nm.to_string(), a.1[i].clone());
-                }
-            }
 
-            if let Type::Var(nm) = ret.clone() {
-                new_aliases.insert(nm.to_string(), a.2.clone());
-            }
+            add_generic_aliases(args.clone(), &mut new_aliases, a.clone(), ret.clone());
 
-            
             let mut node = ASTNode(pos, ASTNodeR::Block(vec![ASTNode(pos, ASTNodeR::FunctionDecl(None, a.0.clone(), args.iter().enumerate().map(|(i, v)| (a.1[i].clone(), v.1.clone())).collect(), a.2, new_block))]));
 
             typecheck((&mut  node, &mut functions, &vars, &mut generic_functions, &mut new_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
@@ -871,17 +976,13 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
     // check for unused generic functions
     for (i, a) in root_arr.clone().iter().enumerate() {
         if let ASTNode(pos, ASTNodeR::FunctionDecl(_, name, args, ret, _)) = a {
-            let mut has_vars = false;
+            let mut vars = true;
             for a in args {
-                if let Type::Var(_) = a.0 {
-                    has_vars = true;
-                }
+                vars &= has_vars(&a.0);
             }
-            if let Type::Var(_) = ret {
-                has_vars = true;
-            }
+            vars &= has_vars(ret);
 
-            if has_vars {
+            if vars {
                 errors.push((ErrorLevel::Warn, error!(lexer, *pos, "unused generic function {name} will be removed from .asm")));
                 root_arr.remove(i);
             }
@@ -892,6 +993,27 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
     if errors.is_empty() {
         Ok((globals, type_aliases, functions))
     } else {
-        Err(errors)
+        Err((errors, type_aliases, globals))
+    }
+}
+
+
+fn has_vars(tp: &Type) -> bool {
+    match tp {
+        Type::Primitive(_)        => false,
+        Type::Custom(_)           => false,
+        Type::Array(a)            => has_vars(a),
+        Type::Pointer(a)          => has_vars(a),
+        Type::Function(args, ret) => {
+            let mut vars: bool = true;
+            for arg in args {
+                vars &= has_vars(arg);
+            }
+            vars &= has_vars(ret);
+            vars
+        },
+        Type::Invalid             => false,
+        Type::Struct(_, _)        => todo!(),
+        Type::Var(_)              => true,
     }
 }

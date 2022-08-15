@@ -16,7 +16,7 @@ pub enum ASTNodeR {
     VarOp(String, BinaryOp, Expression),
     VarDecInit(bool, Type, String, Expression),
     FunctionCall(Box<Expression>, Vec<Expression>),
-    If(Expression, Box<ASTNode>),
+    If(Expression, Box<ASTNode>, Option<Box<ASTNode>>),
     FunctionDecl(Option<Type>, String, Vec<(Type, String)>, Type, Box<ASTNode>),
     Return(Expression),
     TypeAlias(String, Type),
@@ -85,8 +85,12 @@ impl std::fmt::Display for ASTNodeR {
                 }
                 write!(f, ");")
             },
-            ASTNodeR::If(pred, block) => {
-                write!(f, "if ({pred}) {{\n{}}}", indent(block.to_string()))
+            ASTNodeR::If(pred, block1, block2) => {
+                if block2.is_some() {
+                    write!(f, "if ({pred}) {{\n{}}} else {{\n{}}}", indent(block1.to_string()), indent(block2.as_ref().unwrap().to_string()))
+                } else {
+                    write!(f, "if ({pred}) {{\n{}}}", indent(block1.to_string()))
+                }
             },
             ASTNodeR::FunctionDecl(_, name, args, ret_type, block) => {
                 write!(f, "\nfunc {name}(")?;
@@ -921,7 +925,19 @@ impl Parser {
                     
                     let block = self.parse_block(token.pos, verbose)?;
 
-                    return Ok(Some(ASTNode(token.pos, ASTNodeR::If(predicate.0, Box::new(block)))));
+                    // check for else
+                    let next_token = get_peek_token!(self.lexer, errors);
+                    let block2 = if next_token.ttype == TokenType::Keyword && next_token.value == "else" {
+                        self.lexer.next_token().unwrap();
+                        // next token: '{'
+                        err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors);
+                        
+                        Some(Box::new(self.parse_block(token.pos, verbose)?))
+                    } else {
+                        None
+                    };
+
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::If(predicate.0, Box::new(block), block2))));
                     
                 },
                 "while" => {

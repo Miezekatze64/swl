@@ -8,7 +8,7 @@
 
 - [ ] `type**`  syntax fix + allow `deref a = val;` instead of `set_ptr(__unsafe_convert(a), val);`
 
-- [ ] implement else
+- [x] implement else
 
 - [ ] implement for loop
 

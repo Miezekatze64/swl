@@ -100,8 +100,11 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
             Inst::If(reg, id) => {
                 format!(";; IF {id} START\n\tcmp {}, 1\n\tjne .l2_{id}\n.l1_{id}:\n", register_sz(reg, 1))
             },
+            Inst::Else(id) => {
+                format!(";; ELSE {id} END\n\tjmp .l3_{id}\n.l2_{id}:\n")
+            },
             Inst::Endif(id) => {
-                format!(";; IF {id} END\n.l2_{id}:\n")
+                format!(";; IF {id} END\n.l3_{id}:\n")
             },
             Inst::WhileCheck(reg, id) => {
                 format!(";; WHILE {id} CHECK\n\tcmp {}, 1\n\tjne .loop_{id}_end\n", register_sz(reg, 1))

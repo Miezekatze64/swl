@@ -214,12 +214,15 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         }
                     }
                 }
-                ASTNode(pos, ASTNodeR::If(ref mut expr, ref mut block)) => {
+                ASTNode(pos, ASTNodeR::If(ref mut expr, ref mut block, ref mut block2)) => {
                     let bool_type = typecheck_expr(expr, functions, generic_functions, vars_sub, aliases, errors, lexer);
                     if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                     }
                     typecheck((block, functions, vars_sub, generic_functions, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer);
+                    if block2.is_some() {
+                        typecheck((block2.as_deref_mut().unwrap(), functions, vars_sub, generic_functions, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer);
+                    }
                 },
                 ASTNode(pos, ASTNodeR::While(ref mut expr, ref mut block)) => {
                     let bool_type = typecheck_expr(expr, functions, generic_functions, vars_sub, aliases, errors, lexer);
@@ -373,6 +376,29 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
     }
 }
 
+fn check_ret_path(statement: &ASTNode) -> bool {
+    match &statement.1 {
+        ASTNodeR::If(_, block, block2) => {
+            if block2.is_none() {
+                check_ret_path(block)
+            } else {
+                check_ret_path(block) && check_ret_path(block2.as_ref().unwrap())
+            }
+        },
+        ASTNodeR::Return(_) => {
+            true
+        },
+        ASTNodeR::Block(blk_vec) => {
+            let mut rs: bool = false;
+            for statement in blk_vec {
+                rs |= check_ret_path(statement);
+            }
+            rs
+        }
+        _ => false
+    }
+}
+
 fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String)>, lexer: &mut Lexer) {
     match ast {
         ASTNodeR::Block(ref vec) => {
@@ -381,20 +407,7 @@ fn check_function_ret_paths(ast: &ASTNodeR, errors: &mut Vec<(ErrorLevel, String
                     if *rt == Type::Primitive(PrimitiveType::Void) {
                         continue;
                     }
-                    let mut rs: bool = false;
-                    if let ASTNodeR::Block(blk_vec) = &block.1 {
-                        for statement in blk_vec {
-                            match &statement.1 {
-                                ASTNodeR::If(_, _sub) => {
-                                    // TODO: implement here, if else is implemented
-                                },
-                                ASTNodeR::Return(_) => {
-                                    rs = true;
-                                },
-                                _ => {}
-                            }
-                        }
-                    }
+                    let rs = check_ret_path(block);
                     if ! rs {
                         errors.push((ErrorLevel::Err, error!(lexer, a.0, "not all paths lead to a return statement")));
                     }

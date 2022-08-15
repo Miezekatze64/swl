@@ -31,6 +31,7 @@ pub enum Inst {
     Break(usize),
     FuncPtr(usize, String),
     CallReg(usize),
+    Else(usize),
 }
 
 fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>, is_ref: bool) -> Vec<Inst> {
@@ -463,10 +464,14 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             
             ret.push(Inst::Call(tp.to_label() + &name));
         },
-        ASTNodeR::If(expr, block) => {
+        ASTNodeR::If(expr, block, block2) => {
             ret.append(&mut gen_expr(expr, 0, offsets, globals, &aliases, false));
             ret.push(Inst::If(0, index));
-            ret.append(&mut gen(block.1, offsets, globals, aliases, loop_idx, index * 3, false).0);
+            ret.append(&mut gen(block.1, offsets, globals, aliases.clone(), loop_idx, index * 3, false).0);
+            ret.push(Inst::Else(index));
+            if block2.is_some() {
+                ret.append(&mut gen(block2.unwrap().1, offsets, globals, aliases, loop_idx, index * 3, false).0);
+            }
             ret.push(Inst::Endif(index));
         },
         ASTNodeR::While(cond, block) => {

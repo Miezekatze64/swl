@@ -44,7 +44,7 @@ macro_rules! error_arrow {
 }
 
 /// return an error string in the following format:
-///     ERR: This is a error at ~/file.name:430
+///     error: ./file.name:420:: This is a error
 /// argument 2 (msg_fmt) is a format string
 #[macro_export]
 macro_rules! error {

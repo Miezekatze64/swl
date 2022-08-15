@@ -10,7 +10,7 @@ intrinsic syscall      as syscall4(int index, int val, int val2, int val3,
 intrinsic str_to_ptr   as arr2addr(string str)                          -> int;
 intrinsic dereference  as arrlen([unchecked] str)                       -> int;
 intrinsic convert      as ptr2arr(int ptr)                       -> [unchecked];
-intrinsic convert      as __unsafe_convert(unchecked i)           -> unchecked;
+intrinsic convert      as __unsafe_convert(unchecked i)                 -> unchecked;
 
 intrinsic set_ptr      as set_ptr(unchecked* ptr, int val);
 intrinsic set_ptr      as set_addr(int ptr, int val);
@@ -364,9 +364,7 @@ func exit(int status) {
     syscall1(60, status);
 }
 
-
 /** IO UTILS **/
-
 // reads contents from stdin in a given array buffer, until it is full
 // ------
 // args:

@@ -407,7 +407,7 @@ impl Parser {
             match block {
                 ASTNode(_, ASTNodeR::Block(ref mut vec)) => {
                     let bs = match self.parse_block_statement(
-                        is_root, verbose) {
+                        is_root, verbose, &[";"]) {
                         Ok(a) => a,
                         Err(e) => {
                             for a in e {
@@ -589,7 +589,7 @@ impl Parser {
         }
     }
 
-    fn parse_block_statement(&mut self, is_root: bool, verbose: usize)
+    fn parse_block_statement(&mut self, is_root: bool, verbose: usize, seperators: &[&'static str])
                              -> Result<Option<ASTNode>, Vec<Error>> {
         // save position for type parsing
         let start_pos = self.lexer.pos;
@@ -598,8 +598,7 @@ impl Parser {
         let mut token = get_token!(self.lexer, errors);
         let val = token.clone().value;
 
-
-        fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool)
+        fn parse_var_dec(parser: &mut Parser, typ: Type, is_root: bool, seperators: &[&'static str])
                          -> Result<Option<ASTNode>, Vec<Error>> {
             // declare variable
             let pos = parser.lexer.pos;
@@ -614,7 +613,7 @@ impl Parser {
             let ntv = next_token.value.clone();
             match next_token.ttype {
                 TokenType::Special => {
-                    if next_token.value == ";" {
+                    if seperators.contains(&next_token.value.as_str()) {
                         Ok(Some(ASTNode(pos, ASTNodeR::VarDec(
                             is_root, typ, ident))))
                     } else {
@@ -626,7 +625,7 @@ impl Parser {
                 TokenType::Operator => {
                     if next_token.value == "=" {
                         // variable initialization
-                        let expr = parser.parse_expr(&[";"])?.0;
+                        let expr = parser.parse_expr(seperators)?.0;
                         Ok(Some(ASTNode(pos, ASTNodeR::VarDecInit(
                             is_root, typ, ident, expr))))
                     } else {
@@ -736,12 +735,12 @@ impl Parser {
             TokenType::String | TokenType::Bool => {
                 errors.push((ErrorLevel::Err,
                              error!(self.lexer, token.pos, "invalid literal")));
-                return self.parse_block_statement(is_root, verbose);
+                return self.parse_block_statement(is_root, verbose, seperators);
             },
             TokenType::Ident => {
                 let expr = self.parse_ident_expr(val.clone(),
-                                                 token.pos,  &[";"])?;
-                let exp = self.parse_member(*expr, &[";"])?.1;
+                                                 token.pos,  seperators)?;
+                let exp = self.parse_member(*expr, seperators)?.1;
 
                 match exp {
                     ExpressionR::Var(..) => {
@@ -750,13 +749,13 @@ impl Parser {
 
                         if var_token.ttype == TokenType::Operator &&
                             var_val == "=" {
-                                let expr = self.parse_expr(&[";"])?.0;
+                                let expr = self.parse_expr(seperators)?.0;
                                 return Ok(Some(ASTNode(
                                     token.pos,ASTNodeR::VarInit(
                                         val, expr, None))));
                             } else if var_token.ttype == TokenType::Operator &&
                             var_val.ends_with('=') {
-                                let expr = self.parse_expr(&[";"])?.0;
+                                let expr = self.parse_expr(seperators)?.0;
                                 let op = err_ret!(
                                     Op::from_str(
                                         var_val.as_str()
@@ -773,7 +772,7 @@ impl Parser {
                                 let index = self.parse_expr(&["]"])?.0;
                                 err_ret!(self.expect(Some(TokenType::Operator),
                                                      Some("=".into())), errors);
-                                let right_expr = self.parse_expr(&[";"])?.0;
+                                let right_expr = self.parse_expr(seperators)?.0;
                                 let left_expr =
                                     Expression(token.pos,
                                                ExpressionR::Var(val), None);
@@ -800,7 +799,7 @@ impl Parser {
                     ExpressionR::StructField(strct, field, _) => {
                         err_ret!(self.expect(Some(TokenType::Operator),
                                              Some("=".into())), errors);
-                        let expr = self.parse_expr(&[";"])?.0;
+                        let expr = self.parse_expr(seperators)?.0;
                         return Ok(Some(ASTNode(token.pos, ASTNodeR::SetField(*strct, field, expr, None))));
                     },
                     ExpressionR::MemberFunction(tp, expr, name, args) => {
@@ -817,7 +816,7 @@ impl Parser {
                         let var_val = var_token.value;
 
                         if var_token.ttype == TokenType::Operator && var_val == "=" {
-                            let expr = self.parse_expr(&[";"])?.0;
+                            let expr = self.parse_expr(seperators)?.0;
                             return Ok(Some(ASTNode(token.pos, ASTNodeR::ArrIndexInit(*a, *ind, expr, vec![]))));
                         } else {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{var_val}`")));
@@ -866,7 +865,7 @@ impl Parser {
                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "returns are not allowed at top level")));
                     }
                     // parse expression
-                    let expression = self.parse_expr(&[";"])?.0;
+                    let expression = self.parse_expr(seperators)?.0;
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Return(expression))));
                 },
                 "[" => {
@@ -880,7 +879,7 @@ impl Parser {
                         },
                     };
 
-                    return match parse_var_dec(self, array_type, is_root) {
+                    return match parse_var_dec(self, array_type, is_root, seperators) {
                         Ok(a) => {
                             Ok(a)
                         },
@@ -892,7 +891,7 @@ impl Parser {
                 }
                 ";" => {
                     // ignore
-                    return self.parse_block_statement(is_root, verbose);
+                    return self.parse_block_statement(is_root, verbose, seperators);
                 }
                 _ => {},
             },
@@ -901,7 +900,7 @@ impl Parser {
                 self.lexer.pos = start_pos;
                 let typ = err_ret!(self.parse_type(), errors);
                 
-                return match parse_var_dec(self, typ, is_root) {
+                return match parse_var_dec(self, typ, is_root, seperators) {
                     Ok(a) => Ok(a),
                     Err(mut e) => {
                         errors.append(&mut e);
@@ -963,36 +962,51 @@ impl Parser {
                     err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Break())));
                 }
-                // "for" => {
-                //     if is_root {
-                //         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
-                //         // next token: '('
-                //         err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+                "for" => {
+                    if is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`for` not allowed at top level")));
+                        return Err(errors);
+                    }
+                    // next token: '('
+                    err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+                    
+                    // initialization
+                    let init_node = self.parse_block_statement(false, verbose, &[";"])?;
+                    
+                    // loop condition
+                    let cond_expr = err_add!(self.parse_expr(&[";"]), errors);
+                    
+                    // incrementor
+                    let inc_node = self.parse_block_statement(false, verbose, &[")"])?;
 
-                //         // var init
-                //         // get type
-                //         let init_type = err_ret!(self.expect(Some(TokenType::Type), None), errors);
-                //         // get identifier
-                //         let init_ident = err_ret!(self.expect(Some(TokenType::Ident), None), errors);
-                //         // next token: '='
-                //         err_ret!(self.expect(Some(TokenType::Operator), Some("=".into())), errors);
-                //         let init_expr = err_add!(self.parse_expr(&[";"]), errors);
+                    // next token: '{'
+                    err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors);
 
-                //         // loop condition
-                //         let cond_expr = err_add!(self.parse_expr(&[";"]), errors);
-                
-                //         // incrementor
-                //         let inc = self.parse_block_statement(false);
-                
-                //         return Err(errors);
-                //     }
-                // },
+                    // parse block
+                    let mut block = self.parse_block(token.pos, verbose)?;
+                    if let ASTNode(_, ASTNodeR::Block(ref mut vec)) = block {
+                        if inc_node.is_some() {
+                            vec.push(inc_node.unwrap());
+                        }
+                    }
+                    let while_node = ASTNode(token.pos, ASTNodeR::While(cond_expr.0, Box::new(block)));
+
+                    let blk_vec = if init_node.is_some() {
+                        vec![init_node.unwrap(), while_node]
+                    } else {
+                        vec![while_node]
+                    };
+                    
+                    let for_node = ASTNode(token.pos, ASTNodeR::Block(blk_vec));
+                    
+                    return Ok(Some(for_node));
+                },
                 "func" => {
                     if ! is_root {
                         self.lexer.pos = start_pos;
                         let typ = err_ret!(self.parse_type(), errors);
 
-                        return match parse_var_dec(self, typ, is_root) {
+                        return match parse_var_dec(self, typ, is_root, seperators) {
                             Ok(a) => Ok(a),
                             Err(mut e) => {
                                 errors.append(&mut e);
@@ -1151,7 +1165,7 @@ impl Parser {
                 },
                 _ => {}
             },
-            TokenType::Undef => return self.parse_block_statement(is_root, verbose),
+            TokenType::Undef => return self.parse_block_statement(is_root, verbose, &[";"]),
         }
         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{val}`")));
         Err(errors)

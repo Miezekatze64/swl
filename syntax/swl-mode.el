@@ -23,7 +23,7 @@
 
 (eval-and-compile
     (defconst swl-keywords
-        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "syntax" "include" "break" "<-" "from")
+        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "syntax" "include" "break" "<-" "from" "for")
         ))
 
 (eval-and-compile

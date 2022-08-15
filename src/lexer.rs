@@ -46,6 +46,7 @@ const KEYWORDS: &[&str] = &[
     "as",
     "arr",
     "while",
+    "for",
     "break",
     "struct",
     "ref",

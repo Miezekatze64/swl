@@ -10,7 +10,7 @@
 
 - [x] implement else
 
-- [ ] implement for loop
+- [x] implement for loop
 
 - [x] fix `unreachable!()` at line 1292 (struct literals as statement), should add error
 

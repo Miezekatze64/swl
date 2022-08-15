@@ -18,7 +18,7 @@
 
 - [ ] implement lambda functions
 
-- [ ] check for redefined functions
+- [x] check for redefined functions
 
 - [ ] disallow redefinition of vars in same scope
 
@@ -30,7 +30,7 @@
   struct List<T> {T head; List<T> tail}
   ```
 
-- [ ] type inference -> multiple function generation 
+- [x] type inference -> multiple function generation 
 
 - [ ] add support for operator overloading and creation of own operators:
   

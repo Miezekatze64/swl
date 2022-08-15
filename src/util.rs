@@ -193,20 +193,33 @@ impl std::fmt::Display for Type {
 
 impl Type {
     pub fn dealias(&self, aliases: &HashMap<String, Type>) -> Type {
-        let mut ret = self.clone();
-
-        if let Type::Custom(val) = self {
-            if aliases.contains_key(val) {
-                ret = aliases.get(val).unwrap().clone();
-            }
+        match self {
+            Type::Primitive(_)        => self.clone(),
+            Type::Custom(val)         => {
+                if aliases.contains_key(val) {
+                    aliases.get(val).unwrap().clone()
+                } else {
+                    self.clone()
+                }
+            },
+            Type::Array(a)            => Type::Array(Box::new(a.dealias(aliases))),
+            Type::Pointer(a)          => Type::Pointer(Box::new(a.dealias(aliases))),
+            Type::Function(args, ret) => {
+                Type::Function(args.iter().map(|x| x.dealias(aliases)).collect(), Box::new(ret.dealias(aliases)))
+            },
+            Type::Invalid             => Type::Invalid,
+            Type::Struct(name, fields)        => {
+                Type::Struct(name.clone(), fields.iter().
+                             map(|(nm, (tp, sz))|(nm.clone(), (tp.dealias(aliases), sz.clone()))).collect())
+            },
+            Type::Var(val)            => {
+                if aliases.contains_key(val) {
+                    aliases.get(val).unwrap().clone()
+                } else {
+                    self.clone()
+                }
+            },
         }
-        if let Type::Var(val) = self {
-            if aliases.contains_key(val) {
-                ret = aliases.get(val).unwrap().clone();
-            }
-        }
-        
-        ret
     }
 
     pub fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>)
@@ -220,8 +233,10 @@ impl Type {
             return true;
         }
 
-        if a == b || a == Type::Primitive(PrimitiveType::Float) &&
-            b == Type::Primitive(PrimitiveType::Int) {
+        if a == b || (a == Type::Primitive(PrimitiveType::Float) &&
+                     b == Type::Primitive(PrimitiveType::Int)) ||
+            ((a == Type::Primitive(PrimitiveType::Int) && b == Type::Primitive(PrimitiveType::Int)) ||
+              b == Type::Primitive(PrimitiveType::Int) && a == Type::Primitive(PrimitiveType::Int)) {
             true
         } else if let Type::Array(aa) = a {
             if let Type::Array(bb) = b {
@@ -396,19 +411,28 @@ impl Op {
                     match a {
                         Type::Primitive(ref v) => {
                             match v {
-                                PrimitiveType::Int =>
-                                    if a.is_compatible(b, aliases) {
+                                PrimitiveType::Int => {
+                                    let rb = b.dealias(aliases);
+                                    if rb == Type::Primitive(PrimitiveType::Int) || rb == Type::Primitive(PrimitiveType::Char) {
                                         a.clone()
                                     } else {
                                         Type::Invalid
-                                    },
+                                    }
+                                }
                                 PrimitiveType::Float =>
                                     if a.is_compatible(b, aliases) {
                                         a.clone()
                                     } else {
                                         Type::Invalid
                                     },
-                                PrimitiveType::Char => Type::Invalid,
+                                PrimitiveType::Char => {
+                                    let rb = b.dealias(aliases);
+                                    if rb == Type::Primitive(PrimitiveType::Int) || rb == Type::Primitive(PrimitiveType::Char) {
+                                        a.clone()
+                                    } else {
+                                        Type::Invalid
+                                    }
+                                },
                                 PrimitiveType::Void => Type::Invalid,
                                 PrimitiveType::Bool => Type::Invalid,
                                 PrimitiveType::Unchecked => b.clone(),

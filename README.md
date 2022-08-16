@@ -89,7 +89,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Functions: 
   
-  ```go
+  ```swl
   func name(int arg0, string arg1) -> bool {
       // function content
   }

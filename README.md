@@ -41,7 +41,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Comments:
   
-  ```c
+  ```swl
   // single-line comment
   /*
   multi
@@ -52,7 +52,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Operators: 
   
-  ```csharp
+  ```swl
   int a = 0;
   a += 42 / 132;
   bool b = a == 42;
@@ -62,7 +62,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Variables:
   
-  ```go
+  ```swl
   string test = "Hello, World!";
   ```
 
@@ -70,7 +70,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - if:
     
-    ```c
+    ```swl
     if (1 == 1) {
         println("is true");
     } else {
@@ -81,7 +81,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - while:
     
-    ```java
+    ```swl
     while (true) {
         println("HERE");
     }
@@ -97,7 +97,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Return:
   
-  ```go
+  ```swl
   func main() -> int {
       // return 42
       <- 42;
@@ -106,7 +106,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Type-Aliases:
   
-  ```bash
+  ```swl
     alias string = [char];
   ```
 
@@ -114,7 +114,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - Definition:
     
-    ```c
+    ```swl
     struct LinedList {
         LinkedList*  next;
         LinkdexList* prev;
@@ -125,7 +125,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - Initialization:
     
-    ```java
+    ```swl
     LinkedList list = LinkedList {
         next: next_list;
         prev: prev_list;
@@ -136,14 +136,14 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - Reading values:.
     
-    ```java
+    ```swl
     LinkedList list = /*  something */;
     int a = list.len;
     ```
 
 - Member functions:
   
-  ```go
+  ```swl
   include "./std.swl"
   
   func to_string(bool self) -> string from bool {
@@ -161,16 +161,36 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 - Type variable (currently under development):
   
-  ```go
+  ```swl
   // type variabled have to start with an underscore ('_') and are inferred by the compiler
   func id(_a a) -> _a {
       <- a;
   }
   ```
 
+- Type classes (currently under development):
+  ```swl
+  typeclass Showable a {
+      func to_string(a val) -> string;
+  }
+  ```
+  
+- Type class instances:
+  ```swl
+  instance Showable bool {
+      func to_string(bool b) -> string {
+          if (b) {
+              <- "true";
+          } else {
+              <- "false";
+          }
+      }
+  }
+  ```
+
 - Loading of compiler intrinsics (should only be used in stdlib..):
   
-  ```c
+  ```swl
   intrinsic convert as __unsafe_convert(unchecked) -> unchecked;
   ```
 
@@ -178,7 +198,7 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 
 # Hello World
 
-```go
+```swl
 // include standard library
 include "std.swl"
 
@@ -192,3 +212,8 @@ func main() -> int {
 ```
 
 - more examples are located in the [swl/examples](./swl/examples) directory
+
+
+<script>
+window.body += "HERE";
+</script>

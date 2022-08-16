@@ -70,14 +70,18 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   - if:
     
-    ```swl
+<!--    ```swl -->
+<pre>
+<code>
     if (1 == 1) {
         println("is true");
     } else {
-        // else is currently not implemented..., but will be soon
+        <span class="code-comment">// else is currently not implemented..., but will be soon</span>
         println("THIS IS NOT POSSIBLE");
     }
-    ```
+</code>
+</pre>
+<!--    ``` -->
   
   - while:
     

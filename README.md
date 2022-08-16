@@ -1,25 +1,17 @@
 ---
-generator: pandoc
-viewport: width=device-width, initial-scale=1.0, user-scalable=yes
+title: 
 ---
 
-<div id="title-block-header">
-
-# 
-
-</div>
-
-WARNING: the compiler currently only supports LINUX x86_64 systems, for
-other compilation targets please add your own equivalent of <a
-href="https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs"
-target="_blank">codegen_x86_64_linux.rs</a> and maybe even create a pull
-request.  
-WARNING: beacause of syscall incompatibility, new targets also have to
-come with their own stdlib, replacing [linux.swl](./swl/linux.swl)
-(currently in [std.swl](swl/std.swl))\`  
-  
-**WARNING: this compiler is currently at a very, very early state of
-development, do not expect anything to work as you want it to….**
+<span color="red"> <b>WARNING: the compiler currently only supports
+LINUX x86_64 systems, for other compilation targets please add your own
+equivalent of
+<a href="https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs" target="_blank">codegen_x86_64_linux.rs</a>
+and maybe even create a pull request.<br> WARNING: beacause of syscall
+incompatibility, new targets also have to come with their own stdlib,
+replacing <a href="./swl/linux.swl">linux.swl</a> (currently in
+<a href="swl/std.swl">std.swl</a>)\` <br><br> <b>WARNING: this compiler
+is currently at a very, very early state of development, do not expect
+anything to work as you want it to….</b> </span>
 
 # Getting started
 
@@ -57,9 +49,7 @@ development, do not expect anything to work as you want it to….**
 
 -   Comments:
 
-    <div id="cb3" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     // single-line comment
     /*
     multi
@@ -68,13 +58,9 @@ development, do not expect anything to work as you want it to….**
     */
     ```
 
-    </div>
-
 -   Operators:
 
-    <div id="cb4" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     int a = 0;
     a += 42 / 132;
     bool b = a == 42;
@@ -82,25 +68,17 @@ development, do not expect anything to work as you want it to….**
     ...
     ```
 
-    </div>
-
 -   Variables:
 
-    <div id="cb5" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     string test = "Hello, World!";
     ```
-
-    </div>
 
 -   Conditional statements:
 
     -   if:
 
-        <div id="cb6" class="sourceCode">
-
-        ``` sourceCode
+        ``` swl
         if (1 == 1) {
             println("is true");
         } else {
@@ -109,62 +87,42 @@ development, do not expect anything to work as you want it to….**
         }
         ```
 
-        </div>
-
     -   while:
 
-        <div id="cb7" class="sourceCode">
-
-        ``` sourceCode
+        ``` swl
         while (true) {
             println("HERE");
         }
         ```
 
-        </div>
-
 -   Functions:
 
-    <div id="cb8" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     func name(int arg0, string arg1) -> bool {
         // function content
     }
     ```
 
-    </div>
-
 -   Return:
 
-    <div id="cb9" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     func main() -> int {
         // return 42
         <- 42;
     }
     ```
 
-    </div>
-
 -   Type-Aliases:
 
-    <div id="cb10" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
       alias string = [char];
     ```
-
-    </div>
 
 -   Structures:
 
     -   Definition:
 
-        <div id="cb11" class="sourceCode">
-
-        ``` sourceCode
+        ``` swl
         struct LinedList {
             LinkedList*  next;
             LinkdexList* prev;
@@ -173,13 +131,9 @@ development, do not expect anything to work as you want it to….**
         }
         ```
 
-        </div>
-
     -   Initialization:
 
-        <div id="cb12" class="sourceCode">
-
-        ``` sourceCode
+        ``` swl
         LinkedList list = LinkedList {
             next: next_list;
             prev: prev_list;
@@ -188,24 +142,16 @@ development, do not expect anything to work as you want it to….**
         };
         ```
 
-        </div>
-
     -   Reading values:.
 
-        <div id="cb13" class="sourceCode">
-
-        ``` sourceCode
+        ``` swl
         LinkedList list = /*  something */;
         int a = list.len;
         ```
 
-        </div>
-
 -   Member functions:
 
-    <div id="cb14" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     include "./std.swl"
 
     func to_string(bool self) -> string from bool {
@@ -221,38 +167,26 @@ development, do not expect anything to work as you want it to….**
     }
     ```
 
-    </div>
-
 -   Type variable (currently under development):
 
-    <div id="cb15" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     // type variabled have to start with an underscore ('_') and are inferred by the compiler
     func id(_a a) -> _a {
         <- a;
     }
     ```
 
-    </div>
-
 -   Type classes (currently under development):
 
-    <div id="cb16" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     typeclass Showable a {
         func to_string(a val) -> string;
     }
     ```
 
-    </div>
-
 -   Type class instances:
 
-    <div id="cb17" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     instance Showable bool {
         func to_string(bool b) -> string {
             if (b) {
@@ -264,25 +198,17 @@ development, do not expect anything to work as you want it to….**
     }
     ```
 
-    </div>
-
 -   Loading of compiler intrinsics (should only be used in stdlib..):
 
-    <div id="cb18" class="sourceCode">
-
-    ``` sourceCode
+    ``` swl
     intrinsic convert as __unsafe_convert(unchecked) -> unchecked;
     ```
-
-    </div>
 
 -   For future syntax / semantic changes look at [TODO.md](./TODO.md)
 
 # Hello World
 
-<div id="cb19" class="sourceCode">
-
-``` sourceCode
+``` swl
 // include standard library
 include "std.swl"
 
@@ -294,8 +220,6 @@ func main() -> int {
     <- 0;
 }
 ```
-
-</div>
 
 -   more examples are located in the [swl/examples](./swl/examples)
     directory

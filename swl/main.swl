@@ -21,39 +21,7 @@ func toLowercase(char c) -> char {
 */
 alias string = [char];
 
-typeclass Showable a {
-    func to_string(a val) -> string;
-}
 
-instance Showable int {
-    func to_string(int val) -> string {
-        <- itoa(val);
-    }
-}
-
-instance Showable bool {
-    func to_string(bool b) -> string {
-        if (b) {
-            <- "true";
-        } else {
-            <- "false";
-        }
-    }
-}
-
-instance Showable char {
-    func to_string(char c) -> string {
-        string str = alloc_array(1);
-        str[0] = c;
-        <- str;
-    }
- }
-
-instance Showable [char] {
-    func to_string([char] str) -> string {
-        <- str;
-    }
-}
 
 func main() -> int {
     println(to_string(42));

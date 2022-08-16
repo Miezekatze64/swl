@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, Entry};
 
 use crate::error_arrow;
 
@@ -13,7 +13,7 @@ type Instances   = HashMap<(String, Type), Vec<ASTNode>>;
 type Vars        = Aliases;
 type Functions   = HashMap<(Option<Type>, String), (Vec<Type>, Type)>;
 
-type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a mut HashMap<String, Vec<(String, Vec<Type>, Type)>>, &'a TypeClasses, &'a Instances, &'a mut Aliases, &'a mut Globals, &'a mut Vec<(ErrorLevel, String)>, fn() -> HashMap<&'static str, &'static str>);
+type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a mut HashMap<String, Vec<(String, Vec<Type>, Type)>>, &'a mut TypeClasses, &'a mut Instances, &'a mut Aliases, &'a mut Globals, &'a mut Vec<(ErrorLevel, String)>, fn() -> HashMap<&'static str, &'static str>);
 
 fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut String) {
     match tp {
@@ -161,8 +161,8 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                             }
                         }
 
-                        if ! functions.contains_key(&(None, new_func_name.clone())) {
-                            functions.insert((None, new_func_name.clone()), (new_args.clone(), ret_type.clone()));
+                        if let Entry::Vacant(e) = functions.entry((None, new_func_name.clone())) {
+                            e.insert((new_args.clone(), ret_type.clone()));
                             if ! generic_functions.contains_key(&func_name) {
                                 generic_functions.insert(func_name.clone(), vec![]);
                             }
@@ -361,7 +361,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(_, ASTNodeR::TypeAlias(_, _)) => {},
                 ASTNode(_, ASTNodeR::Struct(_, _)) => {},
                 ASTNode(_, ASTNodeR::Include(_, ref mut ast, ref lexer_)) => {
-                    let (g, a, f) = match check(ast, lexer_.clone(), intrinsics) {
+                    let (g, a, f, tc, insts) = match check(ast, lexer_.clone(), intrinsics) {
                         Ok(a) => a,
                         Err((vec, ..)) => {
                             for e in vec {
@@ -378,6 +378,12 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     }
                     for (k, v) in f {
                         functions.insert(k, v);
+                    }
+                    for (k, v) in tc {
+                        type_classes.insert(k, v);
+                    }
+                    for (k, v) in insts {
+                        instances.insert(k, v);
                     }
                 }
                 ASTNode(pos, ASTNodeR::Intrinsic(iname, ..)) => {
@@ -700,24 +706,22 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                             type_class_arg = Some(typa.clone());
                             typb = typa.clone();
                             current_vars.insert(type_class.clone().unwrap(), typa.clone());
-                        } else {
-                            if type_class_arg.as_ref().unwrap() != &typb {
-                                let mut args_pos = 0;
-                                for (ind, arg) in orig_vec.iter().enumerate() {
-                                    if ind == index {
-                                        break;
-                                    }
-                                    args_pos += arg.to_string().chars().count() + 2;
+                        } else if type_class_arg.as_ref().unwrap() != &typb {
+                            let mut args_pos = 0;
+                            for (ind, arg) in orig_vec.iter().enumerate() {
+                                if ind == index {
+                                    break;
                                 }
-                                
-                                let first = "incompatible types in function call: ";
-                                let offset = first.chars().count() + 1 + lexpr.to_string().chars().count() + 1 + args_pos;
-                                let msg = format!("    expected `{typb}`, found `{typa}`");
-                                let line = error_arrow!(lexer, pos, offset, msg, a.to_string().chars().count());
-                                
-                                errors.push((ErrorLevel::Err, error!(lexer, pos, "{first}`{exp}`:\n{line}")));
-                                break;
+                                args_pos += arg.to_string().chars().count() + 2;
                             }
+                            
+                            let first = "incompatible types in function call: ";
+                            let offset = first.chars().count() + 1 + lexpr.to_string().chars().count() + 1 + args_pos;
+                            let msg = format!("    expected `{typb}`, found `{typa}`");
+                            let line = error_arrow!(lexer, pos, offset, msg, a.to_string().chars().count());
+                            
+                            errors.push((ErrorLevel::Err, error!(lexer, pos, "{first}`{exp}`:\n{line}")));
+                            break;
                         }
                     }
                     
@@ -754,22 +758,20 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                         type_class = Some(name.clone());
                         type_class_arg = Some(ret_type.clone());
                         current_vars.insert(name.clone(), ret_type.clone());
-                    } else {
-                        if type_class_arg.as_ref().unwrap() != &ret {
-                            let mut args_pos = 0;
-                            for arg in orig_vec {
-                                args_pos += arg.to_string().chars().count() + 2;
-                            }
-                            
-                            let first = "incompatible types in function call: ";
-                            let offset = first.chars().count() + 1 + lexpr.to_string().chars().count() + 1 + args_pos;
-                            let tca = type_class_arg.unwrap();
-                            let msg = format!("    expected `{tca}`, found `{ret}`");
-                            let line = error_arrow!(lexer, pos, offset, msg, ret.to_string().chars().count());
-                            
-                            errors.push((ErrorLevel::Err, error!(lexer, pos, "{first}`{exp}`:\n{line}")));
-                            return Type::Invalid;
+                    } else if type_class_arg.as_ref().unwrap() != &ret {
+                        let mut args_pos = 0;
+                        for arg in orig_vec {
+                            args_pos += arg.to_string().chars().count() + 2;
                         }
+                        
+                        let first = "incompatible types in function call: ";
+                        let offset = first.chars().count() + 1 + lexpr.to_string().chars().count() + 1 + args_pos;
+                        let tca = type_class_arg.unwrap();
+                        let msg = format!("    expected `{tca}`, found `{ret}`");
+                        let line = error_arrow!(lexer, pos, offset, msg, ret.to_string().chars().count());
+                        
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "{first}`{exp}`:\n{line}")));
+                        return Type::Invalid;
                     }
                 }
 
@@ -803,8 +805,8 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                         return ret;
                     }
 
-                    if ! functions.contains_key(&(None, new_func_name.clone())) {
-                        functions.insert((None, new_func_name.clone()), (new_args.clone(), ret.clone()));
+                    if let Entry::Vacant(e) = functions.entry((None, new_func_name.clone())) {
+                        e.insert((new_args.clone(), ret.clone()));
                         if ! generic_functions.contains_key(&func_name) {
                             generic_functions.insert(func_name.clone(), vec![]);
                         }
@@ -973,7 +975,7 @@ fn add_generic_aliases(args: Vec<(Type, String)>, new_aliases: &mut Aliases, a: 
 
 
 type Ret = (Vec<Error>, Aliases, Globals);
-pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>) -> Result<(Globals, Aliases, Functions), Ret> {
+pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>) -> Result<(Globals, Aliases, Functions, TypeClasses, Instances), Ret> {
     let mut errors: Vec<Error> = vec![];
 
     let mut generic_functions = HashMap::new();
@@ -1132,18 +1134,18 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                         let mut current_vars: HashMap<String, Type> = HashMap::new();
                         
                         if let Some(Type::Custom(ref name)) = fr {
-                            let tp = defined[&(fname.to_owned())].0.clone();
+                            let tp = defined[&(*fname)].0.clone();
                             if let Some(inner) = tp {
                                 current_vars.insert(name.clone(), inner);
                             }
                         }
                         for (ind, arg) in args.iter().enumerate() {
                             if let Type::Custom(a) = arg {
-                                current_vars.insert(a.clone(), defined[&(fname.to_owned())].1[ind].0.clone());
+                                current_vars.insert(a.clone(), defined[&(*fname)].1[ind].0.clone());
                             }
                         }
                         if let Type::Custom(ref name) = ret {
-                            current_vars.insert(name.clone(), defined[&(fname.to_owned())].2.clone());
+                            current_vars.insert(name.clone(), defined[&(*fname)].2.clone());
                         }
 
                         let mut new_func_name = String::new();
@@ -1165,10 +1167,10 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                         
                         hash_vars(tp, current_vars, &mut new_func_name);
 
-                        new_func_name.push_str(&fname);
+                        new_func_name.push_str(fname);
                         
                         let (ref args, ref ret) = class_funcs[&(fr.clone(), fname.to_owned())];
-                        functions.insert((fr.clone(), new_func_name.to_owned()), (args.iter().map(|x| x.clone()).collect(), ret.clone()));
+                        functions.insert((fr.clone(), new_func_name.to_owned()), (args.clone(), ret.clone()));
                         func_names.insert(fname.to_owned(), new_func_name.to_owned());
                     }
 
@@ -1192,7 +1194,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
         unreachable!();
     }
 
-    typecheck((ast, &mut functions, &vars, &mut generic_functions, &type_classes, &instances, &mut type_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
+    typecheck((ast, &mut functions, &vars, &mut generic_functions, &mut type_classes, &mut instances, &mut type_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
     check_function_ret_paths(&ast.1, &mut errors, &mut lexer);
 
     let root_arr;
@@ -1231,7 +1233,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
 
             let mut node = ASTNode(pos, ASTNodeR::Block(vec![ASTNode(pos, ASTNodeR::FunctionDecl(None, a.0.clone(), args.iter().enumerate().map(|(i, v)| (a.1[i].clone(), v.1.clone())).collect(), a.2, new_block))]));
 
-            typecheck((&mut  node, &mut functions, &vars, &mut generic_functions, &type_classes, &instances, &mut new_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
+            typecheck((&mut  node, &mut functions, &vars, &mut generic_functions, &mut type_classes, &mut instances, &mut new_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
 
             let new_func;
             if let ASTNode(_, ASTNodeR::Block(here)) = node {
@@ -1264,7 +1266,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
 
     // type checking
     if errors.is_empty() {
-        Ok((globals, type_aliases, functions))
+        Ok((globals, type_aliases, functions, type_classes, instances))
     } else {
         Err((errors, type_aliases, globals))
     }

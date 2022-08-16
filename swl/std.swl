@@ -386,6 +386,15 @@ func input([char] buf) -> int {
     <- read(0, arr2addr(buf), arrlen(buf));
 }
 
+// reads a single character from stdin and returns it
+// ------
+// returns: the char
+func getch() -> char {
+    [char] buf = arr[char, 1];
+    input(buf);
+    <- buf[0];
+}
+
 // prints a given string to stdout
 // ------
 // args:
@@ -681,4 +690,44 @@ func sqrt(int a) -> int {
         x = (a / x + x) / 2;
     }
     <- x;
+}
+
+
+// TYPECLASSES
+
+// represent all types, that can be converted to a string
+typeclass Showable a {
+    func to_string(a val) -> string;
+}
+
+
+// default implementations:
+instance Showable int {
+    func to_string(int val) -> string {
+        <- itoa(val);
+    }
+}
+
+instance Showable bool {
+    func to_string(bool b) -> string {
+        if (b) {
+            <- "true";
+        } else {
+            <- "false";
+        }
+    }
+}
+
+instance Showable char {
+    func to_string(char c) -> string {
+        string str = alloc_array(1);
+        str[0] = c;
+        <- str;
+    }
+ }
+
+instance Showable [char] {
+    func to_string([char] str) -> string {
+        <- str;
+    }
 }

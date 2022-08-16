@@ -139,7 +139,7 @@ fn main() {
                     globals = g;
                 }
             },
-            Ok((g, a, functions)) => {
+            Ok((g, a, functions, ..)) => {
                 if ! functions.contains_key(&(None, "main".into())) {
                     eprintln!("error: {}: missing main function", parser.lexer.filename);
                     error = true;

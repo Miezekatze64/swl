@@ -214,6 +214,8 @@ func main() -> int {
 - more examples are located in the [swl/examples](./swl/examples) directory
 
 
-<script>
-window.body += "HERE";
-</script>
+<span>
+    <script>
+    window.body += "HERE";
+    </script>
+</span>

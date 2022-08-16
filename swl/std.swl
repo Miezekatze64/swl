@@ -7,7 +7,7 @@ intrinsic syscall      as syscall3(int index, int val, int val2, int val3)
       -> int;
 intrinsic syscall      as syscall4(int index, int val, int val2, int val3,
     int val4)  -> int;
-intrinsic str_to_ptr   as arr2addr(string str)                          -> int;
+intrinsic str_to_ptr   as arr2addr([char] str)                          -> int;
 intrinsic dereference  as arrlen([unchecked] str)                       -> int;
 intrinsic convert      as ptr2arr(int ptr)                       -> [unchecked];
 intrinsic convert      as __unsafe_convert(unchecked i)                 -> unchecked;
@@ -294,6 +294,19 @@ func strcpy(string a, string b) {
     while (i < len) {
         a[i] = b[i];
         i += 1;
+    }
+}
+
+// copies the contents of string b to string a with a given offset (without overflow)
+// ------
+// args:
+//   a     <- the destination string
+//   a_off <- the destination offset
+//   b     <- the source string
+//   b_off <- the source offset
+func strcpy_off(string a, int a_off, string b, int b_off) {
+    for (int i = 0; i+a_off < arrlen(a) && i+b_off < arrlen(b); i += 1) {
+        a[i+a_off] = b[i+b_off];
     }
 }
 

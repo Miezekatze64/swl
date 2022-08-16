@@ -8,6 +8,8 @@ pub struct Parser {
 #[derive(Debug, Clone)]
 pub struct ASTNode(pub usize, pub ASTNodeR);
 
+type Functions   = HashMap<(Option<Type>, String), (Vec<Type>, Type)>;
+
 #[derive(Debug, Clone)]
 pub enum ASTNodeR {
     Block(Vec<ASTNode>),
@@ -28,6 +30,8 @@ pub enum ASTNodeR {
     Include(String, Box<ASTNode>, Lexer),
     Break(),
     MemberFunction(Type, Expression, String, Vec<Expression>),
+    TypeClass(String, String, Functions),
+    Instance(String, Type, Vec<ASTNode>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -133,7 +137,7 @@ impl std::fmt::Display for ASTNodeR {
                 write!(f, "{typ} {name} = {expr};")
             },
             ASTNodeR::While(cond, block) => {
-                write!(f, "while {cond} {{\n{block}}}")
+                write!(f, "while {cond} {{\n{}}}", indent(block.to_string()))
             },
             ASTNodeR::VarOp(name, op, expr) => {
                 write!(f, "{name} {op}= {expr};")
@@ -164,6 +168,37 @@ impl std::fmt::Display for ASTNodeR {
                 }
                 write!(f, ");")
             }
+            ASTNodeR::TypeClass(name, arg, funcs) => {
+                writeln!(f, "typeclass {name} {arg} {{")?;
+                for func in funcs {
+                    write!(f, "    func {}(", func.0.1)?;
+                    let (args, ret) = func.1.clone();
+                    for (index, arg) in args.iter().enumerate() {
+                        write!(f, "{arg}")?;
+                        if index < args.len() - 1 {
+                            write!(f, ", ")?;
+                        }
+                    }
+                    write!(f, ")")?;
+                    if ret != Type::Primitive(PrimitiveType::Void) {
+                        write!(f, " -> {ret}")?;
+                    }
+                    let from = func.0.0.as_ref();
+                    if from.is_some() {
+                        write!(f, " from {}", from.unwrap())?;
+                    }
+                    writeln!(f, ";")?;
+                }
+                writeln!(f, "}}")
+            },
+            ASTNodeR::Instance(name, arg, funcs) => {
+                write!(f, "instance {name} {arg} {{")?;
+                for func in funcs {
+                    writeln!(f, "{}", indent(func.to_string()))?;
+                }
+                writeln!(f, "}}")?;
+                Ok(())
+            },
         }
     }
 }
@@ -197,6 +232,7 @@ impl std::fmt::Display for ExpressionR {
                                "{name}[INVALID, SHOULD BE A STRUCT LITERAL]"),
                     Type::Function(_, _) => write!(f, "[INVALID] This sould be a lambda functino not a 'function literal'..."),
                     Type::Var(val) => write!(f, "{val}[INVALID, TYPE VARIABLE]"),
+                    Type::Bounded(a) => write!(f, "Bounded<{a}>[INVALID]"),
                 }
             },
             ExpressionR::Var(var) => {
@@ -985,8 +1021,8 @@ impl Parser {
                     // parse block
                     let mut block = self.parse_block(token.pos, verbose)?;
                     if let ASTNode(_, ASTNodeR::Block(ref mut vec)) = block {
-                        if inc_node.is_some() {
-                            vec.push(inc_node.unwrap());
+                        if let Some(a) = inc_node {
+                            vec.push(a);
                         }
                     }
                     let while_node = ASTNode(token.pos, ASTNodeR::While(cond_expr.0, Box::new(block)));
@@ -1163,6 +1199,112 @@ impl Parser {
 
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Intrinsic(intr_name, intr_func, args, ret_val))));
                 },
+                "typeclass" => {
+                    if ! is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "typeclasses are only allowed at top-level")));
+                        return Err(errors);
+                    }
+
+                    // tyoclass name:
+                    let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                    
+                    // type arg name:
+                    let arg = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+
+                    // expect {
+                    err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors).value;
+
+                    let mut funcs: Functions = HashMap::new();
+
+                    while get_peek_token!(self.lexer, errors).ttype == TokenType::Keyword {
+                        err_ret!(self.expect(Some(TokenType::Keyword), Some("func".into())), errors).value;
+                        // expect name:
+                        let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                        
+                        err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
+                        
+                        let (args, ret_type) = err_add!(parse_function_decl(self, errors.clone()), errors);
+                        
+                        let mut from_type = None;
+                        
+                        let check_from = get_peek_token!(self.lexer, errors);
+                        if check_from.ttype == TokenType::Keyword && check_from.value == "from" {
+                            self.lexer.next_token().unwrap();
+                            // expect type
+                            from_type = Some(err_ret!(self.parse_type(), errors));
+                        }
+
+                        err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors).value;
+
+                        funcs.insert((from_type, name),
+                                     (
+                                         args.iter().
+                                             map(|(n, _)| n.clone()).
+                                             collect(),
+                                         ret_type
+                                     )
+                        );
+                    }
+
+                    // expect }
+                    err_ret!(self.expect(Some(TokenType::Special), Some("}".into())), errors).value;
+                    
+                    return Ok(Some(ASTNode(0, ASTNodeR::TypeClass(name, arg, funcs))));
+                },
+                "instance" => {
+                    if ! is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "typeclasses are only allowed at top-level")));
+                        return Err(errors);
+                    }
+
+                    // tyoclass name:
+                    let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                    
+                    // type arg:
+                    let arg = err_ret!(self.parse_type(), errors);
+
+                    // expect {
+                    err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors).value;
+
+                    let mut funcs: Vec<ASTNode> = vec![];
+
+                    while get_peek_token!(self.lexer, errors).ttype == TokenType::Keyword {
+                        err_ret!(self.expect(Some(TokenType::Keyword), Some("func".into())), errors).value;
+                        // expect name:
+                        let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                        
+                        err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
+                        
+                        let (args, ret_type) = err_add!(parse_function_decl(self, errors.clone()), errors);
+                        
+                        let mut from_type = None;
+                        
+                        let check_from = get_peek_token!(self.lexer, errors);
+                        if check_from.ttype == TokenType::Keyword && check_from.value == "from" {
+                            self.lexer.next_token().unwrap();
+                            // expect type
+                            from_type = Some(err_ret!(self.parse_type(), errors));
+                        }
+
+                        err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors).value;
+                        let block = err_add!(self.parse_block(token.pos, verbose), errors);
+
+                        funcs.push(ASTNode(block.0,
+                                           ASTNodeR::FunctionDecl(
+                                               from_type,
+                                               name,
+                                               args,
+                                               ret_type,
+                                               Box::new(block))
+                                     )
+                        );
+                    }
+
+                    // expect }
+                    err_ret!(self.expect(Some(TokenType::Special), Some("}".into())), errors).value;
+                    
+                    return Ok(Some(ASTNode(0, ASTNodeR::Instance(name, arg, funcs))));
+                }
                 _ => {}
             },
             TokenType::Undef => return self.parse_block_statement(is_root, verbose, &[";"]),

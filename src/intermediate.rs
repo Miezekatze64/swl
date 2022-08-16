@@ -187,7 +187,7 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
                     offset += tp.size(aliases);
                 }
             } else {
-                unreachable!("should always be a struct (error in type-checking)")
+                unreachable!("should always be a struct (error in type-checking): TYPE = {struct_type:?}")
             }
             ret.push(Inst::Field(index, offset, tp.unwrap().dealias(aliases)));
         }
@@ -469,8 +469,8 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             ret.push(Inst::If(0, index));
             ret.append(&mut gen(block.1, offsets, globals, aliases.clone(), loop_idx, index * 3, false).0);
             ret.push(Inst::Else(index));
-            if block2.is_some() {
-                ret.append(&mut gen(block2.unwrap().1, offsets, globals, aliases, loop_idx, index * 3, false).0);
+            if let Some(a) = block2 {
+                ret.append(&mut gen(a.1, offsets, globals, aliases, loop_idx, index * 3, false).0);
             }
             ret.push(Inst::Endif(index));
         },
@@ -516,7 +516,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             } else {
                 ret.push(Inst::Func(name, offsets.clone()));
             }
-            
+
             ret.append(&mut gen(block.1, &mut offsets, globals, aliases, 0, index * 3, false).0);
             if rt == Type::Primitive(PrimitiveType::Void) {
                 ret.push(Inst::Ret(0));
@@ -536,6 +536,8 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         ASTNodeR::Include(_, ast, _) => {
             ret.append(&mut gen(ast.1, offsets, globals, aliases, 0, index, is_top_level).0);
         }
+        ASTNodeR::TypeClass(..) => {},
+        ASTNodeR::Instance(..) => {},
     }
     (ret, globals.clone())
 }

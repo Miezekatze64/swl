@@ -52,7 +52,9 @@ const KEYWORDS: &[&str] = &[
     "ref",
     "deref",
     "include",
-    "from"
+    "from",
+    "typeclass",
+    "instance"
 ];
 
 macro_rules! ret {

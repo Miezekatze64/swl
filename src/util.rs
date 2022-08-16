@@ -89,6 +89,7 @@ pub enum Type {
     Invalid,
     Struct(String, HashMap<String, (Type, usize)>),
     Var(String),
+    Bounded(String),
 }
 
 impl PartialEq for Type {
@@ -109,8 +110,14 @@ impl std::hash::Hash for Type {
         match self {
             Type::Primitive(a) => a.hash(state),
             Type::Custom(a) => a.hash(state),
-            Type::Array(a) => a.hash(state),
-            Type::Pointer(a) => a.hash(state),
+            Type::Array(a) => {
+                a.hash(state);
+                23.hash(state);
+            },
+            Type::Pointer(a) => {
+                a.hash(state);
+                17.hash(state);
+            },
             Type::Invalid => 0.hash(state),
             Type::Struct(x, map) => {
                 map.iter().map(|(a, b)| (a.clone(), b.clone()))
@@ -122,6 +129,7 @@ impl std::hash::Hash for Type {
                 ret.hash(state);
             },
             Type::Var(a) => ("_".to_string() + a).hash(state),
+            Type::Bounded(a) => a.hash(state),
         }
     }
 }
@@ -187,6 +195,7 @@ impl std::fmt::Display for Type {
                 s
             },
             Type::Var(a) => a.to_string(),
+            Type::Bounded(a) => format!("Bounded<{a}>"),
         }.as_str())
     }
 }
@@ -210,7 +219,7 @@ impl Type {
             Type::Invalid             => Type::Invalid,
             Type::Struct(name, fields)        => {
                 Type::Struct(name.clone(), fields.iter().
-                             map(|(nm, (tp, sz))|(nm.clone(), (tp.dealias(aliases), sz.clone()))).collect())
+                             map(|(nm, (tp, sz))|(nm.clone(), (tp.dealias(aliases), *sz))).collect())
             },
             Type::Var(val)            => {
                 if aliases.contains_key(val) {
@@ -219,6 +228,7 @@ impl Type {
                     self.clone()
                 }
             },
+            Type::Bounded(_) => self.clone(),
         }
     }
 
@@ -311,6 +321,7 @@ impl Type {
             Type::Var(a) => {
                 unreachable!("unevavluated type-variable `{a}`")
             },
+            Type::Bounded(a) => unreachable!("unevaluated bounded generic from typeclass `{a}`"),
         }
     }
 

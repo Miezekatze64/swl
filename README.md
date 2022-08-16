@@ -3,20 +3,23 @@ generator: pandoc
 viewport: width=device-width, initial-scale=1.0, user-scalable=yes
 ---
 
-::: {#title-block-header}
-#  {#section .title}
-:::
+<div id="title-block-header">
+
+# 
+
+</div>
 
 WARNING: the compiler currently only supports LINUX x86_64 systems, for
-other compilation targets please add your own equivalent of
-[codegen_x86_64_linux.rs](https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs){target="_blank"}
-and maybe even create a pull request.\
+other compilation targets please add your own equivalent of <a
+href="https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs"
+target="_blank">codegen_x86_64_linux.rs</a> and maybe even create a pull
+request.  
 WARNING: beacause of syscall incompatibility, new targets also have to
 come with their own stdlib, replacing [linux.swl](./swl/linux.swl)
-(currently in [std.swl](swl/std.swl))\`\
-\
+(currently in [std.swl](swl/std.swl))\`  
+  
 **WARNING: this compiler is currently at a very, very early state of
-development, do not expect anything to work as you want it to....**
+development, do not expect anything to work as you want it to….**
 
 # Getting started
 
@@ -54,8 +57,9 @@ development, do not expect anything to work as you want it to....**
 
 -   Comments:
 
-    ::: {#cb3 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb3" class="sourceCode">
+
+    ``` sourceCode
     // single-line comment
     /*
     multi
@@ -63,34 +67,40 @@ development, do not expect anything to work as you want it to....**
     comment
     */
     ```
-    :::
+
+    </div>
 
 -   Operators:
 
-    ::: {#cb4 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb4" class="sourceCode">
+
+    ``` sourceCode
     int a = 0;
     a += 42 / 132;
     bool b = a == 42;
     bool c = !(b != false);
     ...
     ```
-    :::
+
+    </div>
 
 -   Variables:
 
-    ::: {#cb5 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb5" class="sourceCode">
+
+    ``` sourceCode
     string test = "Hello, World!";
     ```
-    :::
+
+    </div>
 
 -   Conditional statements:
 
     -   if:
 
-        ::: {#cb6 .sourceCode}
-        ``` {.sourceCode .swl}
+        <div id="cb6" class="sourceCode">
+
+        ``` sourceCode
         if (1 == 1) {
             println("is true");
         } else {
@@ -98,53 +108,63 @@ development, do not expect anything to work as you want it to....**
             println("THIS IS NOT POSSIBLE");
         }
         ```
-        :::
+
+        </div>
 
     -   while:
 
-        ::: {#cb7 .sourceCode}
-        ``` {.sourceCode .swl}
+        <div id="cb7" class="sourceCode">
+
+        ``` sourceCode
         while (true) {
             println("HERE");
         }
         ```
-        :::
+
+        </div>
 
 -   Functions:
 
-    ::: {#cb8 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb8" class="sourceCode">
+
+    ``` sourceCode
     func name(int arg0, string arg1) -> bool {
         // function content
     }
     ```
-    :::
+
+    </div>
 
 -   Return:
 
-    ::: {#cb9 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb9" class="sourceCode">
+
+    ``` sourceCode
     func main() -> int {
         // return 42
         <- 42;
     }
     ```
-    :::
+
+    </div>
 
 -   Type-Aliases:
 
-    ::: {#cb10 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb10" class="sourceCode">
+
+    ``` sourceCode
       alias string = [char];
     ```
-    :::
+
+    </div>
 
 -   Structures:
 
     -   Definition:
 
-        ::: {#cb11 .sourceCode}
-        ``` {.sourceCode .swl}
+        <div id="cb11" class="sourceCode">
+
+        ``` sourceCode
         struct LinedList {
             LinkedList*  next;
             LinkdexList* prev;
@@ -152,12 +172,14 @@ development, do not expect anything to work as you want it to....**
             int index;
         }
         ```
-        :::
+
+        </div>
 
     -   Initialization:
 
-        ::: {#cb12 .sourceCode}
-        ``` {.sourceCode .swl}
+        <div id="cb12" class="sourceCode">
+
+        ``` sourceCode
         LinkedList list = LinkedList {
             next: next_list;
             prev: prev_list;
@@ -165,21 +187,25 @@ development, do not expect anything to work as you want it to....**
             index: 0;
         };
         ```
-        :::
+
+        </div>
 
     -   Reading values:.
 
-        ::: {#cb13 .sourceCode}
-        ``` {.sourceCode .swl}
+        <div id="cb13" class="sourceCode">
+
+        ``` sourceCode
         LinkedList list = /*  something */;
         int a = list.len;
         ```
-        :::
+
+        </div>
 
 -   Member functions:
 
-    ::: {#cb14 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb14" class="sourceCode">
+
+    ``` sourceCode
     include "./std.swl"
 
     func to_string(bool self) -> string from bool {
@@ -194,33 +220,39 @@ development, do not expect anything to work as you want it to....**
         <- 0;
     }
     ```
-    :::
+
+    </div>
 
 -   Type variable (currently under development):
 
-    ::: {#cb15 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb15" class="sourceCode">
+
+    ``` sourceCode
     // type variabled have to start with an underscore ('_') and are inferred by the compiler
     func id(_a a) -> _a {
         <- a;
     }
     ```
-    :::
+
+    </div>
 
 -   Type classes (currently under development):
 
-    ::: {#cb16 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb16" class="sourceCode">
+
+    ``` sourceCode
     typeclass Showable a {
         func to_string(a val) -> string;
     }
     ```
-    :::
+
+    </div>
 
 -   Type class instances:
 
-    ::: {#cb17 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb17" class="sourceCode">
+
+    ``` sourceCode
     instance Showable bool {
         func to_string(bool b) -> string {
             if (b) {
@@ -231,22 +263,26 @@ development, do not expect anything to work as you want it to....**
         }
     }
     ```
-    :::
+
+    </div>
 
 -   Loading of compiler intrinsics (should only be used in stdlib..):
 
-    ::: {#cb18 .sourceCode}
-    ``` {.sourceCode .swl}
+    <div id="cb18" class="sourceCode">
+
+    ``` sourceCode
     intrinsic convert as __unsafe_convert(unchecked) -> unchecked;
     ```
-    :::
+
+    </div>
 
 -   For future syntax / semantic changes look at [TODO.md](./TODO.md)
 
 # Hello World
 
-::: {#cb19 .sourceCode}
-``` {.sourceCode .swl}
+<div id="cb19" class="sourceCode">
+
+``` sourceCode
 // include standard library
 include "std.swl"
 
@@ -258,7 +294,8 @@ func main() -> int {
     <- 0;
 }
 ```
-:::
+
+</div>
 
 -   more examples are located in the [swl/examples](./swl/examples)
     directory

@@ -4,6 +4,7 @@ mod parser;
 mod typecheck;
 mod intermediate;
 mod codegen_x86_64_linux;
+mod interpreter;
 
 use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
           time::SystemTime};
@@ -70,6 +71,8 @@ fn main() {
     } else {
         "1"
     }.parse::<usize>().unwrap_or(0);
+
+    let interpret = gnu_args.contains_key("interpret") || unix_args.contains_key(&'i');
 
     let filename: String = match pos_args.get(0) {
         Some(a) => a.to_string(),
@@ -166,57 +169,62 @@ fn main() {
             if verbose > 2 {
                 println!("{:#?}", intermediate);
             }
-            
-            if verbose > 0 {
-                println!("[*] generating assembly");
+
+            if ! interpret {
+                if verbose > 0 {
+                    println!("[*] generating assembly");
+                }
+                let asm = generate(intermediate, &globals);
+                if verbose > 1 {
+                    println!("{}", asm);
+                }
+                
+                let mut asm_path = path.clone();
+                asm_path.push_str(&name);
+                asm_path.push_str(".asm");
+                match fs::write(asm_path.clone(), asm) {
+                    Ok(_) => {},
+                    Err(a) => {
+                        eprintln!("Error writing file: {}", a);
+                        exit(1);
+                    },
+                };
+                
+                // call nasm and ld
+                if verbose > 0 {
+                    println!("[*] CMD: nasm -felf64 {asm_path}");
+                }
+                
+                let nasm =  Command::new("nasm").arg("-felf64").arg(asm_path).output().unwrap();
+                if ! nasm.status.success() {
+                    eprintln!("ERROR executing nasm: \n{}", std::str::from_utf8(&nasm.stderr).unwrap());
+                    error = true;
+                }
+                
+                let mut obj_path = path.clone();
+                obj_path.push_str(&name);
+                obj_path.push_str(".o");
+                
+                let mut outfile = path;
+                outfile.push_str(&name);
+                
+                if verbose > 0 {
+                    println!("[*] CMD: ld -o {outfile} {obj_path}");
+                }
+                
+                let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
+                if ! ld.status.success() {
+                    eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
+                    error = true;
+                }
+                
+                let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
+                
+                println!("[!] compiled {filename} -> {outfile} in {time}s");
+            } else {
+                println!("[*] Starting interpreter");
+                interpreter::interpret(&intermediate);
             }
-            let asm = generate(intermediate, &globals);
-            if verbose > 1 {
-                println!("{}", asm);
-            }
-
-            let mut asm_path = path.clone();
-            asm_path.push_str(&name);
-            asm_path.push_str(".asm");
-            match fs::write(asm_path.clone(), asm) {
-                Ok(_) => {},
-                Err(a) => {
-                    eprintln!("Error writing file: {}", a);
-                    exit(1);
-                },
-            };
-
-            // call nasm and ld
-            if verbose > 0 {
-                println!("[*] CMD: nasm -felf64 {asm_path}");
-            }
-            
-            let nasm =  Command::new("nasm").arg("-felf64").arg(asm_path).output().unwrap();
-            if ! nasm.status.success() {
-                eprintln!("ERROR executing nasm: \n{}", std::str::from_utf8(&nasm.stderr).unwrap());
-                error = true;
-            }
-
-            let mut obj_path = path.clone();
-            obj_path.push_str(&name);
-            obj_path.push_str(".o");
-
-            let mut outfile = path;
-            outfile.push_str(&name);
-
-            if verbose > 0 {
-                println!("[*] CMD: ld -o {outfile} {obj_path}");
-            }
-            
-            let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
-            if ! ld.status.success() {
-                eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
-                error = true;
-            }
-
-            let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
-
-            println!("[!] compiled {filename} -> {outfile} in {time}s");
         }
     }
 

@@ -1,40 +1,6 @@
 include "std.swl";
-/*
-func map(func<(_a) -> _b> f, [_a] a) -> [_b] {
-    [_b] new_arr = alloc_array(arrlen(a));
-    int i = 0;
-    while (i < arrlen(a)) {
-        _b tmp     = f(a[i]);
-        new_arr[i] = tmp;
-        i += 1;
-    }
-    <- new_arr;
-}
-
-
-func toLowercase(char c) -> char {
-    if (c >= 'A' && c <= 'Z') {
-        <- c + 32;
-    }
-    <- c;
-}
-*/
-alias string = [char];
-
-
 
 func main() -> int {
-    println(to_string(42));
-    println(to_string(true));
-    println(to_string(32));
-    println(to_string(false));
-    print(to_string('H'));
-    print(to_string('e'));
-    print(to_string('l'));
-    print(to_string('l'));
-    print(to_string('o'));
-    print(to_string(','));
-    print(to_string(" World!\n"));
-
+    println("Hello, World!");
     <- 0;
 }

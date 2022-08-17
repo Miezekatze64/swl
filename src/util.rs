@@ -540,12 +540,36 @@ pub fn parse_args(vec: Vec<String>) -> Result<(PosArgs, GnuArgs, UnixArgs), Stri
     
     for a in vec {
         if a.starts_with("--") {
+            match state {
+                NONE => {},
+                GNU => {
+                    gnu_args.insert(tmp_gnu_name.clone(), String::new());
+                },
+                UNIX => {
+                    unix_args.insert(tmp_unix_name, String::new());
+                },
+                _ => {
+                    return Err("invalid state".into());
+                }
+            }
             if a.len() == 2 {
                 continue;
             }
             tmp_gnu_name = a.strip_prefix("--").unwrap().to_string();
             state = GNU;
         } else if a.starts_with('-') {
+            match state {
+                NONE => {},
+                GNU => {
+                    gnu_args.insert(tmp_gnu_name.clone(), String::new());
+                },
+                UNIX => {
+                    unix_args.insert(tmp_unix_name, String::new());
+                },
+                _ => {
+                    return Err("invalid state".into());
+                }
+            }
             if a.len() > 2 {
                 return Err(format!("short (unix-like) argument `{a}` should only be one character long (e. g. `-o`)"));
             }
@@ -570,6 +594,20 @@ pub fn parse_args(vec: Vec<String>) -> Result<(PosArgs, GnuArgs, UnixArgs), Stri
             }
         }
     }
+
+    match state {
+        NONE => {},
+        GNU => {
+            gnu_args.insert(tmp_gnu_name.clone(), String::new());
+        },
+        UNIX => {
+            unix_args.insert(tmp_unix_name, String::new());
+        },
+        _ => {
+            return Err("invalid state".into());
+        }
+    }
+    
     Ok((pos_args, gnu_args, unix_args))
 }
 

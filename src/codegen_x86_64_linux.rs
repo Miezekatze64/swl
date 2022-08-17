@@ -260,9 +260,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 let r2 = register(reg2);
                 
                 if sz_vec.len() == 1 {
-                    let r0s = register_sz(reg0, sz_vec[0]);
+//                    let r0s = register_sz(reg0, sz_vec[0]);
                     let r1s = register_sz(reg1, sz_vec[0]);
-                    format!(";; SET ARRAY INDEX\n\tpush {r0}\n\tmov {r0}, {r2}\n\tadd {r0}, 8\n\tadd {r0s}, {r1s}\n\tpop {r1}\n\tmov [{r0}], {r1s}\n")
+                    format!(";; SET ARRAY INDEX\n\tpush {r0}\n\tmov {r0}, {r2}\n\tadd {r0}, 8\n\tadd {r0}, {r1}\n\tpop {r1}\n\tmov [{r0}], {r1s}\n")
                 } else {
                     let mut string: String = String::new();
                     string.push_str(";; SET ARRAY INDEX\n");

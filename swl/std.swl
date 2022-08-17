@@ -391,8 +391,11 @@ func input([char] buf) -> int {
 // returns: the char
 func getch() -> char {
     [char] buf = arr[char, 1];
-    input(buf);
-    <- buf[0];
+    if (input(buf) == 0) {
+        <- 0.to_char();
+    } else {
+        <- buf[0];
+    }
 }
 
 // prints a given string to stdout

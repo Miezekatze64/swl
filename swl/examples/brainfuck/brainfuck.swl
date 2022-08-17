@@ -1,0 +1,79 @@
+include "../../std.swl";
+
+func exec([char] src) {
+    [char] tape = arr[char, 3000];
+    int ip = 0;
+    int p = 0;
+    while (ip < arrlen(src)) {
+        char c = src[ip];
+        if (c == '<') {
+            p -= 1;
+            ip += 1;
+        } else {if (c == '>') {
+            p += 1;
+            ip += 1;
+        } else {if (c == '+') {
+            tape[p] = tape[p] + 1;
+            ip += 1;
+        } else {if (c == '-') {
+            tape[p] = tape[p] - 1;
+            ip += 1;
+        } else {if (c == '[') {
+            if (tape[p].char_code() == 0) {
+                int lvl = 1;
+                int closing = ip;
+                while (lvl > 0) {
+                    closing += 1;
+                    if (src[closing] == '[') {
+                        lvl += 1;
+                    } else {if (src[closing] == ']') {
+                        lvl -= 1;
+                    }}
+                }
+                ip = closing + 1;
+            } else {
+                ip += 1;
+            }
+        } else {if (c == ']') {
+            if (tape[p].char_code() != 0) {
+                int lvl = 1;
+                int open = ip;
+                while (lvl > 0) {
+                    open -= 1;
+                    if (src[open] == '[') {
+                        lvl -= 1;
+                    } else {if (src[open] == ']') {
+                        lvl += 1;
+                    }}
+                }
+                ip = open + 1;
+            } else {
+                ip += 1;
+            }
+        } else {if (c == '.') {
+            print(to_string(tape[p]));
+            ip += 1;
+        } else {if (c == ',') {
+            tape[p] = getch();
+            ip += 1;
+        } else {if (c.char_code() == 0) {
+            <-;
+        } else {
+            ip += 1;
+        }}}}}}}}}
+    }
+}
+
+func main() -> int {
+    [char] buf = arr[char, 20000];
+    int buf_ind = 0;
+    for (char c = getch(); c.char_code() != 0; c = getch()) {
+        buf[buf_ind] = c;
+        buf_ind += 1;
+    }
+    buf[buf_ind] = 0.to_char();
+    exec(buf);
+    <- 0;
+}
+
+

@@ -328,6 +328,7 @@ impl Op {
             "/"  => Ok(Op::Binary(BinaryOp::Div)),
             "%"  => Ok(Op::Binary(BinaryOp::Mod)),
             "==" => Ok(Op::Binary(BinaryOp::Eq)),
+            "!=" => Ok(Op::Binary(BinaryOp::Neq)),
             "<"  => Ok(Op::Binary(BinaryOp::Less)),
             ">"  => Ok(Op::Binary(BinaryOp::Greater)),
             "<=" => Ok(Op::Binary(BinaryOp::LessEq)),
@@ -344,7 +345,7 @@ impl Op {
         match op_type {
             Op::Binary(bin_op) => match bin_op {
                 BinaryOp::BoolAnd | BinaryOp::BoolOr => 0,
-                BinaryOp::Eq | BinaryOp::Less |
+                BinaryOp::Eq | BinaryOp::Neq | BinaryOp::Less |
                 BinaryOp::Greater | BinaryOp::GreaterEq | BinaryOp::LessEq => 1,
                 BinaryOp::Add | BinaryOp::Sub => 2,
                 BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 3,

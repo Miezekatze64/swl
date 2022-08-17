@@ -470,7 +470,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             ret.append(&mut gen(block.1, offsets, globals, aliases.clone(), loop_idx, index * 3, false).0);
             ret.push(Inst::Else(index));
             if let Some(a) = block2 {
-                ret.append(&mut gen(a.1, offsets, globals, aliases, loop_idx, index * 3, false).0);
+                ret.append(&mut gen(a.1, offsets, globals, aliases, loop_idx, index * 5, false).0);
             }
             ret.push(Inst::Endif(index));
         },

@@ -353,6 +353,7 @@ pub enum BinaryOp {
     LessEq,
     Greater,
     GreaterEq,
+    Neq,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -376,6 +377,7 @@ impl std::fmt::Display for BinaryOp {
             BinaryOp::Mul          => "*",
             BinaryOp::Div          => "/",
             BinaryOp::Eq           => "==",
+            BinaryOp::Neq          => "!=",
             BinaryOp::Less         => "<",
             BinaryOp::LessEq       => "<=",
             BinaryOp::Greater      => ">",
@@ -465,7 +467,7 @@ impl Op {
                     },
                     _ => Type::Invalid,
                 },
-                BinaryOp::Eq => if (a == b) ||
+                BinaryOp::Eq | BinaryOp::Neq => if (a == b) ||
                     (a == &Type::Primitive(PrimitiveType::Unchecked) ||
                      b == &Type::Primitive(PrimitiveType::Unchecked)) {
                     Type::Primitive(PrimitiveType::Bool)

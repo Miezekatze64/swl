@@ -222,7 +222,7 @@ fn main() {
                 
                 println!("[!] compiled {filename} -> {outfile} in {time}s");
             } else {
-                println!("[*] Starting interpreter");
+                println!("[*] Starting interpreter\n");
                 interpreter::interpret(&intermediate);
             }
         }

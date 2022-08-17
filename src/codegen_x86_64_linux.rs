@@ -317,7 +317,8 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
     ret.push_str("_end:\n;; EXIT\n\tmov rdi, rax\n\tmov rax, 60\n\tsyscall\nsection .data\nARGS:\n\tresb 8\n");
 
     for a in global_strings {
-        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb `{a}`\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len() - a.matches('\\').count()).as_str());
+        let bytes: String = a.bytes().map(|x| x.to_string()).collect::<Vec<String>>().join(", ");
+        ret.push_str(format!("str_{}:\n\tdq {}\n\tdb {bytes}\n", a.to_lowercase().chars().map(|a| if a.is_alphanumeric() {a} else {'_'}).collect::<String>(), a.len()).as_str());
     }
 
     for (ind, a) in global_arrays.into_iter().enumerate() {

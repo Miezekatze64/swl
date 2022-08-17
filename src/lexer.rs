@@ -171,7 +171,24 @@ impl Lexer {
                     false
                 },
                 TokenType::String => {
-                    if ch == '"' {
+                    let mut c = ch;
+                    if val.ends_with('\\') {
+                        let esc = match ch {
+                            'n' => '\n',
+                            'r' => '\r',
+                            't' => '\t',
+                            '\\' => '\\',
+                            _ => {
+                                return Err((ErrorLevel::Err,
+                                    error!(self, self.pos,
+                                           "invalid escape literal: '{val}'")));
+                            }
+                        };
+                        val.pop().unwrap();
+                        c = esc;
+                    }
+                    
+                    if c == '"' {
                         self.pos += 1;
 
                         ret!(Ok::<Token, Error>(Token {
@@ -180,7 +197,7 @@ impl Lexer {
                             value: val.clone(),
                         }), self.verbose);
                     }
-                    val.push(ch);
+                    val.push(c);
                     false
                 },
                 _ => true

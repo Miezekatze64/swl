@@ -144,27 +144,19 @@ func _brk(int val) -> int {
 //   the new loctaion of the break
 func _sbrk(int inc) -> int {
     int newbrk;
-    int oldbrk = 0;
     int curbrk = 0;
     
-    if (oldbrk == 0) {
-        curbrk = _brk(0);
-        oldbrk = curbrk;
-    }
+    curbrk = _brk(0);
 
     if (inc == 0) {
         <- curbrk;
     }
     
     newbrk = curbrk + inc;
-    
-    if (_brk(newbrk) == curbrk) {
-        <- (-1);
-    }
-    
-    oldbrk = curbrk;
-    curbrk = newbrk;
-    <- oldbrk;
+
+    _brk(newbrk);
+
+    <- curbrk;
 }
 
 // fields used by _malloc and _free

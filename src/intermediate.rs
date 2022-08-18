@@ -42,6 +42,7 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             ret.append(&mut gen_expr(*fst, index, indicies, globals, aliases, false));
             ret.push(Inst::Push(index));
             ret.push(Inst::UnOp(index, tp.unwrap().size(aliases), op));
+            ret.push(Inst::Pop(index));
         },
         ExpressionR::T(fst, op, snd, _) => {
             ret.append(&mut gen_expr(*fst.clone(), index, indicies, globals, aliases, false));

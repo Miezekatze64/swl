@@ -20,7 +20,13 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 - run the compiler
 
 ```shell
-  ./swlc main.swl
+  cargo run --release main.swl
+```
+
+- run interpreted mode (EXPERIMENTAL, NOT FINISHED)
+
+```shell
+  cargo run --release main.swl -i
 ```
 
 # Primitive Types:

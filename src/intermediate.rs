@@ -39,10 +39,10 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
     let Expression(_pos, expr, tp) = expr;
     match expr {
         ExpressionR::UnaryOp(op, fst, _) => {
-            ret.append(&mut gen_expr(*fst, index, indicies, globals, aliases, false));
             ret.push(Inst::Push(index));
-            ret.push(Inst::UnOp(index, tp.unwrap().size(aliases), op));
+            ret.append(&mut gen_expr(*fst, index, indicies, globals, aliases, false));
             ret.push(Inst::Pop(index));
+            ret.push(Inst::UnOp(index, tp.unwrap().size(aliases), op));
         },
         ExpressionR::T(fst, op, snd, _) => {
             ret.append(&mut gen_expr(*fst.clone(), index, indicies, globals, aliases, false));

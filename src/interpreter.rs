@@ -1,4 +1,5 @@
-use std::{process::exit, collections::HashMap, fs::File};
+use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read}, ffi::CString};
+use libc;
 
 use crate::{intermediate::Inst, util::{Type, PrimitiveType, BinaryOp}};
 
@@ -98,12 +99,21 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
     let mut heap:       Vec<u8>                               = vec![];
 
     let mut var_offset: usize = 0;
+    let mut arr_index: usize = 0;
 
-    let strace: bool = false;
+    let strace: bool = true;
 
     fds.push(FileDescriptor::STDIN);
     fds.push(FileDescriptor::STDOUT);
     fds.push(FileDescriptor::STDERR);
+
+    // setup args:
+    globals.append(&mut 1u64.to_le_bytes().to_vec() /* argc */);
+    globals.append(&mut 24u64.to_le_bytes().to_vec() /* argv[0] */);
+    globals.append(&mut 0u64.to_le_bytes().to_vec() /* envp END */);
+    globals.append(&mut vec!['.' as u8, '/' as u8, 'm' as u8, 'a' as u8, 'i' as u8, 'n' as u8, 0, 0] /* envp END */);
+
+    let arg_ptr = 0 | GLOBAL_SEG;
     
     let mut ip = 0;
     loop {
@@ -236,7 +246,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     BinaryOp::Less => {
                         registers[*r1] = ((registers[*r1] as i64) < (registers[*r2] as i64)) as u64;
                     },
-                    BinaryOp::LessEq => todo!(),
+                    BinaryOp::LessEq => {
+                        registers[*r1] = ((registers[*r1] as i64) <= (registers[*r2] as i64)) as u64;
+                    },
                     BinaryOp::Greater => {
                         registers[*r1] = ((registers[*r1] as i64) > (registers[*r2] as i64)) as u64;
                     },
@@ -263,6 +275,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 index = globals.len() as u64;
                                 
                                 vec.append(&mut val.bytes().collect());
+                                vec.append(&mut vec![0, 0, 0, 0, 0, 0, 0, 0]);
                                 globals.append(&mut vec);
                                 global_idx.insert(val.clone(), index as usize);
                             } else {
@@ -299,6 +312,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
             Inst::Intrinsic(nm, _) => {
                 stack.push(var_offset as u64);
                 match nm.as_str() {
+                    "get_args" => {
+                        registers[0] = arg_ptr;
+                    },
                     "str_to_ptr" => {
                         registers[0] += 8;
                     },
@@ -324,6 +340,60 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     "syscall" => {
                         let id = registers[0];
                         match id {
+                            // read(fd, buf, count)
+                            0 => {
+                                let fd    = registers[1];
+                                let buf   = registers[2];
+                                let count = registers[3];
+                                
+                                let mut bytes: Vec<u8> = vec![];
+                                
+                                if count > 0 {
+                                    match fds[fd as usize] {
+                                        FileDescriptor::STDIN => {
+                                            stdin().take(count).read_to_end(&mut bytes).unwrap();
+
+                                            assert_eq!(count as usize, bytes.len());
+                                    },
+                                    FileDescriptor::STDOUT => {
+                                        eprintln!("FATAL: Attempt to read from stdout");
+                                        exit(1);
+                                    }
+                                    FileDescriptor::STDERR => {
+                                        eprintln!("FATAL: Attempt to read from stderr");
+                                        exit(1);
+                                    },
+                                    FileDescriptor::File(_) => unimplemented!(),
+                                    }
+                                }
+
+                                let val = buf & VALUE;
+                                match buf & SEGMENT {
+                                    GLOBAL_SEG => {
+                                        for (i, a) in bytes.iter().enumerate() {
+                                            if (val as usize + i) >= globals.len() {
+                                                for _ in globals.len() ..= (buf as usize + i) {
+                                                    globals.push(0);
+                                                }
+                                            }
+                                            globals[val as usize + i] = *a;
+                                        }
+                                    },
+                                    HEAP_SEG => {
+                                        for (i, a) in bytes.iter().enumerate() {
+                                            heap[val as usize + i] = *a;
+                                        }
+                                    },
+                                    _ => unimplemented!("SEGMENT: {}", buf & SEGMENT)
+                                }
+
+                                registers[0] = bytes.len() as u64;
+
+                                if strace {
+                                    eprintln!("read({fd}, {buf}, {count}) -> {}", registers[0]);
+                                }
+                            },
+
                             // write(fd, buf, count)
                             1 => {
                                 let fd    = registers[1];
@@ -375,6 +445,72 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     eprintln!("brk({val}) -> {}", registers[0]);
                                 }
                             },
+                            // nanosleep(rqtp, rmtp)
+                            35 => {
+                                unsafe {
+                                    let a = registers[1];
+                                    let b = registers[2];
+                                    registers[0] = libc::nanosleep(a as *const libc::timespec,
+                                                                   b as *mut libc::timespec)
+                                        as u64;
+                                    if strace {
+                                        eprintln!("nanosleep({a}, {b}) -> {}", registers[0]);
+                                    }
+                                }
+                            }
+                            // fork()
+                            57 => {
+                                unsafe {
+                                    registers[0] = libc::fork() as u64;
+                                    if strace {
+                                        eprintln!("fork() -> {}", registers[0]);
+                                    }
+                                }
+                            },
+                            // wait4(pid, stat_addr, options, ru)
+                            61 => {
+                                unsafe {
+                                    let a = registers[1];
+                                    let b = registers[2];
+                                    let c = registers[3];
+                                    let d = registers[4];
+                                    registers[0] = libc::wait4(a as i32,
+                                                              b as *mut i32,
+                                                              c as i32,
+                                                               d as *mut libc::rusage)
+                                        as u64;
+                                    if strace {
+                                        eprintln!("wait4({a}, {b}, {c}, {d}) -> {}", registers[0]);
+                                    }
+                                }
+                            },
+                            // execve(filename, argv, envp)
+                            59 => {
+                                let a = registers[1];
+                                let b = registers[2];
+                                let c = registers[3];
+                                
+                                unsafe {
+                                    let arg_ptr = libc::malloc(8 + 8 + 8 + 7) as *mut u64;
+                                    *arg_ptr.offset(0) = 1; // argc
+                                    *arg_ptr.offset(1) = arg_ptr.offset(3) as u64; // argv[0]
+                                    *arg_ptr.offset(2) = 0; // envp
+                                    let str = CString::new("./test").unwrap();
+                                    libc::strcpy(arg_ptr.offset(3) as *mut i8, str.as_ptr() as *const i8); // argc
+                                
+                                    registers[0] = libc::execve(a as *const i8,
+                                                                b as *const *const i8,
+                                                                c as *const *const i8)
+                                    as u64;
+                                }
+                                if strace {
+                                    eprintln!("execve({a}, {b}, {c}) -> {}", registers[0]);
+                                }
+                                unimplemented!("not the correct implementation...")
+                            },
+                            60 => {
+                                
+                            },
                             a => {
                                 eprintln!("FATAL: Syscall {a} not implented");
                                 exit(1);
@@ -421,7 +557,20 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 *v = stack.pop().unwrap();
                 ip += 1;
             },
-            Inst::Arr(_, _) => todo!(),
+            Inst::Arr(reg, siz) => {
+                let pos = globals.len();
+                let sz = if *siz < 8 {8} else {*siz};
+                global_idx.insert(format!("arr_{arr_index}"), pos);
+                globals.resize(pos + sz + 8 + 1, 0);
+
+                for (i, a) in siz.to_le_bytes().iter().enumerate() {
+                    globals[pos + i] = *a;
+                }
+                
+                registers[*reg] = pos as u64 | GLOBAL_SEG;
+                arr_index += 1;
+                ip += 1;
+            },
             Inst::Index(reg0, reg1, sz_vec, is_ref) => {
                 if *is_ref {
                     registers[*reg0] = registers[*reg1] + 8 + registers[*reg0];
@@ -590,7 +739,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 }
                 ip += 1;
             },
-            Inst::Break(_) => todo!(),
+            Inst::Break(id) => {
+                ip = loops[id].1 + 1;
+            },
             Inst::FuncPtr(reg, f) => {
                 registers[*reg] = CODE_SEG | (find_function(intermediate, f) as u64);
                 ip += 1;

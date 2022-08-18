@@ -69,13 +69,14 @@ func to_string(char* self) -> string from char* {
 // --------
 // returns: the pointer to the string
 func to_cstr(string self) -> char* from string {
-    int ptr = _malloc(self.len() + 1);
+    int ptr = _malloc(self.len() + 8);
     int i = 0;
 
     while (i < self.len()) {
         set_addr(ptr+i, __unsafe_convert(self[i]));
         i += 1;
     }
+
     set_addr(ptr+self.len(), 0);
     <- __unsafe_convert(ptr);
 }
@@ -376,6 +377,19 @@ func exit(int status) {
 //   buf <- the buffer
 func input([char] buf) -> int {
     <- read(0, arr2addr(buf), arrlen(buf));
+}
+
+func get_line([char] buf) -> int {
+    int bytes = 0;
+    while (bytes < arrlen(buf)) {
+        buf[bytes] = getch();
+        if (buf[bytes] == '\n') {
+            <- bytes + 1;
+        } else {
+            bytes += 1;
+        }
+    }
+    <- bytes;
 }
 
 // reads a single character from stdin and returns it

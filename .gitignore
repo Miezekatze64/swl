@@ -5,6 +5,7 @@
 *.o
 !swlc
 !LICENSE
+!build
 
 
 # Added by cargo

@@ -1,0 +1,17 @@
+#!/usr/bin/sh
+
+cd `dirname $0`
+
+if [[ $1 == 'static' ]]; then
+    RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
+    shift
+else
+    cargo build --release
+fi
+cp ./target/release/lang ./swlc
+
+if [ $# -ge 1 ]; then
+    cargo run --release $*
+else
+    cargo build --release
+fi

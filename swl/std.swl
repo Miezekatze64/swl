@@ -384,17 +384,12 @@ func get_line([char] buf) -> int {
     int bytes = 0;
     while (bytes < arrlen(buf)) {
         buf[bytes] = getch();
-
         if (buf[bytes] == '\n') {
-            println("RET");
             <- bytes + 1;
         } else {
-            println("HERE!");
-            println(to_string(buf[bytes].char_code()));
             bytes += 1;
         }
     }
-    println("END_OF_BUF");
     <- bytes;
 }
 

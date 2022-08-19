@@ -4,10 +4,10 @@ DIR="`pwd`"
 cd `dirname $0`
 
 if [[ $1 == 'static' ]]; then
-    RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
+    RUSTFLAGS='-C target-feature=+crt-static' cargo build --release || return 1
     shift
 else
-    cargo build --release
+    cargo build --release || return 1
 fi
 cp ./target/release/lang ./swlc
 

@@ -75,6 +75,7 @@ macro_rules! deref {
         match $val & SEGMENT {
             GLOBAL_SEG => {
                 let bytes: Vec<u8> = $globals.iter().skip(($val & VALUE) as usize).take(8).map(|x| *x).collect();
+
                 let mut arr: [u8; 8] = [0; 8];
                 arr.copy_from_slice(&bytes[..]);
                 u64::from_le_bytes(arr)
@@ -302,7 +303,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     BinaryOp::GreaterEq => {
                         registers[*r1] = ((registers[*r1] as i64) >= (registers[*r2] as i64)) as u64;
                     },
-                    BinaryOp::Neq => todo!(),
+                    BinaryOp::Neq => {
+                        registers[*r1] = !((registers[*r1] as i64) <= (registers[*r2] as i64)) as u64;
+                    },
                 }
                 *sz as u64;
                 ip += 1;
@@ -388,8 +391,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     match fds[fd as usize] {
                                         FileDescriptor::STDIN => {
                                             stdin().take(count).read_to_end(&mut bytes).unwrap();
-
-                                            assert_eq!(count as usize, bytes.len());
+                                            if bytes.len() > 0 {
+                                                assert_eq!(count as usize, bytes.len());
+                                            }
                                     },
                                     FileDescriptor::STDOUT => {
                                         eprintln!("FATAL: Attempt to read from stdout");
@@ -699,27 +703,13 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 } else {
                     let rr = sz_vec.len();
                     registers[*reg1] += 8 + registers[*reg0];
-                    registers[rr] = registers[1];
+                    registers[rr] = registers[*reg1];
                     
                     let mut offset = 0;
                     for (off, sz) in sz_vec.iter().enumerate() {
                         let r = reg0 + off;
                         let val = registers[rr] + offset as u64;
-                        registers[r] = match val & SEGMENT {
-                            GLOBAL_SEG => {
-                                let bytes: Vec<u8> = globals.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
-                                let mut arr: [u8; 8] = [0; 8];
-                                arr.copy_from_slice(&bytes[..]);
-                                u64::from_le_bytes(arr)
-                            },
-                            HEAP_SEG => {
-                                let bytes: Vec<u8> = heap.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
-                                let mut arr: [u8; 8] = [0; 8];
-                                arr.copy_from_slice(&bytes[..]);
-                                u64::from_le_bytes(arr)
-                            },
-                            _ => unimplemented!("SEGMENT: {}", val & SEGMENT)
-                        };
+                        registers[r] = deref!(val, globals, heap, vars);
                         offset += sz;
                     }
                 }

@@ -1,4 +1,4 @@
-use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read}, ffi::CString};
+use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read, stderr, Write}};
 use libc;
 
 use crate::{intermediate::Inst, util::{Type, PrimitiveType, BinaryOp}};
@@ -70,6 +70,50 @@ macro_rules! uc {
     }
 }
 
+macro_rules! deref {
+    ($val:expr, $globals:expr, $heap:expr, $vars:expr) => {
+        match $val & SEGMENT {
+            GLOBAL_SEG => {
+                let bytes: Vec<u8> = $globals.iter().skip(($val & VALUE) as usize).take(8).map(|x| *x).collect();
+                let mut arr: [u8; 8] = [0; 8];
+                arr.copy_from_slice(&bytes[..]);
+                u64::from_le_bytes(arr)
+            },
+            HEAP_SEG => {
+                let bytes: Vec<u8> = $heap.iter().skip(($val & VALUE) as usize).take(8).map(|x| *x).collect();
+                let mut arr: [u8; 8] = [0; 8];
+                arr.copy_from_slice(&bytes[..]);
+                u64::from_le_bytes(arr)
+            },
+            VAR_SEG => {
+                let bytes: Vec<u8> = $vars.iter().skip(($val & VALUE) as usize).take(8).map(|x| *x).collect();
+                let mut arr: [u8; 8] = [0; 8];
+                arr.copy_from_slice(&bytes[..]);
+                u64::from_le_bytes(arr)
+            },
+            _ => unimplemented!("SEGMENT: {}, VALUE: {}", $val & SEGMENT, $val)
+        }
+    }
+}
+
+macro_rules! get_str {
+    ($init_ptr:expr, $globals:expr, $heap:expr, $vars:expr) => {
+        | | -> Vec<u8> {
+            let mut ptr = $init_ptr;
+            let mut vec = vec![];
+            loop {
+                let ch = (deref!(ptr, $globals, $heap, $vars) & 0xff) as u8;
+                ptr += 1;
+                vec.push(ch);
+                if ch == 0 {
+                    break;
+                }
+            }
+            vec
+        }()
+    }
+}
+
 const HEAP_SEG:   u64 = 0b00 << 62;
 const VAR_SEG:    u64 = 0b01 << 62;
 const GLOBAL_SEG: u64 = 0b10 << 62;
@@ -101,7 +145,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
     let mut var_offset: usize = 0;
     let mut arr_index: usize = 0;
 
-    let strace: bool = true;
+    let strace: bool = false;
 
     fds.push(FileDescriptor::STDIN);
     fds.push(FileDescriptor::STDOUT);
@@ -110,8 +154,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
     // setup args:
     globals.append(&mut 1u64.to_le_bytes().to_vec() /* argc */);
     globals.append(&mut 24u64.to_le_bytes().to_vec() /* argv[0] */);
+    globals.append(&mut 0u64.to_le_bytes().to_vec() /* argv END */);
     globals.append(&mut 0u64.to_le_bytes().to_vec() /* envp END */);
-    globals.append(&mut vec!['.' as u8, '/' as u8, 'm' as u8, 'a' as u8, 'i' as u8, 'n' as u8, 0, 0] /* envp END */);
+    globals.append(&mut vec!['.' as u8, '/' as u8, 'm' as u8, 'a' as u8, 'i' as u8, 'n' as u8, 0, 0] /* argv[0]*/);
 
     let arg_ptr = 0 | GLOBAL_SEG;
     
@@ -164,6 +209,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 let idx = *ind+var_offset;
                 
                 let inc = if sz < &8 { 8 } else { *sz };
+
                 if idx + inc >= vars.len() {
                     vars.resize(idx + inc, 0);
                 }
@@ -237,7 +283,8 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                         registers[*r1] = registers[*r1] % registers[*r2];
                     },
                     BinaryOp::Eq => {
-                        registers[*r1] = (registers[*r1] == registers[*r2]) as u64;
+                        let mask = ((1u128 << sz*8) - 1) as u64;
+                        registers[*r1] = (registers[*r1] & mask == registers[*r2] & mask) as u64;
                     },
                     BinaryOp::BoolAnd => {
                         registers[*r1] = ((registers[*r1] != 0) && (registers[*r2] != 0)) as u64;
@@ -320,21 +367,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     },
                     "dereference" => {
                         let val = registers[0];
-                        registers[0] = match val & SEGMENT {
-                            GLOBAL_SEG => {
-                                let bytes: Vec<u8> = globals.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
-                                let mut arr: [u8; 8] = [0; 8];
-                                arr.copy_from_slice(&bytes[..]);
-                                u64::from_le_bytes(arr)
-                            },
-                            HEAP_SEG => {
-                                let bytes: Vec<u8> = heap.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
-                                let mut arr: [u8; 8] = [0; 8];
-                                arr.copy_from_slice(&bytes[..]);
-                                u64::from_le_bytes(arr)
-                            },
-                            _ => unimplemented!("SEGMENT: {}", val & SEGMENT)
-                        };
+                        registers[0] = deref!(val, globals, heap, vars);
                     },
                     // LINUX x86_64 sycall emulation, to make stdlib work
                     "syscall" => {
@@ -347,6 +380,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 let count = registers[3];
                                 
                                 let mut bytes: Vec<u8> = vec![];
+
+//                                stdout().flush().unwrap();
+//                                stderr().flush().unwrap();
                                 
                                 if count > 0 {
                                     match fds[fd as usize] {
@@ -391,6 +427,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
 
                                 if strace {
                                     eprintln!("read({fd}, {buf}, {count}) -> {}", registers[0]);
+                                    stderr().flush().unwrap();
                                 }
                             },
 
@@ -418,6 +455,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
 
                                 if strace {
                                     eprintln!("write({fd}, {buf}, {count}) -> {}", registers[0]);
+                                    stderr().flush().unwrap();
                                 }
 
                                 match fds[fd as usize] {
@@ -443,6 +481,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
 
                                 if strace {
                                     eprintln!("brk({val}) -> {}", registers[0]);
+                                    stderr().flush().unwrap();
                                 }
                             },
                             // nanosleep(rqtp, rmtp)
@@ -450,11 +489,33 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 unsafe {
                                     let a = registers[1];
                                     let b = registers[2];
-                                    registers[0] = libc::nanosleep(a as *const libc::timespec,
-                                                                   b as *mut libc::timespec)
+
+                                    let ptr = a;
+                                    let val1 = deref!(ptr, globals, heap, vars);
+                                    
+                                    let ptr = a-8;
+                                    let val2 = deref!(ptr, globals, heap, vars);
+
+                                    let str1 = libc::malloc(16) as *mut u64;
+                                    *str1            = val1;
+                                    *str1.offset(1)  = val2;
+
+                                                                        let ptr = a;
+                                    let val1 = deref!(ptr, globals, heap, vars);
+                                    
+                                    let ptr = a-8;
+                                    let val2 = deref!(ptr, globals, heap, vars);
+
+                                    let str2 = libc::malloc(16) as *mut u64;
+                                    *str2            = val1;
+                                    *str2.offset(1)  = val2;
+                                    
+                                    registers[0] = libc::nanosleep(str1 as *const libc::timespec,
+                                                                   str2 as *mut libc::timespec)
                                         as u64;
                                     if strace {
                                         eprintln!("nanosleep({a}, {b}) -> {}", registers[0]);
+                                        stderr().flush().unwrap();
                                     }
                                 }
                             }
@@ -464,6 +525,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     registers[0] = libc::fork() as u64;
                                     if strace {
                                         eprintln!("fork() -> {}", registers[0]);
+                                        stderr().flush().unwrap();
                                     }
                                 }
                             },
@@ -474,43 +536,103 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     let b = registers[2];
                                     let c = registers[3];
                                     let d = registers[4];
+
+//                                    let a = size_of::<String>();
+
                                     registers[0] = libc::wait4(a as i32,
                                                               b as *mut i32,
                                                               c as i32,
-                                                               d as *mut libc::rusage)
+                                                              d as *mut libc::rusage)
                                         as u64;
                                     if strace {
                                         eprintln!("wait4({a}, {b}, {c}, {d}) -> {}", registers[0]);
+                                        stderr().flush().unwrap();
                                     }
                                 }
                             },
                             // execve(filename, argv, envp)
                             59 => {
-                                let a = registers[1];
+                                let a = registers[1]; // char*
                                 let b = registers[2];
                                 let c = registers[3];
+
+                                let mut fstr = get_str!(a, globals, heap, vars);
+                                let len =  fstr.len();
                                 
+                                let mut ptr = b;
+                                let mut args = vec![];
+                                loop {
+                                    let arg = deref!(ptr, globals, heap, vars);
+                                    let string = get_str!(arg, globals, heap, vars);
+
+                                    if string[0] == 'q' as u8 {
+                                        exit(42);
+                                    }
+                                    
+                                    args.push(string);
+                                    ptr += 8;
+                                    if arg == 0 {
+                                        break;
+                                    }
+                                }
+
+                                let argc = args.len();
+
+                                let mut ptr = c;
+                                let mut envs = vec![];
+                                loop {
+                                    let env = deref!(ptr, globals, heap, vars);
+                                    let string = get_str!(env, globals, heap, vars);
+                                    envs.push(string);
+                                    ptr += 8;
+                                    if env == 0 {
+                                        break;
+                                    }
+                                }
+                                
+                                let envc = args.len();
+
                                 unsafe {
-                                    let arg_ptr = libc::malloc(8 + 8 + 8 + 7) as *mut u64;
-                                    *arg_ptr.offset(0) = 1; // argc
-                                    *arg_ptr.offset(1) = arg_ptr.offset(3) as u64; // argv[0]
-                                    *arg_ptr.offset(2) = 0; // envp
-                                    let str = CString::new("./test").unwrap();
-                                    libc::strcpy(arg_ptr.offset(3) as *mut i8, str.as_ptr() as *const i8); // argc
-                                
-                                    registers[0] = libc::execve(a as *const i8,
-                                                                b as *const *const i8,
-                                                                c as *const *const i8)
-                                    as u64;
+                                    let fname_ptr = libc::malloc(len+1) as *mut i8;
+                                    libc::strcpy(fname_ptr, fstr.as_mut_ptr() as *mut i8);
+
+                                    let argv = libc::malloc((argc+1) * 8) as *mut *const i8;
+                                    for (i, mut a) in args.into_iter().enumerate() {
+                                        let arg_ptr = libc::malloc(a.len()) as *mut i8;
+                                        libc::strcpy(arg_ptr, a.as_mut_ptr() as *mut i8);
+                                        *argv.offset(i as isize) = arg_ptr;
+                                    }
+                                    *argv.offset(argc as isize) = 0 as *const i8;
+
+                                    let envp = libc::malloc((envc+1) * 8) as *mut *const i8;
+                                    for (i, mut a) in envs.into_iter().enumerate() {
+                                        let env_ptr = libc::malloc(a.len()) as *mut i8;
+                                        libc::strcpy(env_ptr, a.as_mut_ptr() as *mut i8);
+                                        *envp.offset(i as isize) = env_ptr;
+                                    }
+                                    *envp.offset(argc as isize) = 0 as *const i8;
+                                    
+                                    registers[0] = libc::execve(fname_ptr,
+                                                                argv,
+                                                                envp)
+                                        as u64;
+
+                                    if registers[0] == u64::MAX {
+                                        libc::perror("ERROR\0".as_ptr() as *const i8);
+
+                                    }
+                                    
+                                    if strace {
+                                        eprintln!("execve({fname_ptr:?}, {argv:?}, {envp:?}) -> {}", registers[0]);
+                                        stderr().flush().unwrap();
+                                    }
                                 }
-                                if strace {
-                                    eprintln!("execve({a}, {b}, {c}) -> {}", registers[0]);
-                                }
-                                unimplemented!("not the correct implementation...")
+
+                                unimplemented!("END")
                             },
-                            60 => {
-                                
-                            },
+//                            60 => {
+//                                
+//                            },
                             a => {
                                 eprintln!("FATAL: Syscall {a} not implented");
                                 exit(1);
@@ -765,3 +887,4 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
         }
     }
 }
+

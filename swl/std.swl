@@ -107,7 +107,8 @@ func env() -> [char*] {
     }
 
     int envc = i;
-    [char*] envp = alloc_array(envc * (8 + 8));
+    [char*] envp = alloc_array(envc * (8 + 8) + 8);
+    envp[0] = __unsafe_convert(0);
     int i  = 0;
     while (i < envc) {
         char *env = _args[i + argc + 1]; 
@@ -383,12 +384,17 @@ func get_line([char] buf) -> int {
     int bytes = 0;
     while (bytes < arrlen(buf)) {
         buf[bytes] = getch();
+
         if (buf[bytes] == '\n') {
+            println("RET");
             <- bytes + 1;
         } else {
+            println("HERE!");
+            println(to_string(buf[bytes].char_code()));
             bytes += 1;
         }
     }
+    println("END_OF_BUF");
     <- bytes;
 }
 

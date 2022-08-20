@@ -166,8 +166,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                                 }
                                 format!("str_{}", val.to_lowercase()
                                         .chars()
-                                        .map(|a| if a.is_alphanumeric() {a}
-                                             else {'_'})
+                                        .map(|a| format!("{}", a as u64))
                                         .collect::<String>())
                             },
                             _ => unreachable!()
@@ -405,9 +404,8 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
             .collect::<Vec<String>>().join(", ");
         ret.push_str(format!("str_{}:\n\tdq {}\n\tdb {bytes}\n",
                              a.to_lowercase().chars().
-                             map(|a| if a.is_alphanumeric()
-                                 {a} else {'_'}
-                             ).collect::<String>(), a.len()).as_str());
+                             map(|a| format!("{}", a as u64))
+                             .collect::<String>(), a.len()).as_str());
     }
 
     for (ind, a) in global_arrays.into_iter().enumerate() {

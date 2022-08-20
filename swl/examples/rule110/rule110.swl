@@ -1,0 +1,70 @@
+include "../../std.swl";
+
+func dump([bool] state) {
+    for (int i = 0; i < arrlen(state); i += 1) {
+        string str = to_string(27.to_char());
+        print(str);
+        if (state[i]) {
+            print("[42m ");
+        } else {
+            print("[0m ");
+        }
+    }
+    print("\n");
+}
+
+func clone([bool] array) -> [bool] {
+    [bool] new = alloc_array(arrlen(array));
+    for (int i = 0; i < arrlen(array); i += 1) {
+        new[i] = array[i];
+    }
+    <- new;
+}
+
+func step([bool] state) {
+    [bool] tmp = clone(state);
+    
+    for (int i = 0; i < arrlen(state); i += 1) {
+        bool l = tmp[(i - 1) % arrlen(state)];
+        bool m = tmp[(  i  ) % arrlen(state)];
+        bool r = tmp[(i + 1) % arrlen(state)];
+
+        if (l && m && r) {
+            state[i] = false;
+        } else {
+            if (l && (m == false) && (r == false)) {
+                state[i] = false;
+            } else {
+                if ((l == false) && (m == false) && (r == false)) {
+                    state[i] = false;
+                } else {
+                    state[i] = true;
+                }
+            }
+        }
+    }
+
+    free_array(tmp);
+}
+
+func main() -> int {
+    [bool] state = arr[bool, 600];
+
+    int seed = 42;
+    for (int i = 0; i < 600; i += 1) {
+        seed = 3 * seed - 1;
+        if (seed % 3 == 0) {
+            state[i] = true;
+        }
+    }
+    
+//    state[599] = true;
+
+    while (true) {
+        dump(state);
+        step(state);
+//        sleep(20);
+    }
+    
+    <- 0;
+}

@@ -229,7 +229,7 @@ func _free(int ptr) {
     int i = 0;
     while (i < _m_location) {
         m_struct index = _m_tcache[i];
-        if (ptr == index.ptr && index.is_block) {
+        if (ptr == index.ptr /*&& index.is_block*/) {
             // free it
             _m_tcache[i].is_block = false;
             // test for merge left
@@ -247,7 +247,8 @@ func _free(int ptr) {
 
             if (i == _m_location - 1) {
                 // decrement heap space
-                _sbrk(-_m_tcache[i].size);
+                // FIXME: this causes segfault
+//                _sbrk(-_m_tcache[i].size);
             }
             <-;
         }

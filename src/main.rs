@@ -162,21 +162,21 @@ fn main() {
     if checked {
         if let Ok(ast) = a {
             if verbose > 0 {
-                println!("[*] generating intermediate represantation");
+                eprintln!("[*] generating intermediate represantation");
             }
 
             let (intermediate, globals) = intermediate::gen(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
             if verbose > 2 {
-                println!("{:#?}", intermediate);
+                eprintln!("{:#?}", intermediate);
             }
 
             if ! interpret {
                 if verbose > 0 {
-                    println!("[*] generating assembly");
+                    eprintln!("[*] generating assembly");
                 }
                 let asm = generate(intermediate, &globals);
                 if verbose > 1 {
-                    println!("{}", asm);
+                    eprintln!("{}", asm);
                 }
                 
                 let mut asm_path = path.clone();
@@ -192,7 +192,7 @@ fn main() {
                 
                 // call nasm and ld
                 if verbose > 0 {
-                    println!("[*] CMD: nasm -felf64 {asm_path}");
+                    eprintln!("[*] CMD: nasm -felf64 {asm_path}");
                 }
                 
                 let nasm =  Command::new("nasm").arg("-felf64").arg(asm_path).output().unwrap();
@@ -209,7 +209,7 @@ fn main() {
                 outfile.push_str(&name);
                 
                 if verbose > 0 {
-                    println!("[*] CMD: ld -o {outfile} {obj_path}");
+                    eprintln!("[*] CMD: ld -o {outfile} {obj_path}");
                 }
                 
                 let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
@@ -220,9 +220,9 @@ fn main() {
                 
                 let time = SystemTime::now().duration_since(start_time).expect("not possible: backwards time...").as_secs_f32();
                 
-                println!("[!] compiled {filename} -> {outfile} in {time}s");
+                eprintln!("[!] compiled {filename} -> {outfile} in {time}s");
             } else {
-                println!("[*] Starting interpreter\n");
+                eprintln!("[*] Starting interpreter\n");
                 interpreter::interpret(&intermediate);
             }
         }

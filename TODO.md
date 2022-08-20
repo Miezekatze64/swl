@@ -66,6 +66,8 @@
 
 - [x] complete malloc implementation + wrapper functions
 
+- [ ] fix free() / malloc() implementation, to not return "double free or corruption"
+
 - [ ] implement some kind of dynamic array / list / vector
 
 - [x] create stdlib
@@ -74,7 +76,7 @@
 
 - [x] test sample programs (e.g. fizzbuzz)
 
-- [ ] check turing completeness (maybe implement RULE 110)
+- [x] check turing completeness (maybe implement RULE 110)
 
 - [ ] add lazy evaluated list (infinite data structures)
 

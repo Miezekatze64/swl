@@ -1,6 +1,6 @@
-// include "std.swl";
+include "std.swl";
 
 func main() -> int {
-    int a = 34;
-    <- a + (1 + 235) * 17 / 81457 % 13948;
+    sleep(1000);
+    <- 0;
 }

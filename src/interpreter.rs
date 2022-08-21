@@ -1,4 +1,4 @@
-use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read, stderr, Write}};
+use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read, stderr, Write}, time::Duration};
 use libc;
 
 use crate::{intermediate::Inst, util::{Type, PrimitiveType, BinaryOp}};
@@ -146,7 +146,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
     let mut var_offset: usize = 0;
     let mut arr_index: usize = 0;
 
-    let strace: bool = false;
+    let strace: bool = true;
 
     fds.push(FileDescriptor::STDIN);
     fds.push(FileDescriptor::STDOUT);
@@ -490,37 +490,23 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                             },
                             // nanosleep(rqtp, rmtp)
                             35 => {
-                                unsafe {
-                                    let a = registers[1];
-                                    let b = registers[2];
+                                let a = registers[1];
+                                let b = registers[2];
 
-                                    let ptr = a;
-                                    let val1 = deref!(ptr, globals, heap, vars);
-                                    
-                                    let ptr = a-8;
-                                    let val2 = deref!(ptr, globals, heap, vars);
+                                let ptr = a;
+                                let secs = deref!(ptr, globals, heap, vars);
 
-                                    let str1 = libc::malloc(16) as *mut u64;
-                                    *str1            = val1;
-                                    *str1.offset(1)  = val2;
+                                let ptr = a-8;
+                                let nsecs = deref!(ptr, globals, heap, vars);
 
-                                                                        let ptr = a;
-                                    let val1 = deref!(ptr, globals, heap, vars);
-                                    
-                                    let ptr = a-8;
-                                    let val2 = deref!(ptr, globals, heap, vars);
+                                std::thread::sleep(Duration::from_nanos(nsecs) +
+                                                   Duration::from_secs(secs));
 
-                                    let str2 = libc::malloc(16) as *mut u64;
-                                    *str2            = val1;
-                                    *str2.offset(1)  = val2;
-                                    
-                                    registers[0] = libc::nanosleep(str1 as *const libc::timespec,
-                                                                   str2 as *mut libc::timespec)
-                                        as u64;
-                                    if strace {
-                                        eprintln!("nanosleep({a}, {b}) -> {}", registers[0]);
-                                        stderr().flush().unwrap();
-                                    }
+                                registers[0] = 0;
+                                if strace {
+                                    eprintln!("nanosleep({a}, {b}) -> {}",
+                                              registers[0]);
+                                    stderr().flush().unwrap();
                                 }
                             }
                             // fork()
@@ -546,7 +532,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     registers[0] = libc::wait4(a as i32,
                                                               b as *mut i32,
                                                               c as i32,
-                                                              d as *mut libc::rusage)
+                                                              d as *mutlibc::rusage)
                                         as u64;
                                     if strace {
                                         eprintln!("wait4({a}, {b}, {c}, {d}) -> {}", registers[0]);
@@ -625,11 +611,11 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                         libc::perror("ERROR\0".as_ptr() as *const i8);
 
                                     }
-                                    
-                                    if strace {
-                                        eprintln!("execve({fname_ptr:?}, {argv:?}, {envp:?}) -> {}", registers[0]);
-                                        stderr().flush().unwrap();
-                                    }
+                                }
+
+                                if strace {
+                                    eprintln!("execve({a}, {b}, {c}) -> {}", registers[0]);
+                                    stderr().flush().unwrap();
                                 }
 
                                 unimplemented!("END")

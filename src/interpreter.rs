@@ -860,6 +860,24 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
             Inst::Else(id) => {
                 ip = find_if_else_end(intermediate, *id).1;
             },
+            Inst::DerefSet(r1, r2) => {
+                let val  = registers[*r1];
+                let val2 = registers[*r2];
+                match val & SEGMENT {
+                    GLOBAL_SEG => {
+                        for (i, a) in val2.to_le_bytes().iter().enumerate() {
+                            globals[(val & VALUE) as usize + i] =  *a;
+                        }
+                    },
+                    HEAP_SEG => {
+                        for (i, a) in val2.to_le_bytes().iter().enumerate() {
+                            let ind = (val & VALUE) as usize + i;
+                            heap[ind] = *a;
+                        }
+                    },
+                    a => unimplemented!("SEGMENT: {a}"),
+                }
+            },
         }
     }
 }

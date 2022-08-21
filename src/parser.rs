@@ -32,6 +32,7 @@ pub enum ASTNodeR {
     MemberFunction(Type, Expression, String, Vec<Expression>),
     TypeClass(String, String, Functions),
     Instance(String, Type, Vec<ASTNode>),
+    DerefSet(Expression, Expression),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -198,6 +199,9 @@ impl std::fmt::Display for ASTNodeR {
                 }
                 writeln!(f, "}}")?;
                 Ok(())
+            },
+            ASTNodeR::DerefSet(l, r) => {
+                writeln!(f, "deref {l} = {r};")
             },
         }
     }
@@ -575,6 +579,11 @@ impl Parser {
 
             // parse operation
             let tk_op = get_peek_token!(self.lexer, errors);
+
+            if seperators.contains(&tk_op.value.as_str()) {
+                self.lexer.next_token().unwrap();
+                return Ok((*nleft_expr, tk));
+            }
             
             let op = if tk_op.ttype == TokenType::Operator {
                 match Op::from_str(tk_op.value) {
@@ -1309,7 +1318,13 @@ impl Parser {
                     err_ret!(self.expect(Some(TokenType::Special), Some("}".into())), errors).value;
                     
                     return Ok(Some(ASTNode(0, ASTNodeR::Instance(name, arg, funcs))));
-                }
+                },
+                "deref" => {
+                    let lexpr = self.parse_expr(&["="])?.0;
+                    let rexpr = self.parse_expr(seperators)?.0;
+
+                    return Ok(Some(ASTNode(0, ASTNodeR::DerefSet(lexpr, rexpr))));
+                },
                 _ => {}
             },
             TokenType::Undef => return self.parse_block_statement(is_root, verbose, &[";"]),

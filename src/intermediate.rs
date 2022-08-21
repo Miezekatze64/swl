@@ -32,6 +32,7 @@ pub enum Inst {
     FuncPtr(usize, String),
     CallReg(usize),
     Else(usize),
+    DerefSet(usize, usize),
 }
 
 fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>, is_ref: bool) -> Vec<Inst> {
@@ -539,6 +540,11 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         }
         ASTNodeR::TypeClass(..) => {},
         ASTNodeR::Instance(..) => {},
+        ASTNodeR::DerefSet(l, r) =>{
+            ret.append(&mut gen_expr(l, 0, offsets, globals, &aliases, false));
+            ret.append(&mut gen_expr(r, 1, offsets, globals, &aliases, false));
+            ret.push(Inst::DerefSet(0, 1));
+        },
     }
     (ret, globals.clone())
 }

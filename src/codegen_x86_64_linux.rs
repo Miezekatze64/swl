@@ -393,6 +393,11 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 format!(";; FUNCTION ADRESS\n\tmov {r}, f_{func}\n",
                         r = register(reg))
             },
+            Inst::DerefSet(r1, r2) => {
+                let reg1 = register(r1);
+                let reg2 = register(r2);
+                format!(";; DEREF SET\n\tmov [{reg1}], {reg2}\n")
+            },
 
         }.as_str())
     }

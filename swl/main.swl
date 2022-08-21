@@ -1,6 +1,7 @@
-include "std.swl";
+// include "std.swl";
 
 func main() -> int {
-    sleep(1000);
-    <- 0;
+    int *a = ref 42;
+    deref a = 42;
+    <- deref a;
 }

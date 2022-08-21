@@ -414,7 +414,19 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 },
                 ASTNode(_, ASTNodeR::Instance(_, _, _)) => {
                     // nothing here
-                }
+                },
+                ASTNode(pos, ASTNodeR::DerefSet(lexpr, rexpr)) => {
+                    let ltype = &typecheck_expr(lexpr, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer);
+                    let rtype = &typecheck_expr(rexpr, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer);
+
+                    if let Type::Pointer(inner) = ltype {
+                        if ! inner.is_compatible(rtype, aliases) {
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types {ltype} and {rtype}")));
+                        }
+                    } else {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "cannot dereference non-pointer type {ltype}")));
+                    }
+                },
              }
         };
     }

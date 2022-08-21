@@ -814,7 +814,10 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 };
                 ip += 1;
             },
-            Inst::Deref(_) => todo!(),
+            Inst::Deref(regid) => {
+                registers[*regid] = deref!(registers[*regid], globals, heap, vars);
+                ip += 1;
+            },
             Inst::SetField(reg0, reg1, off, _) => {
                 let val = registers[*reg0] + *off as u64;
                 match val & SEGMENT {
@@ -875,8 +878,15 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                             heap[ind] = *a;
                         }
                     },
+                    VAR_SEG => {
+                        for (i, a) in val2.to_le_bytes().iter().enumerate() {
+                            let ind = (val & VALUE) as usize + i;
+                            vars[ind] = *a;
+                        }
+                    }
                     a => unimplemented!("SEGMENT: {a}"),
                 }
+                ip += 1;
             },
         }
     }

@@ -532,7 +532,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     registers[0] = libc::wait4(a as i32,
                                                               b as *mut i32,
                                                               c as i32,
-                                                              d as *mutlibc::rusage)
+                                                              d as *mut libc::rusage)
                                         as u64;
                                     if strace {
                                         eprintln!("wait4({a}, {b}, {c}, {d}) -> {}", registers[0]);

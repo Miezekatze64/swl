@@ -1,18 +1,10 @@
 /* SWL STANDARD LIBRARY */
-// used intrinsics
-intrinsic syscall      as syscall0(int index)                           -> int;
-intrinsic syscall      as syscall1(int index, int val)                  -> int;
-intrinsic syscall      as syscall2(int index, int val, int val2)        -> int;
-intrinsic syscall      as syscall3(int index, int val, int val2, int val3)
-      -> int;
-intrinsic syscall      as syscall4(int index, int val, int val2, int val3,
-    int val4)  -> int;
-intrinsic str_to_ptr   as arr2addr([char] str)                          -> int;
-intrinsic dereference  as arrlen([unchecked] str)                       -> int;
-intrinsic convert      as ptr2arr(int ptr)                       -> [unchecked];
-intrinsic convert      as __unsafe_convert(unchecked i)                 -> unchecked;
 
-intrinsic set_ptr      as set_ptr(unchecked* ptr, int val);
+include "linux.swl";
+
+// used intrinsics
+
+intrinsic set_ptr      as set_ptr(_a* ptr, int val);
 intrinsic set_ptr      as set_addr(int ptr, int val);
 
 intrinsic get_args     as __get_args()                               -> [char*];
@@ -127,136 +119,6 @@ func envp() -> char* * {
     
 /** MEMORY UTILS **/
 
-// calls the brk (break) system call, to change the current program break (start of heap) to given location
-// -------
-// args:
-//   val <- the next break location (pointer)
-// returns:
-//   if > 0: the number of bytes the break moved.
-//   if 0: the current program break
-func _brk(int val) -> int {
-    <- syscall1(12, val);
-}
-
-// moves the current program's break (start of heap) a given number of bytes
-// -------
-// args:
-//   inc <- the number of bytes to increment
-// returns:
-//   the new loctaion of the break
-func _sbrk(int inc) -> int {
-    int newbrk;
-    int curbrk = 0;
-    
-    curbrk = _brk(0);
-
-    if (inc == 0) {
-        <- curbrk;
-    }
-    
-    newbrk = curbrk + inc;
-
-    _brk(newbrk);
-
-    <- curbrk;
-}
-
-// fields used by _malloc and _free
-// _m_heap_start:
-//   contains the current start of the heap (program break)
-// _m_location:
-//   contains the last used index of the tcache
-// _m_tcache:
-//   contains current allocated (and freed + blocked) blocks of the malloc() and free() functions
-int    _m_heap_start = 0;
-int    _m_location = 0;
-[m_struct]  _m_tcache;
-
-// the structure of the tcache (one allocated or blocked block)
-// ptr:
-//    the memory location of the block
-// size:
-//    the size (in bytes) of the block
-// is_block:
-//    true if block, false if hole
-struct m_struct {
-    int ptr;
-    int size;
-    bool is_block;
-}
-
-
-// allocates given number of bytes
-// ------
-// args:
-//   size <- the number of bytes to allocate
-// returns: the address of the allocated space
-func _malloc(int size) -> int {
-    if (_m_heap_start == 0) {
-        _m_heap_start = _sbrk(0);
-        _m_tcache     = ptr2arr(_sbrk(1000 * (8 + 8 + 1)));
-    }
-
-    int i = 0;
-    while (i < _m_location) {
-        m_struct index = _m_tcache[i];
-        if (!index.is_block && index.size >= size) {
-            _m_tcache[0].is_block = true;
-            <- index.ptr;
-        }
-        i += 1;
-    }
-    
-    int ptr = _sbrk(size);
-    int current = ptr + size;
-
-    _m_tcache[_m_location] = m_struct {
-        ptr: ptr;
-        size: size;
-        is_block: true;
-    };
-
-    _m_location += 1;
-    
-    <- ptr;
-}
-
-// frees an earlier allocated block
-// ------
-// args:
-//   ptr <- the address of the block to free
-func _free(int ptr) {
-    int i = 0;
-    while (i < _m_location) {
-        m_struct index = _m_tcache[i];
-        if (ptr == index.ptr /*&& index.is_block*/) {
-            // free it
-            _m_tcache[i].is_block = false;
-            // test for merge left
-            if (i > 0) {
-                if (!_m_tcache[i - 1].is_block) {
-                    _m_tcache[i - 1].size = _m_tcache[i - 1].size + _m_tcache[i].size;
-                }
-            }
-
-            if (i < _m_location - 1) {
-                if (!_m_tcache[i + 1].is_block) {
-                    _m_tcache[i].size = _m_tcache[i + 1].size + _m_tcache[i].size;
-                }
-            }
-
-            if (i == _m_location - 1) {
-                // decrement heap space
-                // FIXME: this causes segfault
-//                _sbrk(-_m_tcache[i].size);
-            }
-            <-;
-        }
-        i += 1;
-    }
-
-    print("free: double free or corruption\n");
-}
 
 // allocates an array with a given number of bytes on the heap
 // ------
@@ -275,7 +137,10 @@ func alloc_array(int size) -> [unchecked] {
 // args:
 //   a <- the array to free
 func free_array([unchecked] a) {
-    _free(__unsafe_convert(a));
+    int ret = _free(__unsafe_convert(a));
+    if (ret == -1) {
+        print("free: double free or corruption\n");
+    }
 }
 
 // copies the contents of string b to string a (without overflow)
@@ -305,81 +170,9 @@ func strcpy_off(string a, int a_off, string b, int b_off) {
     }
 }
 
-/** SYSCALL WRAPPER FUNCTIONS (LINUX x86_64) **/
-
-// reads a given number of bytes from a given file descriptor
-// ------
-// args:
-//   fd     <- the file descriptor to read from
-//   buf    <- the buffer to read into
-//   nbytes <- the number of bytes to read
-// returns: the number of bytes read
-func read(int fd, int buf, int nbytes) -> int {
-    <- syscall3(0, fd, buf, nbytes);
-}
-
-// writes a given number of bytes to a given file descriptor
-// ------
-// args:
-//   fd     <- the file descriptor to write to
-//   buf    <- the buffer to write from
-//   nbytes <- the number of bytes to write
-// returns: the number of bytes written
-func write(int fd, int buf, int nbytes) -> int {
-    <- syscall3(1, fd, buf, nbytes);
-}
-
-// opens a file with a given path, mode, and flags
-// ------
-// args:
-//   path <- the path to the file to open
-//   mode <- the mode to open the file with
-//   flags <- the flags to open the file with
-// returns: the file descriptor of the opened file
-func open(string path, int flags, int mode) -> int {
-    <- syscall3(2, arr2addr(path), flags, mode);
-}
-
-// closes a given file descriptor
-// ------
-// args:
-//   fd <- the file descriptor to close   
-func close(int fd) {
-    syscall1(3, fd);
-}
-
-// sets the program break to a given address
-// ------
-// args:
-//   addr <- the address to set the program break to
-func brk(int addr) -> int {
-    <- syscall1(12, addr);
-}
-
-// forks a new process
-// ------
-// args:
-//   returns: the pid of the new process
-func fork() -> int {
-    <- syscall0(57);
-}
-
-// exits the current process
-// ------
-// args:
-//   status <- the status to exit with
-func exit(int status) {
-    syscall1(60, status);
-}
 
 /** IO UTILS **/
-// reads contents from stdin in a given array buffer, until it is full
-// ------
-// args:
-//   buf <- the buffer
-func input([char] buf) -> int {
-    <- read(0, arr2addr(buf), arrlen(buf));
-}
+
 
 func get_line([char] buf) -> int {
     int bytes = 0;
@@ -440,15 +233,7 @@ func eprintln([char] str) {
     print("\n");
 }
 
-// replaces the current process with the given process
-// -----
-// args:
-//   filename <- the filename of the process
-//   argv     <- args of the process
-//   envp     <- environment of the process
-func execve(string filename, [char*] argv, [char*] envp) {
-    syscall3(59, __unsafe_convert(filename.to_cstr()), __unsafe_convert(argv) + 8, __unsafe_convert(envp) + 8);
-}
+
 
 // runs a given command
 // -----
@@ -463,7 +248,7 @@ func system(string command) {
 
     int pid = fork();
     if (pid == 0) {
-        execve("/usr/bin/sh", args, env());
+        execve("/usr/bin/sh".to_cstr(), args, env());
         exit(0);
     }
     while (true) {
@@ -473,23 +258,6 @@ func system(string command) {
        }
        sleep(10);
     }
-}
-
-struct timespec {
-    int _secs;
-    int nanos;
-}
-
-// sleeps a given amount of milliseconds
-// -----
-// args:
-//   millis <- the time
-func sleep(int millis) {
-    timespec time = timespec {
-        _secs: millis / 1000;
-        nanos: (millis % 1000) * 1000000;
-    };
-    syscall2(35, __unsafe_convert(ref time),  0);
 }
 
 /** STRING UTILS **/

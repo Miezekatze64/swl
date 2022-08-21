@@ -1,29 +1,6 @@
-include "std.swl";
-
-func fizzbuzz_(int i) -> string {
-    if (i % 15 == 0) {
-        <- "FizzBuzz";
-    }
-    if (i % 5 == 0) {
-        <- "Buzz";
-    }
-    if (i % 3 == 0) {
-        <- "Fizz";
-    }
-    <- i.to_string();
-}
-
-func fizzbuzz(int max) {
-    int i = 1;
-    while (i < max) {
-        print(fizzbuzz_(i));
-        print(", ");
-        i += 1;
-    }
-    println(fizzbuzz_(max));
-}
+// include "std.swl";
 
 func main() -> int {
-    fizzbuzz(100);
-    <- 0;
+    int a = 34;
+    <- a + (1 + 235) * 17 / 81457 % 13948;
 }

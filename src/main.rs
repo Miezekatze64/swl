@@ -3,6 +3,7 @@ mod util;
 mod parser;
 mod typecheck;
 mod intermediate;
+mod optimizer;
 mod codegen_x86_64_linux;
 mod interpreter;
 
@@ -113,8 +114,8 @@ fn main() {
     }
 
     let checked: bool;
-    let mut aliases: HashMap<String, util::Type> = HashMap::new();
-    let mut globals: HashMap<String, usize> = HashMap::new();
+    let mut aliases:   HashMap<String, util::Type> = HashMap::new();
+    let mut globals:   HashMap<String, usize> = HashMap::new();
 
     if let Ok(ref mut ast) = a {
         if verbose > 1 {
@@ -160,10 +161,12 @@ fn main() {
     }
 
     if checked {
-        if let Ok(ast) = a {
+        if let Ok(mut ast) = a {
             if verbose > 0 {
                 eprintln!("[*] generating intermediate represantation");
             }
+
+            optimizer::optimize(&mut ast, &aliases);
 
             let (intermediate, globals) = intermediate::gen(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
             if verbose > 2 {

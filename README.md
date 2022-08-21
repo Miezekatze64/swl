@@ -1,6 +1,6 @@
 <span color="red">
 <b>WARNING: the compiler currently only supports LINUX x86_64 systems, for other compilation targets please add your own equivalent of <a href="https://github.com/Miezekatze64/swl/blob/main/src/codegen_x86_64_linux.rs" target="_blank">codegen_x86_64_linux.rs</a> and maybe even create a pull request.<br>
-WARNING: beacause of syscall incompatibility, new targets also have to come with their own stdlib, replacing <a href="./swl/linux.swl">linux.swl</a>`
+WARNING: beacause of syscall incompatibility, new targets also have to come with their own stdlib, replacing <a href="./swl/linux.swl">linux.swl</a>
 <br><br>
 <b>WARNING: this compiler is currently at a very, very early state of development, do not expect anything to work as you want it to....</b>
 </span>

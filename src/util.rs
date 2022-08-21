@@ -232,6 +232,14 @@ impl Type {
         }
     }
 
+    pub fn is_numeric(&self) -> bool {
+        self == &Type::Primitive(PrimitiveType::Char) || self == &Type::Primitive(PrimitiveType::Float) || self == &Type::Primitive(PrimitiveType::Int)
+    }
+
+    pub fn is_integral(&self) -> bool {
+        self == &Type::Primitive(PrimitiveType::Char) || self == &Type::Primitive(PrimitiveType::Int)
+    }
+
     pub fn is_compatible(&self, type_r: &Type, aliases: &HashMap<String, Type>)
                 -> bool {
         let a = self.dealias(aliases);

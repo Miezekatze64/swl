@@ -8,7 +8,7 @@
 
 - [x] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities
 
-- [ ] allow `deref a = val;` instead of `set_ptr(__unsafe_convert(a), val);`
+- [x] allow `deref a = val;` instead of `set_ptr(__unsafe_convert(a), val);`
 
 - [x] implement else
 

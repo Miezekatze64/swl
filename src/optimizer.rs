@@ -56,13 +56,13 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                                     expr.1 = ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), "true".to_string());
                                 }
                             },
-                            BinaryOp::BoolAnd => todo!(),
-                            BinaryOp::BoolOr => todo!(),
-                            BinaryOp::Less => todo!(),
-                            BinaryOp::LessEq => todo!(),
-                            BinaryOp::Greater => todo!(),
-                            BinaryOp::GreaterEq => todo!(),
-                            BinaryOp::Neq => todo!(),
+                            BinaryOp::BoolAnd => {},
+                            BinaryOp::BoolOr => {},
+                            BinaryOp::Less => {},
+                            BinaryOp::LessEq => {},
+                            BinaryOp::Greater => {},
+                            BinaryOp::GreaterEq => {},
+                            BinaryOp::Neq => {},
                         };
                     }
                 }
@@ -94,13 +94,13 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
             optimize_expr(e1, aliases, const_vars.clone());
             optimize_expr(e2, aliases, const_vars.clone());
         },
-        ExpressionR::UnaryOp(_, _, _) => todo!(),
+        ExpressionR::UnaryOp(_, _, _) => {},
         ExpressionR::StructLiteral(_, _) => {},
         ExpressionR::StructField(e1, _, _) => {
             optimize_expr(e1, aliases, const_vars.clone());
         },
         ExpressionR::Ref(_) => {},
-        ExpressionR::Deref(_) => todo!(),
+        ExpressionR::Deref(_) => {},
         ExpressionR::MemberFunction(_, e1, _, args) => {
             optimize_expr(e1, aliases, const_vars.clone());
             for e in args {

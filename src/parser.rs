@@ -349,6 +349,7 @@ impl Op {
                 BinaryOp::Greater | BinaryOp::GreaterEq | BinaryOp::LessEq => 1,
                 BinaryOp::Add | BinaryOp::Sub => 2,
                 BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 3,
+                // PARENS => 4
             },
             Op::Unary(un_op) => match un_op {
                 UnaryOp::Not => 0,
@@ -558,15 +559,17 @@ impl Parser {
 
         // parse left side
         let subexpr = self.parse_subexpr(seperators)?;
+
+        let tk = subexpr.1;
+        
         let mut nleft_expr = subexpr.0;
         if let ExpressionR::Undef =  nleft_expr.1  {
-            return Ok((*nleft_expr, subexpr.1));
+            return Ok((*nleft_expr, tk));
         }
-
 
         loop {
             if let Expression(_, ExpressionR::Undef, _) = *nleft_expr {
-                return Ok((*nleft_expr, subexpr.1));
+                return Ok((*nleft_expr, tk));
             }
             left_expr = nleft_expr.clone();
 
@@ -617,10 +620,11 @@ impl Parser {
             let subexpr_r = self.parse_subexpr(seperators)?;
 
             if let Expression(_, ExpressionR::Undef, _) = *subexpr_r.0 {
-                return Ok((*left_expr, subexpr.1));
+                return Ok((*left_expr,subexpr_r.1));
             }
 
             let right_expr = subexpr_r.0;
+
             nleft_expr = check_precedence_and_update(
                 op, right_expr.clone(), &mut left_expr);
         }
@@ -1462,8 +1466,11 @@ impl Parser {
             },
             TokenType::Special => match val.as_str() {
                 "(" => {
-                    let expr_ = self.parse_expr(&[")"])?.0;
-                    Ok((Box::new(self.parse_member(expr_, seperators)?), token))
+                    let (mut expr_, tk) = self.parse_expr(&[")"])?;
+                    if let ExpressionR::T(l, o, r, _) = expr_.1 {
+                        expr_.1 = ExpressionR::T(l, o, r, 4);
+                    }
+                    Ok((Box::new(self.parse_member(expr_, &[")"])?), tk))
                 },
                 "{" => {
                     // expect array definition

@@ -164,9 +164,9 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 optimize_expr(exp, aliases, const_vars.clone());
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == exp.1 {
-                    println!("ALWAYS TRUE IF!");
+                    println!("Optimizer: TODO: ALWAYS TRUE IF!");
                 } else if ExpressionR::Val(b, "false".into()) == exp.1 {
-                    println!("ALWAYS FALSE IF!");
+                    println!("Optimizer: TODO: ALWAYS FALSE IF!");
                 }
             },
 //            ASTNodeR::FunctionDecl(_, _, _, _, _) => {},
@@ -179,10 +179,10 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
             ASTNodeR::While(expr, _block) => {
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
-                    println!("CONSTANT TRUE LOOP");
+                    println!("Optimizer: TODO: CONSTANT TRUE LOOP");
                     // TODO: remove WhileCheck -> replace with direct jump in IR
                 } else if ExpressionR::Val(b, "false".into()) == expr.1 {
-                    println!("CONSTANT FALSE LOOP");
+                    println!("Optimizer: TODO: CONSTANT FALSE LOOP");
                 }
             },
             ASTNodeR::SetField(e1, _, e2, _) => {

@@ -3,9 +3,6 @@ use std::collections::HashMap;
 use crate::{parser::{ASTNode, ASTNodeR, Expression, ExpressionR}, util::{BinaryOp, PrimitiveType, Type, Op}};
 
 fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_vars: HashMap<String, (Type, String)>) {
-    //    println!(" -- CONST EVAL: {expr:#?} --");
-    let old_expr = expr.to_owned();
-    
     match &mut expr.1 {
         ExpressionR::T(ea, op_, eb, _) => {            
             optimize_expr(ea, aliases, const_vars.clone());
@@ -70,7 +67,6 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                     }
                 }
             }
-            println!("CONST EVAL: {old_expr} --> {}", expr);
         },
         ExpressionR::Val(_, _) => {},
         ExpressionR::Var(nm) => {

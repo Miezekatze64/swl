@@ -248,6 +248,12 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     BinaryOp::BoolOr  => format!(";; AND\n\tor {r0}, {r1}\n",
                                                 r0 = register_sz(reg.0, sz),
                                                 r1 = register_sz(reg.1, sz)),
+                    BinaryOp::BitwiseAnd => format!(";; BITWISE AND\n\tand {r0}, {r1}",
+                                                   r0 = register_sz(reg.0, sz),
+                                                   r1 = register_sz(reg.1, sz)),
+                    BinaryOp::BitwiseOr => format!(";; BITWISE OR\n\tor {r0}, {r1}",
+                                                   r0 = register_sz(reg.0, sz),
+                                                   r1 = register_sz(reg.1, sz)),
 
                 }
             },

@@ -193,6 +193,22 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             }
             ret.push(Inst::Field(index, offset, tp.unwrap().dealias(aliases)));
         }
+        ExpressionR::Cast(ltp, expr, rtp_) => {
+            assert!(rtp_.is_some());
+            let rtp = rtp_.unwrap();
+
+            ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, false));
+
+            let lsz = ltp.size(aliases);
+            let rsz = rtp.size(aliases);
+
+            let bits_mask = 2u32.pow(rsz as u32 * 8) - 1;
+            
+            if lsz >= rsz {
+                ret.push(Inst::Val(index+1, Type::Primitive(PrimitiveType::Int), bits_mask.to_string()));
+                ret.push(Inst::BinOp((index, index+1), 8, BinaryOp::BitwiseAnd));
+            }
+        },
     }
     ret
 }

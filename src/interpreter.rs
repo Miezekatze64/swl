@@ -283,6 +283,12 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     BinaryOp::Mod => {
                         registers[*r1] = registers[*r1] % registers[*r2];
                     },
+                    BinaryOp::BitwiseAnd => {
+                        registers[*r1] = registers[*r1] & registers[*r2];
+                    },
+                    BinaryOp::BitwiseOr => {
+                        registers[*r1] = registers[*r1] | registers[*r2];
+                    },
                     BinaryOp::Eq => {
                         let mask = ((1u128 << sz*8) - 1) as u64;
                         registers[*r1] = (registers[*r1] & mask == registers[*r2] & mask) as u64;

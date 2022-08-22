@@ -357,6 +357,8 @@ pub enum BinaryOp {
     Eq,
     BoolAnd,
     BoolOr,
+    BitwiseAnd,
+    BitwiseOr,
     Less,
     LessEq,
     Greater,
@@ -391,6 +393,8 @@ impl std::fmt::Display for BinaryOp {
             BinaryOp::Greater      => ">",
             BinaryOp::GreaterEq    => ">=",
             BinaryOp::Mod          => "%",
+            BinaryOp::BitwiseAnd   => "&",
+            BinaryOp::BitwiseOr    => "|",
             BinaryOp::BoolAnd      => "&&",
             BinaryOp::BoolOr       => "||",
         })
@@ -428,7 +432,7 @@ impl Op {
             },
             Op::Binary(bin) => match bin {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div |
-                BinaryOp::Mod => {
+                BinaryOp::Mod |  BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr => {
                     match a {
                         Type::Primitive(ref v) => {
                             match v {

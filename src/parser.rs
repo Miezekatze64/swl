@@ -54,6 +54,7 @@ pub enum ExpressionR {
     Ref(Box<Expression>),
     Deref(Box<Expression>),
     MemberFunction(Type, Box<Expression>, String, Vec<Expression>),
+    Cast(Type, Box<Expression>, Option<Type>),
 }
 
 
@@ -291,7 +292,7 @@ impl std::fmt::Display for ExpressionR {
                 }
                 write!(f, "}}")
             },
-            ExpressionR::StructField(expr, field,_) => {
+            ExpressionR::StructField(expr, field, _) => {
                 write!(f, "{expr}.{field}")
             },
             ExpressionR::Ref(expr) => {
@@ -299,6 +300,9 @@ impl std::fmt::Display for ExpressionR {
             },
             ExpressionR::Deref(expr) => {
                 write!(f, "deref {expr}")
+            },
+            ExpressionR::Cast(tp, expr, _) => {
+                write!(f, "as[{tp}, {expr}]")
             },
         }
     }
@@ -339,6 +343,8 @@ impl Op {
             ">=" => Ok(Op::Binary(BinaryOp::GreaterEq)),
             "&&" => Ok(Op::Binary(BinaryOp::BoolAnd)),
             "||" => Ok(Op::Binary(BinaryOp::BoolOr)),
+            "&" => Ok(Op::Binary(BinaryOp::BitwiseAnd)),
+            "|" => Ok(Op::Binary(BinaryOp::BitwiseOr)),
             "!"  => Ok(Op::Unary(UnaryOp::Not)),
             _ => Err((ErrorLevel::Fatal,
                      format!("FATAL: invalid operator `{s}` set from lexer"))),
@@ -351,9 +357,10 @@ impl Op {
                 BinaryOp::BoolAnd | BinaryOp::BoolOr => 0,
                 BinaryOp::Eq | BinaryOp::Neq | BinaryOp::Less |
                 BinaryOp::Greater | BinaryOp::GreaterEq | BinaryOp::LessEq => 1,
-                BinaryOp::Add | BinaryOp::Sub => 2,
-                BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 3,
-                // PARENS => 4
+                BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr => 2,
+                BinaryOp::Add | BinaryOp::Sub => 3,
+                BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 4,
+                // PARENS => 99
             },
             Op::Unary(un_op) => match un_op {
                 UnaryOp::Not => 0,
@@ -520,7 +527,8 @@ impl Parser {
                 ExpressionR::ArrAlloc(..) | ExpressionR::Index(..) |
                 ExpressionR::StructLiteral(..) | ExpressionR::StructField(..) |
                 ExpressionR::Ref(..) | ExpressionR::Deref(..) |
-                ExpressionR::MemberFunction(..) => {
+                ExpressionR::MemberFunction(..) | ExpressionR::Cast(..)
+=> {
                     true
                 },
                 ExpressionR::Undef => unreachable!(),
@@ -884,7 +892,8 @@ impl Parser {
                         return Ok(Some(ASTNode(token.pos, ASTNodeR::FunctionCall(name, args))));
                     },
                     ExpressionR::Undef => unreachable!(),
-                    ExpressionR::ArrAlloc(..) => todo!(),
+                    ExpressionR::ArrAlloc(..) => unreachable!(),
+                    ExpressionR::Cast(..) => unreachable!(),
                 }
             },
             TokenType::Eof => return Ok(None),
@@ -1449,6 +1458,22 @@ impl Parser {
                     let expr = self.parse_subexpr(seperators)?;
                     Ok((Box::new(Expression(token.pos, ExpressionR::Deref(expr.0), None)), token))
                 },
+                "as" => {
+                    err_ret!(self.expect(Some(TokenType::Special), Some("[".into())), errors);
+
+                    // parse type
+                    let tp = err_ret!(self.parse_type(), errors);
+
+                    // comma
+                    err_ret!(self.expect(Some(TokenType::Special), Some(",".into())), errors);
+
+                    // parse size
+                    let value = err_add!(self.parse_expr(&["]"]), errors).0;
+
+//                    err_ret!(self.expect(Some(TokenType::Special), Some("]".into())), errors);
+
+                    Ok((Box::new(Expression(token.pos, ExpressionR::Cast(tp, Box::new(value), None), None)), token))
+                }
                 _ => {
                     errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected keyword `{val}`")));
                     Err(errors.clone())
@@ -1483,7 +1508,7 @@ impl Parser {
                 "(" => {
                     let (mut expr_, tk) = self.parse_expr(&[")"])?;
                     if let ExpressionR::T(l, o, r, _) = expr_.1 {
-                        expr_.1 = ExpressionR::T(l, o, r, 4);
+                        expr_.1 = ExpressionR::T(l, o, r, 99);
                     }
                     Ok((Box::new(self.parse_member(expr_, &[")"])?), tk))
                 },

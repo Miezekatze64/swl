@@ -54,7 +54,7 @@ const KEYWORDS: &[&str] = &[
     "include",
     "from",
     "typeclass",
-    "instance"
+    "instance",
 ];
 
 macro_rules! ret {

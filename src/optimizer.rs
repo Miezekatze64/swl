@@ -63,6 +63,8 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                             BinaryOp::Greater => {},
                             BinaryOp::GreaterEq => {},
                             BinaryOp::Neq => {},
+                            BinaryOp::BitwiseAnd => {},
+                            BinaryOp::BitwiseOr => {},
                         };
                     }
                 }
@@ -108,6 +110,7 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
             }
             // TODO: check for constant / empty function
         },
+        ExpressionR::Cast(_, _, _) => {},
     }
 }
 

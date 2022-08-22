@@ -935,47 +935,39 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
             ExpressionR::Cast(ref tp, ref mut rexpr, _) => {
                 let rtp = typecheck_expr(rexpr, functions, generic_functions,
                                          immutable_args, errors, lexer);
-                if let Type::Primitive(ref priml) = tp {
-                    if let Type::Primitive(ref primr) = rtp {
-                        let allowed = match priml {
-                            PrimitiveType::Int =>
-                                primr == &PrimitiveType::Float ||
-                                primr == &PrimitiveType::Int ||
-                                primr == &PrimitiveType::Char ||
-                                primr == &PrimitiveType::Bool,
-                            PrimitiveType::Float =>
-                                primr == &PrimitiveType::Float ||
-                                primr == &PrimitiveType::Int ||
-                                primr == &PrimitiveType::Char ||
-                                primr == &PrimitiveType::Bool,
-                            PrimitiveType::Char =>
-                                primr == &PrimitiveType::Float ||
-                                primr == &PrimitiveType::Int ||
-                                primr == &PrimitiveType::Char ||
-                                primr == &PrimitiveType::Bool,
-                            PrimitiveType::Void => false,
-                            PrimitiveType::Unchecked => false,
-                            PrimitiveType::Bool => todo!(),
-                        };
-                        return if ! allowed {
-                            errors.push((ErrorLevel::Err,
-                                         error!(lexer, pos,
-                                                "invalid cast {rtp} -> {tp}")
-                            ));
-                            Type::Invalid
-                        } else {
-                            let rettp = tp.clone();
-                            expr.1 = ExpressionR::Cast(tp.clone(), rexpr.clone(), Some(rtp));
-                            rettp
-                        }
-                    }
+
+                let rvalid = match rtp {
+                    Type::Primitive(ref primr) => 
+                        primr == &PrimitiveType::Float ||
+                        primr == &PrimitiveType::Int ||
+                        primr == &PrimitiveType::Char ||
+                        primr == &PrimitiveType::Bool,
+                    Type::Pointer(_) => true,
+                    _ => false
+                };
+
+                let lvalid = match tp {
+                    Type::Primitive(ref priml) => 
+                        priml == &PrimitiveType::Float ||
+                        priml == &PrimitiveType::Int ||
+                        priml == &PrimitiveType::Char ||
+                        priml == &PrimitiveType::Bool,
+                    Type::Pointer(_) => true,
+                    _ => false
+                };
+                
+                let allowed = rvalid && lvalid;
+                return if ! allowed {
+                    errors.push((ErrorLevel::Err,
+                                 error!(lexer, pos,
+                                        "invalid cast {rtp} -> {tp}")
+                    ));
+                    Type::Invalid
+                } else {
+                    let rettp = tp.clone();
+                    expr.1 = ExpressionR::Cast(tp.clone(), rexpr.clone(), Some(rtp));
+                    rettp
                 }
-                errors.push((ErrorLevel::Err,
-                             error!(lexer, pos,
-                                    "non-primitive cast: consider \
-                                     using conversion functions")
-                ));
-                Type::Invalid
             },
         }}();
     let typ = tp;//expr, functions, vars, aliases, errors, lexer);

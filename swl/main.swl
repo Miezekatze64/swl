@@ -1,14 +1,5 @@
-//include "std.swl";
-
-func f(int a) {}
+include "std.swl";
 
 func main() -> int {
-//    int a = 2345;
-//    int b = 15145514;
-//    char c = as[char, a+b];
-    f(1);
-    if (1 < 2) {
-        <- (1 + 2) * 3;
-    }
-    <- 0;//as[int, c];
+    <- 0;
 }

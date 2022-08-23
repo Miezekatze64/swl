@@ -182,7 +182,7 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
             ASTNodeR::While(expr, _block) => {
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
-                    // TODO: CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
+                    // TODO(#5): CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
                 } else if ExpressionR::Val(b, "false".into()) == expr.1 {
                     // TODO: CONSTANT FALSE LOOP: remove this loop entirely
                 }

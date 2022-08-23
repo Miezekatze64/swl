@@ -184,7 +184,7 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
                     // TODO(#5): CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
                 } else if ExpressionR::Val(b, "false".into()) == expr.1 {
-                    // TODO: CONSTANT FALSE LOOP: remove this loop entirely
+                    // TODO(#6): CONSTANT FALSE LOOP: remove this loop entirely
                 }
             },
             ASTNodeR::SetField(e1, _, e2, _) => {

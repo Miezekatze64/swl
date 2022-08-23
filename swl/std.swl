@@ -24,7 +24,7 @@ alias string = [char];
 func cstrlen(char *ptr) -> int {
     int i    = 0;
     while (true) {
-        bool* _ptr = __unsafe_convert(__unsafe_convert(ptr) + i);
+        bool* _ptr = as[bool*, as[int, ptr] + i];
         if (!(deref _ptr)) {
             break;
         }
@@ -42,7 +42,7 @@ func cstr_to_str(char *cstr) -> string {
     string str = alloc_array(cstrlen(cstr));
     int i = 0;
     while (i < cstrlen(cstr)) {
-        char* _ptr = __unsafe_convert(__unsafe_convert(cstr) + i);
+        char* _ptr = as[char*, as[int, cstr] + i];
         char c = deref _ptr;
         str[i] = c;
         i += 1;
@@ -65,7 +65,8 @@ func to_cstr(string self) -> char* from string {
     int i = 0;
 
     while (i < self.len()) {
-        set_addr(ptr+i, __unsafe_convert(self[i]));
+        char *nptr = as[char*, ptr+i];
+        deref nptr = self[i];
         i += 1;
     }
 

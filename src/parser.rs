@@ -588,10 +588,10 @@ impl Parser {
             // parse operation
             let tk_op = get_peek_token!(self.lexer, errors);
 
-//            if seperators.contains(&tk_op.value.as_str()) {
-//                self.lexer.next_token().unwrap();
-//                return Ok((*nleft_expr, tk));
-//            }
+            if seperators.contains(&tk_op.value.as_str()) {
+                self.lexer.next_token().unwrap();
+                return Ok((*nleft_expr, tk_op));
+            }
             
             let op = if tk_op.ttype == TokenType::Operator {
                 match Op::from_str(tk_op.value) {

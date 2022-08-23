@@ -9,7 +9,7 @@ if [[ $1 == 'static' ]]; then
 else
     cargo build --release || exit 1
 fi
-cp ./target/release/lang ./swlc
+cp ./target/release/swl ./swlc
 
 cd "$DIR"
 if [ $# -ge 1 ]; then

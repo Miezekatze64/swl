@@ -1,5 +1,5 @@
 [package]
-name = "lang"
+name = "swl"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -8,6 +8,6 @@ publish = false
 libc = "0.2"
 
 [[bin]]
-name = "lang"
+name = "swl"
 path = "src/main.rs"
 

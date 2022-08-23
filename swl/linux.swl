@@ -4,7 +4,7 @@ alias string = [char];
 
 intrinsic convert      as __unsafe_convert(_a i)                        -> unchecked;
 intrinsic dereference  as arrlen([unchecked] str)                       -> int;
-intrinsic str_to_ptr   as arr2addr([char] str)                          -> int;
+intrinsic str_to_ptr   as arr2addr([unchecked] str)                     -> int;
 intrinsic convert      as ptr2arr(int ptr)                              -> [unchecked];
 intrinsic syscall      as syscall0(int index)                           -> int;
 intrinsic syscall      as syscall1(int index, int val)                  -> int;

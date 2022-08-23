@@ -58,6 +58,7 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                                     ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), "false".to_string())
                                 }
                             },
+                            // TODO(#8): add missing operations to optimizer
                             BinaryOp::BoolAnd => {},
                             BinaryOp::BoolOr => {},
                             BinaryOp::Less => {},

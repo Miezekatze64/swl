@@ -419,7 +419,7 @@ func max(int a, int b) -> int {
 }
 
 // asserts a given condition is true and panics if not
-// TODO: replace this with a macro, when there are implemented
+// TODO(#7): replace assert() with a macro, when there are implemented
 // -----
 // args:
 //   cond <- the condition to be checked

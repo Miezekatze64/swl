@@ -3,6 +3,7 @@ use {crate::{intermediate::Inst,
      std::{fmt::Write, collections::HashMap}
 };
 
+// TODO: move this function into an own x86_64 file, without OS specific code
 pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 
     let datatype = |a: usize| match a {

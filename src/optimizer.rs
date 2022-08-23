@@ -85,11 +85,9 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                 optimize_expr(e, aliases, const_vars.clone());
             }
 
-//            if let ExpressionR::Var(name) = e1 {
-//                
-//            }
-            
-            // TODO: check for constant / empty function
+            // TODO: check for constant / empty functions for further optimization
+            // TODO: check if `f` is a pure function
+            // ^^^^ implement at F(), FunctionCall() as well as MemberFunction()
         },
         ExpressionR::Arr(_) => {},
         ExpressionR::Undef => {},
@@ -110,7 +108,6 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
             for e in args {
                 optimize_expr(e, aliases, const_vars.clone());
             }
-            // TODO: check for constant / empty function
         },
         ExpressionR::Cast(_, _, _) => {},
     }
@@ -163,7 +160,6 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 for a in args {
                     optimize_expr(a, aliases, const_vars.clone());
                 }
-                // TODO: check if `f` is guaranteed to be pure
             },
             ASTNodeR::If(exp, fst, snd) => {
                 optimize_expr(exp, aliases, const_vars.clone());
@@ -186,10 +182,9 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
             ASTNodeR::While(expr, _block) => {
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
-                    println!("Optimizer: TODO: CONSTANT TRUE LOOP");
-                    // TODO: remove WhileCheck -> replace with direct jump in IR
+                    // TODO: CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
                 } else if ExpressionR::Val(b, "false".into()) == expr.1 {
-                    println!("Optimizer: TODO: CONSTANT FALSE LOOP");
+                    // TODO: CONSTANT FALSE LOOP: remove this loop entirely
                 }
             },
             ASTNodeR::SetField(e1, _, e2, _) => {
@@ -209,7 +204,6 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 optimize_expr(expr, aliases, const_vars.clone());
             },
             ASTNodeR::FunctionDecl(_, _, _, _, block) => {
-                // TODO: some checks
                 optimize(block, aliases);
             },
             _ => {}

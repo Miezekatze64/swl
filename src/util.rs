@@ -73,7 +73,6 @@ impl std::fmt::Display for ErrorLevel {
 }
 
 pub fn is_valid_type(val: &str) -> bool {
-    // TODO: check for custom types
     val == "int" || val == "float" || val == "char" ||
         val == "void" || val == "bool" || val == "unchecked"
 }
@@ -274,7 +273,6 @@ impl Type {
                     let mut comp = true;
                     for (string, typ) in a_fields.iter() {
                         if ! b_fields.contains_key(string) {
-                            // TODO: Error
                             return false;
                         }
                         comp &= typ.0.is_compatible(&b_fields[string].0,
@@ -282,7 +280,6 @@ impl Type {
                     }
                     for (string, _) in b_fields {
                         if ! a_fields.contains_key(&string) {
-                            // TODO: Error
                             return false;
                         }
                     }

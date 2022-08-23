@@ -13,6 +13,7 @@ use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
           time::SystemTime};
 
 /// Enum representing possible target types
+// TODO: parse target types (-t/--target)
 #[allow(unused)]
 enum Target {
     Linux,

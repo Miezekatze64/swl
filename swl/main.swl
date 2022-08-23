@@ -1,5 +1,7 @@
 include "std.swl";
 
 func main() -> int {
-    <- 0;
+    char *s = ref 'c';
+    deref s = 'a';
+    <- as[int, deref s];
 }

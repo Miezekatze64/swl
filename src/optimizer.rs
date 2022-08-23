@@ -210,8 +210,14 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
         }
     }
 
+    // sort by index
+    to_remove.sort();
+    // removing to avoid shifting issues
+    to_remove = to_remove.into_iter().rev().collect();
+
     for a in to_remove {
-        vec.remove(a);
+        let rmd = vec.remove(a);
+        println!("Removing {a}: {rmd}");
     }
 }
 

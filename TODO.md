@@ -18,6 +18,12 @@
 
 - [x] make all functions first-class
 
+- [ ] add REPL to interpreter
+
+- [ ] remove syscall() intrinsic -> create more abstract intrinsics (e. g. exec()) -> make interpreter platform independent
+
+- [ ] add FreeBSD (and maybe windows) targets
+
 - [ ] implement lambda functions
 
 - [x] check for redefined functions
@@ -61,8 +67,6 @@
 - [ ] add macro system / preprocessor
 
 - [ ] add useful comments
-
-- [ ] add REPL to interpreter
   
   ## SWL
 

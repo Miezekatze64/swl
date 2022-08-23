@@ -1,5 +1,5 @@
 include "../../std.swl";
-char NULL = __unsafe_convert(0);
+char NULL = as[char, 0];
     
 func main() -> int {
     string buf = arr[char, 100];

@@ -65,13 +65,12 @@ func to_cstr(string self) -> char* from string {
     int i = 0;
 
     while (i < self.len()) {
-        char *nptr = as[char*, ptr+i];
-        deref nptr = self[i];
+        deref (as[char*, ptr+i]) = self[i];
         i += 1;
     }
 
-    set_addr(ptr+self.len(), 0);
-    <- __unsafe_convert(ptr);
+    deref as[char*, ptr+self.len()] = as[char, 0];
+    <- as[char*, ptr];
 }
 
 // returns the program's arguments as a char* array
@@ -92,7 +91,7 @@ func env() -> [char*] {
     
     while (true) {
         char *ptr = _args[i + argc + 1];
-        int iptr  = __unsafe_convert(ptr);
+        int iptr  = as[int, ptr];
         if (iptr == 0) {
             break;
         }
@@ -101,7 +100,7 @@ func env() -> [char*] {
 
     int envc = i;
     [char*] envp = alloc_array(envc * (8 + 8) + 8);
-    envp[0] = __unsafe_convert(0);
+    envp[0] = as[char*, 0];
     int i  = 0;
     while (i < envc) {
         char *env = _args[i + argc + 1]; 
@@ -114,8 +113,8 @@ func env() -> [char*] {
 // returns the program's environment as a char* pointer
 // -----
 // returns: the environment
-func envp() -> char* * {
-    <- __unsafe_convert(__unsafe_convert(env()) + 8);
+func envp() -> char** {
+    <- as[char**, arr2addr(env())];
 }
     
 /** MEMORY UTILS **/
@@ -128,7 +127,7 @@ func envp() -> char* * {
 // returns: an array at the newly allocated space
 func alloc_array(int size) -> [unchecked] {
     int ptr     = _malloc(8+size);
-    set_addr(ptr, size);
+    deref as[int*, ptr] = size;
     [int] array = ptr2arr(ptr);
     <- array;
 }
@@ -245,7 +244,7 @@ func system(string command) {
     args[0] = "/usr/bin/sh".to_cstr();
     args[1] = "-c".to_cstr();
     args[2] = command.to_cstr();
-    args[3] = __unsafe_convert(0);
+    args[3] = as[char*, 0];
 
     int pid = fork();
     if (pid == 0) {
@@ -267,14 +266,14 @@ func system(string command) {
 // -------
 // returns: the char code
 func char_code(char self) -> int from char {
-    <- __unsafe_convert(self);
+    <- as[int, self];
 }
 
 // convert given char code (ASCII) to a character
 // -------
 // returns: the char
 func to_char(int self) -> char from int {
-    <- __unsafe_convert(self);
+    <- as[char, self];
 }
 
 // func format(string str)

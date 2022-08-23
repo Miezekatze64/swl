@@ -219,7 +219,10 @@ func input([char] buf) -> int {
 //   argv     <- args of the process
 //   envp     <- environment of the process
 func execve(char *filename, [char*] argv, [char*] envp) {
-    syscall3(59, __unsafe_convert(filename), __unsafe_convert(argv) + 8, __unsafe_convert(envp) + 8);
+    int fn   = as[int, filename];
+    int argp = arr2addr(argv);
+    int envv = arr2addr(envp);
+    syscall3(59, fn, argp, envv);
 }
 
 
@@ -237,5 +240,5 @@ func sleep(int millis) {
         _secs: millis / 1000;
         nanos: (millis % 1000) * 1000000;
     };
-    syscall2(35, __unsafe_convert(ref time),  0);
+    syscall2(35, as[int, ref time],  0);
 }

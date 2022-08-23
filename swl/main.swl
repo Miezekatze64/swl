@@ -1,9 +1,10 @@
 // include "std.swl";
 
 func main() -> int {
-    int i = 42;
-    i += 0;
-    int j = 43;
-    j *= 1;
+    int i = 35;
+    while (false) {
+        i += 42;
+    }
+    int j = 34;
     <- i + j;
 }

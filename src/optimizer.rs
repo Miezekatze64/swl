@@ -180,11 +180,12 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 optimize_expr(c, aliases, const_vars.clone());
             },
             ASTNodeR::While(expr, _block) => {
+                optimize_expr(expr, aliases, const_vars.clone());
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
                     // TODO(#5): CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
                 } else if ExpressionR::Val(b, "false".into()) == expr.1 {
-                    // TODO(#6): CONSTANT FALSE LOOP: remove this loop entirely
+                    to_remove.push(i);
                 }
             },
             ASTNodeR::SetField(e1, _, e2, _) => {

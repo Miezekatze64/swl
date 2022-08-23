@@ -4,7 +4,7 @@
 
 <!-- - [ ] IMPORTANT -- FIX ORDER OF STRUCT FIELDS!!! -- IMPORTANT -->
 
-- [ ] add casting
+- [x] add casting
 
 - [x] finish `ref` and `deref` implementation + implement `is_ref` for all possibilities
 
@@ -21,8 +21,6 @@
 - [ ] implement lambda functions
 
 - [x] check for redefined functions
-
-- [ ] disallow redefinition of vars in same scope
 
 - [x] ensure that innermost var definition is used
 
@@ -58,11 +56,13 @@
 
 - [ ] add support for functional concepts
 
-- [ ] create code optimizer
+- [x] create code optimizer
 
 - [ ] add macro system / preprocessor
 
 - [ ] add useful comments
+
+- [ ] add REPL to interpreter
   
   ## SWL
 

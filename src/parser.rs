@@ -497,6 +497,9 @@ impl Parser {
             }
             let token = get_peek_token!(self.lexer, errors);
             if token.ttype == TokenType::Eof {
+                if ! is_root {
+                    errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected end-of-file")));
+                }
                 break;
             }
         }

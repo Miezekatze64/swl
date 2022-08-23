@@ -1,5 +1,7 @@
 include "std.swl";
 
 func main() -> int {
-    <- 0;
+    if (1 == 2) {
+        <- 0;
+    }
 }

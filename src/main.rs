@@ -1,3 +1,4 @@
+// including used modules
 mod lexer;
 mod util;
 mod parser;
@@ -7,9 +8,11 @@ mod optimizer;
 mod codegen_x86_64_linux;
 mod interpreter;
 
+// including used stdlib function
 use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
           time::SystemTime};
 
+/// Enum representing possible target types
 #[allow(unused)]
 enum Target {
     Linux,
@@ -19,6 +22,7 @@ enum Target {
     Wasm,
 }
 
+/// The main function of the compiler
 fn main() {
     let start_time = SystemTime::now();
     
@@ -27,6 +31,7 @@ fn main() {
 
     let mut error: bool = false;
 
+    // parse arguments
     let vec: Vec<String> = args_.collect();
     let (pos_args, gnu_args, unix_args) = match util::parse_args(vec) {
         Ok(a) => a,
@@ -36,8 +41,10 @@ fn main() {
         },
     };
 
+    // temporarily fix target to Linux
     let target = Target::Linux;
 
+    // get architecture-specific functions
     let arch_result = match target {
         Target::Linux => {
             Ok((codegen_x86_64_linux::intrinsics, codegen_x86_64_linux::generate))
@@ -56,6 +63,7 @@ fn main() {
         },
     };
 
+    // check for errors
     let (intrinsics, generate) = match arch_result {
         Ok(a) => a,
         Err(e) => {
@@ -65,6 +73,7 @@ fn main() {
     };
     
 
+    // parse arguments
     let verbose = if gnu_args.contains_key("verbose") {
         &gnu_args["verbose"]
     } else if unix_args.contains_key(&'v') {
@@ -83,7 +92,10 @@ fn main() {
         },
     };
 
+    // get directory of program
     let path: String = filename.chars().rev().skip_while(|x| x != &'/').collect::<String>().chars().rev().collect();
+
+    // check for output arg
     let name: String =  if gnu_args.contains_key("output") {
         gnu_args["output"].clone()
     } else if unix_args.contains_key(&'o') {
@@ -91,10 +103,12 @@ fn main() {
     } else {
         filename.chars().rev().skip_while(|x| x != &'.').skip(1).take_while(|x| x != &'/').collect::<String>().chars().rev().collect()
     };
+
     if verbose > 2 {
         println!("PATH: {path}, NAME: {name}");
     }
 
+    // construct parser
     let mut parser = parser::Parser::new(filename.clone(), verbose).unwrap_or_else(|a| {
         eprintln!("Error reading file: {}", a);
         exit(1);
@@ -104,6 +118,7 @@ fn main() {
         eprintln!("[*] generating AST");
     }
 
+    // parse the file
     let mut a = parser.parse(verbose);
     if let Err(ref e) = a {
         for a in e {
@@ -127,6 +142,8 @@ fn main() {
         if verbose > 0 {
             eprintln!("[*] type-checking");
         }
+
+        // typecheck the AST
         match typecheck::check(ast, parser.lexer.clone(), intrinsics) {
             Err((e, a, g)) => {
                 for a in e.iter() {
@@ -166,6 +183,7 @@ fn main() {
                 eprintln!("[*] generating intermediate represantation");
             }
 
+            // optimize AST
             optimizer::optimize(&mut ast, &aliases);
 
             let (intermediate, globals) = intermediate::gen(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
@@ -174,6 +192,7 @@ fn main() {
             }
 
             if ! interpret {
+                // generate assembly
                 if verbose > 0 {
                     eprintln!("[*] generating assembly");
                 }
@@ -193,7 +212,7 @@ fn main() {
                     },
                 };
                 
-                // call nasm and ld
+                // call nasm and ld -> ELF file
                 if verbose > 0 {
                     eprintln!("[*] CMD: nasm -felf64 {asm_path}");
                 }
@@ -225,13 +244,14 @@ fn main() {
                 
                 eprintln!("[!] compiled {filename} -> {outfile} in {time}s");
             } else {
+                // interpret file
                 eprintln!("[*] Starting interpreter\n");
                 interpreter::interpret(&intermediate);
             }
         }
     }
 
-
+    // return 1 on error
     if error {
         exit(1);
     }

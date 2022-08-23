@@ -248,10 +248,10 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     BinaryOp::BoolOr  => format!(";; AND\n\tor {r0}, {r1}\n",
                                                 r0 = register_sz(reg.0, sz),
                                                 r1 = register_sz(reg.1, sz)),
-                    BinaryOp::BitwiseAnd => format!(";; BITWISE AND\n\tand {r0}, {r1}",
+                    BinaryOp::BitwiseAnd => format!(";; BITWISE AND\n\tand {r0}, {r1}\n",
                                                    r0 = register_sz(reg.0, sz),
                                                    r1 = register_sz(reg.1, sz)),
-                    BinaryOp::BitwiseOr => format!(";; BITWISE OR\n\tor {r0}, {r1}",
+                    BinaryOp::BitwiseOr => format!(";; BITWISE OR\n\tor {r0}, {r1}\n",
                                                    r0 = register_sz(reg.0, sz),
                                                    r1 = register_sz(reg.1, sz)),
 
@@ -319,7 +319,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                     string.push_str(";; ARRAY INDEX\n");
                     let rr = register(sz_vec.len());
                     string.push_str(format!(
-                        "\tadd {r1}, 8\n\tadd {r1},{r0}\n\tmov {rr}, rbx\n")
+                        "\tadd {r1}, 8\n\tadd {r1}, {r0}\n\tmov {rr}, {r1}\n")
                                     .as_str());
                     let mut offset = 0;
                     for (off, sz) in sz_vec.iter().enumerate() {

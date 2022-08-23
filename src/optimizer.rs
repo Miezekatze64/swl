@@ -86,7 +86,7 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
             }
 
             // TODO(#3): check for constant / empty functions for further optimization
-            // TODO: check for pure function for further optimization
+            // TODO(#4): check for pure function for further optimization
             // ^^^^ implement at F(), FunctionCall() as well as MemberFunction()
         },
         ExpressionR::Arr(_) => {},

@@ -2,6 +2,6 @@ include "std.swl";
 
 func main() -> int {
     if (1 == 2) {
-        <- 0;
+        <- 42;
     }
 }

@@ -436,7 +436,7 @@ fn check_ret_path(statement: &ASTNode) -> bool {
     match &statement.1 {
         ASTNodeR::If(_, block, block2) => {
             if block2.is_none() {
-                check_ret_path(block)
+                false
             } else {
                 check_ret_path(block) && check_ret_path(block2.as_ref().unwrap())
             }

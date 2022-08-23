@@ -1326,13 +1326,13 @@ impl Parser {
                     // expect }
                     err_ret!(self.expect(Some(TokenType::Special), Some("}".into())), errors).value;
                     
-                    return Ok(Some(ASTNode(0, ASTNodeR::Instance(name, arg, funcs))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Instance(name, arg, funcs))));
                 },
                 "deref" => {
                     let lexpr = self.parse_expr(&["="])?.0;
                     let rexpr = self.parse_expr(seperators)?.0;
 
-                    return Ok(Some(ASTNode(0, ASTNodeR::DerefSet(lexpr, rexpr))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::DerefSet(lexpr, rexpr))));
                 },
                 _ => {}
             },

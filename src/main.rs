@@ -22,6 +22,22 @@ enum Target {
     Wasm,
 }
 
+const COLOR_RED:   &'static str = "\x1b[31m";
+const COLOR_GREEN: &'static str = "\x1b[32m";
+const COLOR_YELLOW: &'static str = "\x1b[33m";
+const COLOR_RESET: &'static str = "\x1b[0m";
+
+/// Returns the usage of the compiler as a string
+fn usage(prog_name: String) -> String {
+    format!("{COLOR_GREEN}Usage: {prog_name} <file> [OPTIONS]{COLOR_RESET}\n\
+             Options:\n\
+             \t--verbose   | -v {COLOR_YELLOW}=>{COLOR_RESET} set verbosity level\n\
+             \t--output    | -o {COLOR_YELLOW}=>{COLOR_RESET} set output filename\n\
+             \t--help      | -h {COLOR_YELLOW}=>{COLOR_RESET} display this help message and exit\n\
+             \t--interpret | -i {COLOR_YELLOW}=>{COLOR_RESET} interpret program instead of compiling\n\
+             ")
+}
+
 /// The main function of the compiler
 fn main() {
     let start_time = SystemTime::now();
@@ -74,6 +90,11 @@ fn main() {
     
 
     // parse arguments
+    if gnu_args.contains_key("help") || unix_args.contains_key(&'h') {
+        eprintln!("{}", usage(arg0));
+        exit(0);
+    }
+    
     let verbose = if gnu_args.contains_key("verbose") {
         &gnu_args["verbose"]
     } else if unix_args.contains_key(&'v') {
@@ -87,7 +108,7 @@ fn main() {
     let filename: String = match pos_args.get(0) {
         Some(a) => a.to_string(),
         None => {
-            eprintln!("{esc}[31mERROR: <filename> not given\n{esc}[0mUsage: {arg0} {esc}[31m<filename>{esc}[0m", esc = 27 as char);
+            eprintln!("{COLOR_RED}ERROR: <filename> not given{COLOR_RESET}\n{}", usage(arg0));
             exit(1);
         },
     };

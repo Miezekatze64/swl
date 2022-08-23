@@ -20,20 +20,20 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 - run the compiler
 
 ```shell
-  cargo run --release main.swl
+  ./build main.swl
 ```
 
 - run interpreted mode (EXPERIMENTAL, NOT FINISHED)
 
 ```shell
-  cargo run --release main.swl -i
+  ./build main.swl -i
 ```
 
 # Primitive Types:
 
-- int     (64 bit signed integer)
+- int (64 bit signed integer)
 
-- float  (not fully implemented)
+- float (not fully implemented)
 
 - bool (8 bit, 0 or 1)
 
@@ -80,7 +80,6 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
     if (1 == 1) {
         println("is true");
     } else {
-        <span class="code-comment">// else is currently not implemented..., but will be soon</span>
         println("THIS IS NOT POSSIBLE");
     }
     ```
@@ -154,9 +153,9 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
   
   func to_string(bool self) -> string from bool {
       if (self) {
-          return "true";
+          <- "true";
       }
-      return "false";
+      <- "false";
   }
   
   func main() -> int {
@@ -193,10 +192,20 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
       }
   }
   ```
+  
+- Type-Casting:
+  ```swl
+  // as[type, expression]
+  int i = as[int, 'c'];
+  int addr = as[int, ref i];
+  // ...
+  ```
+
 
 - Loading of compiler intrinsics (should only be used in stdlib..):
   
   ```swl
+  // consider using casts instead
   intrinsic convert as __unsafe_convert(unchecked) -> unchecked;
   ```
 
@@ -205,16 +214,16 @@ WARNING: beacause of syscall incompatibility, new targets also have to come with
 # Hello World
 
 ```swl
-// include standard library
-include "std.swl"
-
-// declaration of main entrypoint
-func main() -> int {
-    // call `println` function
+  // include standard library
+  include "std.swl"
+  
+  // declaration of main entrypoint
+  func main() -> int {
+    // call `println` function from `std.swl`
     println("Hello, World!");
     // return success
     <- 0;
-}
+  }
 ```
 
 - more examples are located in the [swl/examples](./swl/examples) directory

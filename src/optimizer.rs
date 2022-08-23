@@ -52,8 +52,10 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
                                 }
                             },
                             BinaryOp::Eq => {
-                                if ta == tb && va == vb {
-                                    expr.1 = ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), "true".to_string());
+                                expr.1 = if ta == tb && va == vb {
+                                    ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), "true".to_string())
+                                } else {
+                                    ExpressionR::Val(Type::Primitive(PrimitiveType::Bool), "false".to_string())
                                 }
                             },
                             BinaryOp::BoolAnd => {},
@@ -163,13 +165,15 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 }
                 // TODO: check if `f` is guaranteed to be pure
             },
-            ASTNodeR::If(exp, _, _) => {
+            ASTNodeR::If(exp, fst, snd) => {
                 optimize_expr(exp, aliases, const_vars.clone());
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == exp.1 {
-                    println!("Optimizer: TODO: ALWAYS TRUE IF!");
+                    *a = *fst.clone();
                 } else if ExpressionR::Val(b, "false".into()) == exp.1 {
-                    println!("Optimizer: TODO: ALWAYS FALSE IF!");
+                    if snd.is_some() {
+                        *a = *snd.clone().unwrap();
+                    }
                 }
             },
 //            ASTNodeR::FunctionDecl(_, _, _, _, _) => {},

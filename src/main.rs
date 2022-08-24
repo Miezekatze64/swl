@@ -265,6 +265,9 @@ fn main() {
                     let lib_path = Path::new(&path_str);
                     if lib_path.exists() {
                         linked_files.push(lib_path.to_str().unwrap().to_string());
+                    } else {
+                        eprintln!("ERROR: Unknown shared library: {lib}");
+                        exit(1);
                     }
                 }
 

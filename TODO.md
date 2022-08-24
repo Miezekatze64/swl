@@ -18,7 +18,7 @@
 
 - [x] make all functions first-class
 
-- [ ] add library linking (calling of external c functions)
+- [x] add library linking (calling of external c functions)
 
 - [ ] add REPL to interpreter
 

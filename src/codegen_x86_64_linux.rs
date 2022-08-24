@@ -9,7 +9,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
     let datatype = |a: usize| match a {
         0|1 => "byte",
         2 => "word",
-        4 => "word",
+        4 => "dword",
         8 => "qword",
         _ => "__invalid__"
     };
@@ -80,8 +80,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
               ");
 
     let mut intrinsic_labels: Vec<String> = vec![];
-
     let mut arr_index: usize = 0;
+
+    let mut set_indicies = vec![];
 
     for a in insts {
         ret.push_str(match a {
@@ -91,6 +92,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 let mut vec: Vec<(usize, String)> = offsets.iter().
                     map(|(x, (o, _))| (*o, x.clone())).collect();
                 vec.sort();
+                set_indicies.clear();
 
                 for (index, a) in (0..offsets.len()).enumerate() {
                     let mut sz = offsets[&vec[a].1].1;
@@ -247,9 +249,11 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                                                   r0 = register_sz(reg.0, sz),
                                                   r1 = register_sz(reg.1, sz),
                                                   rr = register_sz(reg.0, 1)),
-                    BinaryOp::Mod => format!(";; MOD\n\tmov rax, {r0}\n\txor \
-                                             rdx, rdx\n\tdiv {r1}\n\tmov {r0},\
-                                             rdx\n",
+                    BinaryOp::Mod => format!(";; MOD\n\tmov {rax}, {r0}\n\txor \
+                                             {rdx}, {rdx}\n\tdiv {r1}\n\tmov {r0},\
+                                             {rdx}\n",
+                                            rax = register_sz(0, sz),
+                                            rdx = register_sz(3, sz),
                                             r0 = register_sz(reg.0, sz),
                                             r1 = register_sz(reg.1, sz)),
                     BinaryOp::BoolAnd  => format!(";; AND\n\tand {r0}, {r1}\n",
@@ -268,9 +272,16 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 }
             },
             Inst::VarSet(reg, sz, index) => {
-                format!(";; SET VAR {index}\n\tsub rsp, {ind_aligned}\n\tmov {tp} \
-                         [rbp-{ind}], {}\n",
-                        register_sz(reg, sz), ind_aligned = (index / 16 + 1) * 16, ind = index, tp = datatype(sz))
+                if ! set_indicies.contains(&index) {
+                    set_indicies.push(index);
+                    format!(";; SET VAR {index}\n\tsub rsp, {ind_aligned}\n\tmov {tp} \
+                             [rbp-{ind}], {}\n",
+                            register_sz(reg, sz), ind_aligned = (index / 16 + 1) * 16, ind = index, tp = datatype(sz))
+                } else {
+                    format!(";; SET VAR {index}\n\tmov {tp} \
+                             [rbp-{ind}], {}\n",
+                            register_sz(reg, sz), ind = index, tp = datatype(sz))
+                }
             },
             Inst::Var(reg, index, sz, is_ref) => {
                 if is_ref {

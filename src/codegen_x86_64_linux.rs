@@ -155,6 +155,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                     Type::Primitive(a) => {
                         match a {
                             PrimitiveType::Int => val.clone(),
+                            PrimitiveType::Long => val.clone(),
                             PrimitiveType::Float => unimplemented!(),
                             PrimitiveType::Char => {
                                 format!("{}", val.as_bytes()[0])

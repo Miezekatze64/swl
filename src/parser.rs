@@ -333,6 +333,7 @@ impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             TokenType::Int => "integer literal",
+            TokenType::Long => "long literal",
             TokenType::Bool => "boolean literal",
             TokenType::Float => "floating-point literal",
             TokenType::Char => "character literal",
@@ -816,7 +817,7 @@ impl Parser {
 
 
         match token.ttype {
-            TokenType::Int | TokenType::Float | TokenType::Char |
+            TokenType::Int | TokenType::Long | TokenType::Float | TokenType::Char |
             TokenType::String | TokenType::Bool => {
                 errors.push((ErrorLevel::Err,
                              error!(self.lexer, token.pos, "invalid literal")));
@@ -1398,7 +1399,7 @@ impl Parser {
         let val = token.clone().value;
 
         let res = match token.ttype {
-            TokenType::Int | TokenType::Float | TokenType::Ident | TokenType::Type | TokenType::Keyword | TokenType::String | TokenType::Char | TokenType::Bool => {
+            TokenType::Int | TokenType::Long | TokenType::Float | TokenType::Ident | TokenType::Type | TokenType::Keyword | TokenType::String | TokenType::Char | TokenType::Bool => {
                 errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected construct `{ident} {val}`, BlockStatement expected")));
                 Err(errors.clone())
             }
@@ -1530,6 +1531,11 @@ impl Parser {
             },
             TokenType::Int => {
                 let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Int), val), None);
+                Ok((Box::new(self.parse_member(expr_, seperators)?), token))
+
+            },
+            TokenType::Long => {
+                let expr_ = Expression(token.pos, ExpressionR::Val(Type::Primitive(PrimitiveType::Long), val), None);
                 Ok((Box::new(self.parse_member(expr_, seperators)?), token))
 
             },

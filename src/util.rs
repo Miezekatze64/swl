@@ -74,7 +74,7 @@ impl std::fmt::Display for ErrorLevel {
 
 pub fn is_valid_type(val: &str) -> bool {
     val == "int" || val == "float" || val == "char" ||
-        val == "void" || val == "bool" || val == "unchecked"
+        val == "void" || val == "bool" || val == "unchecked" || val == "long"
 }
 
 
@@ -148,11 +148,12 @@ impl std::fmt::Display for Type {
         f.write_str(match self {
             Type::Primitive(a) => match a {
                 PrimitiveType::Int => "int",
+                PrimitiveType::Long => "long",
                 PrimitiveType::Float => "float",
                 PrimitiveType::Char => "char",
                 PrimitiveType::Void => "void",
                 PrimitiveType::Bool => "bool",
-                PrimitiveType::Unchecked => "unchecked"
+                PrimitiveType::Unchecked => "unchecked",
             }.into(),
             Type::Custom(s) => s.clone(),
             Type::Array(a) => {
@@ -298,7 +299,8 @@ impl Type {
     pub fn size(&self, aliases: &HashMap<String, Type>) -> usize {
         match self {
             Type::Primitive(a) => match a {
-                PrimitiveType::Int => 8,
+                PrimitiveType::Int => 4,
+                PrimitiveType::Long => 8,
                 PrimitiveType::Float => 8,
                 PrimitiveType::Char => 1,
                 PrimitiveType::Void => 0,
@@ -433,10 +435,12 @@ impl Op {
                     match a {
                         Type::Primitive(ref v) => {
                             match v {
-                                PrimitiveType::Int => {
+                                PrimitiveType::Int | PrimitiveType::Long => {
                                     let rb = b.dealias(aliases);
                                     if rb == Type::Primitive(PrimitiveType::Int) || rb == Type::Primitive(PrimitiveType::Char) {
                                         a.clone()
+                                    } else if rb == Type::Primitive(PrimitiveType::Long) {
+                                        rb.clone()
                                     } else {
                                         Type::Invalid
                                     }
@@ -466,7 +470,7 @@ impl Op {
                 BinaryOp::Less | BinaryOp::Greater | BinaryOp::LessEq |
                 BinaryOp::GreaterEq => match a {
                     Type::Primitive(ref p) => match p {
-                        PrimitiveType::Int | PrimitiveType::Float |
+                        PrimitiveType::Int | PrimitiveType::Float | PrimitiveType::Long | 
                         PrimitiveType::Char => if a.is_compatible(b, aliases) {
                             Type::Primitive(PrimitiveType::Bool)
                         } else {
@@ -500,6 +504,7 @@ pub fn parse_type(string: String) -> Option<Type> {
     }
     match string.as_str() {
         "int"       => Some(Type::Primitive(PrimitiveType::Int)),
+        "long"      => Some(Type::Primitive(PrimitiveType::Long)),
         "float"     => Some(Type::Primitive(PrimitiveType::Float)),
         "char"      => Some(Type::Primitive(PrimitiveType::Char)),
         "void"      => Some(Type::Primitive(PrimitiveType::Void)),

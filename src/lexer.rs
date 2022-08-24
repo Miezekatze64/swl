@@ -23,6 +23,7 @@ pub struct Token {
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TokenType {
     Int,
+    Long,
     Float,
     Char,
     String,
@@ -237,10 +238,17 @@ impl Lexer {
                     'a'..='z'|'_'|'A'..='Z' => {
                         if ttype == TokenType::Undef ||
                             ttype == TokenType::Ident {
-                            ttype = TokenType::Ident;
-                            val.push(ch);
-                        } else {
-                            // check for keywords / types
+                                ttype = TokenType::Ident;
+                                val.push(ch);
+                            } else if ch == 'l' && ttype == TokenType::Int {
+                                self.pos += 1;
+                                ret!(Ok::<Token, Error>(Token {
+                                    pos: token_pos,
+                                    ttype: TokenType::Long,
+                                    value: val.clone(),
+                            }), self.verbose);
+                         } else {
+                                // check for keywords / types
                                 ttype = check_keywords_and_types(
                                     val.as_str(), ttype);
 
@@ -267,17 +275,20 @@ impl Lexer {
                                 }
                                 ttype = TokenType::Float;
                                 val.push(ch);
-                            } else if ttype == TokenType::Undef ||
-                            ttype == TokenType::Int {
-                                ttype = TokenType::Int;
-                                val.push(ch);
                             } else if ttype == TokenType::Ident && ch != '.' {
                                 ttype = TokenType::Ident;
+                                val.push(ch);
+                            } else if (ttype == TokenType::Undef ||
+                                       ttype == TokenType::Int) && ch != '.' {
+                                ttype = TokenType::Int;
                                 val.push(ch);
                             } else if ttype == TokenType::Operator &&
                             val == "-" {
                                 val.push(ch);
                                 ttype = TokenType::Int;
+                            } else if ttype == TokenType::Undef && ch == '.' {
+                                val.push(ch);                                
+                                ttype = TokenType::Float;
                             } else {
                                 // check for keywords / types
                                 ttype = check_keywords_and_types(

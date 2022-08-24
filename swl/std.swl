@@ -61,7 +61,7 @@ func to_string(char* self) -> string from char* {
 // --------
 // returns: the pointer to the string
 func to_cstr(string self) -> char* from string {
-    int ptr = _malloc(self.len() + 8);
+    long ptr = malloc(self.len() + 8);
     int i = 0;
 
     while (i < self.len()) {
@@ -126,8 +126,8 @@ func envp() -> char** {
 //   size <- the number of bytes to allocate
 // returns: an array at the newly allocated space
 func alloc_array(int size) -> [unchecked] {
-    int ptr     = _malloc(8+size);
-    deref as[int*, ptr] = size;
+    long ptr     = malloc(8+size);
+    deref as[long*, ptr] = as[long, size];
     [int] array = ptr2arr(ptr);
     <- array;
 }
@@ -137,10 +137,8 @@ func alloc_array(int size) -> [unchecked] {
 // args:
 //   a <- the array to free
 func free_array([unchecked] a) {
-    int ret = _free(__unsafe_convert(a));
-    if (ret == -1) {
-        print("free: double free or corruption\n");
-    }
+    long l = arr2addr(a);
+    free(l - 8);
 }
 
 // copies the contents of string b to string a (without overflow)
@@ -204,7 +202,7 @@ func getch() -> char {
 // args:
 //   str <- the string to print
 func print([char] str) {
-    write(1, arr2addr(str), arrlen(str));
+    write(1l, arr2addr(str), arrlen(str));
 }
 
 // prints a given string to stderr
@@ -212,7 +210,7 @@ func print([char] str) {
 // args:
 //   str <- the string to print
 func eprint([char] str) {
-    write(2, arr2addr(str), arrlen(str));
+    write(2l, arr2addr(str), arrlen(str));
 }
 
 // prints a given string to stdout, followed by a line feed
@@ -252,11 +250,11 @@ func system(string command) {
         exit(0);
     }
     while (true) {
-       int ret = syscall4(61, pid, 0, 0, 0);
-       if (ret <= 0) {
+       long ret = syscall4(61, as[long, pid], 0l, 0l, 0l);
+       if (ret <= 0l) {
            break;
        }
-       sleep(10);
+       sleep(10l);
     }
 }
 

@@ -2,17 +2,17 @@
 
 alias string = [char];
 
-intrinsic convert      as __unsafe_convert(_a i)                        -> unchecked;
-intrinsic dereference  as arrlen([unchecked] str)                       -> int;
-intrinsic str_to_ptr   as arr2addr([unchecked] str)                     -> int;
-intrinsic convert      as ptr2arr(int ptr)                              -> [unchecked];
-intrinsic syscall      as syscall0(int index)                           -> int;
-intrinsic syscall      as syscall1(int index, int val)                  -> int;
-intrinsic syscall      as syscall2(int index, int val, int val2)        -> int;
-intrinsic syscall      as syscall3(int index, int val, int val2, int val3)
-      -> int;
-intrinsic syscall      as syscall4(int index, int val, int val2, int val3,
-    int val4)  -> int;
+intrinsic convert      as __unsafe_convert(_a i)                            -> unchecked;
+intrinsic dereference  as arrlen([unchecked] str)                           -> int;
+intrinsic str_to_ptr   as arr2addr([unchecked] str)                         -> long;
+intrinsic convert      as ptr2arr(long ptr)                                  -> [unchecked];
+intrinsic syscall      as syscall0(int index)                              -> long;
+intrinsic syscall      as syscall1(int index, long val)                    -> long;
+intrinsic syscall      as syscall2(int index, long val, long val2)         -> long;
+intrinsic syscall      as syscall3(int index, long val, long val2, long val3)
+      -> long;
+intrinsic syscall      as syscall4(int index, long val, long val2, long val3,
+    long val4)  -> long;
 
 // reads a given number of bytes from a given file descriptor
 // ------
@@ -21,8 +21,8 @@ intrinsic syscall      as syscall4(int index, int val, int val2, int val3,
 //   buf    <- the buffer to read into
 //   nbytes <- the number of bytes to read
 // returns: the number of bytes read
-func read(int fd, int buf, int nbytes) -> int {
-    <- syscall3(0, fd, buf, nbytes);
+func read(int fd, long buf, int nbytes) -> int {
+    <- as[int, syscall3(0, as[long, fd], buf, as[long, nbytes])];
 }
 
 // writes a given number of bytes to a given file descriptor
@@ -32,8 +32,8 @@ func read(int fd, int buf, int nbytes) -> int {
 //   buf    <- the buffer to write from
 //   nbytes <- the number of bytes to write
 // returns: the number of bytes written
-func write(int fd, int buf, int nbytes) -> int {
-    <- syscall3(1, fd, buf, nbytes);
+func write(long fd, long buf, int nbytes) -> long {
+    <- syscall3(1, fd, buf, as[long, nbytes]);
 }
 
 // opens a file with a given path, mode, and flags
@@ -43,7 +43,7 @@ func write(int fd, int buf, int nbytes) -> int {
 //   mode <- the mode to open the file with
 //   flags <- the flags to open the file with
 // returns: the file descriptor of the opened file
-func open(string path, int flags, int mode) -> int {
+func open(string path, long flags, long mode) -> long {
     <- syscall3(2, arr2addr(path), flags, mode);
 }
 
@@ -51,7 +51,7 @@ func open(string path, int flags, int mode) -> int {
 // ------
 // args:
 //   fd <- the file descriptor to close   
-func close(int fd) {
+func close(long fd) {
     syscall1(3, fd);
 }
 
@@ -62,7 +62,7 @@ func close(int fd) {
 // returns:
 //   if > 0: the number of bytes the break moved.
 //   if 0: the current program break
-func brk(int addr) -> int {
+func brk(long addr) -> long {
     <- syscall1(12, addr);
 }
 
@@ -71,7 +71,7 @@ func brk(int addr) -> int {
 // args:
 //   returns: the pid of the new process
 func fork() -> int {
-    <- syscall0(57);
+    <- as[int, syscall0(57)];
 }
 
 // exits the current process
@@ -79,7 +79,7 @@ func fork() -> int {
 // args:
 //   status <- the status to exit with
 func exit(int status) {
-    syscall1(60, status);
+    syscall1(60, as[long, status]);
 }
 
 
@@ -91,11 +91,11 @@ func exit(int status) {
 //   inc <- the number of bytes to increment
 // returns:
 //   the new loctaion of the break
-func _sbrk(int inc) -> int {
-    int newbrk;
-    int curbrk = 0;
+func _sbrk(int inc) -> long {
+    long newbrk;
+    long curbrk = 0l;
     
-    curbrk = brk(0);
+    curbrk = brk(0l);
 
     if (inc == 0) {
         <- curbrk;
@@ -115,7 +115,7 @@ func _sbrk(int inc) -> int {
 //   contains the last used index of the tcache
 // _m_tcache:
 //   contains current allocated (and freed + blocked) blocks of the malloc() and free() functions
-int    _m_heap_start = 0;
+long   _m_heap_start = 0l;
 int    _m_location = 0;
 [m_struct]  _m_tcache;
 
@@ -127,7 +127,7 @@ int    _m_location = 0;
 // is_block:
 //    true if block, false if hole
 struct m_struct {
-    int ptr;
+    long ptr;
     int size;
     bool is_block;
 }
@@ -153,8 +153,8 @@ func _malloc(int size) -> int {
         i += 1;
     }
     
-    int ptr = _sbrk(size);
-    int current = ptr + size;
+    long ptr = _sbrk(size);
+    long current = ptr + size;
 
     _m_tcache[_m_location] = m_struct {
         ptr: ptr;
@@ -219,26 +219,26 @@ func input([char] buf) -> int {
 //   argv     <- args of the process
 //   envp     <- environment of the process
 func execve(char *filename, [char*] argv, [char*] envp) {
-    int fn   = as[int, filename];
-    int argp = arr2addr(argv);
-    int envv = arr2addr(envp);
+    long fn   = as[long, filename];
+    long argp = arr2addr(argv);
+    long envv = arr2addr(envp);
     syscall3(59, fn, argp, envv);
 }
 
 
 struct timespec {
-    int _secs;
-    int nanos;
+    long _secs;
+    long nanos;
 }
 
 // sleeps a given amount of milliseconds
 // -----
 // args:
 //   millis <- the time
-func sleep(int millis) {
+func sleep(long millis) {
     timespec time = timespec {
         _secs: millis / 1000;
         nanos: (millis % 1000) * 1000000;
     };
-    syscall2(35, as[int, ref time],  0);
+    syscall2(35, as[long, ref time],  0l);
 }

@@ -941,6 +941,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     Type::Primitive(ref primr) => 
                         primr == &PrimitiveType::Float ||
                         primr == &PrimitiveType::Int ||
+                        primr == &PrimitiveType::Long ||
                         primr == &PrimitiveType::Char ||
                         primr == &PrimitiveType::Bool,
                     Type::Pointer(_) => true,
@@ -951,6 +952,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     Type::Primitive(ref priml) => 
                         priml == &PrimitiveType::Float ||
                         priml == &PrimitiveType::Int ||
+                        priml == &PrimitiveType::Long ||
                         priml == &PrimitiveType::Char ||
                         priml == &PrimitiveType::Bool,
                     Type::Pointer(_) => true,

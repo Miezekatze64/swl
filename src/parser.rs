@@ -1144,8 +1144,6 @@ impl Parser {
                     }
 
                     let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();
-                    // TODO: preprocessor here
-                    
                     let mut file_parser = match Parser::new(contents, filename.clone(), verbose) {
                         Ok(a) => a,
                         Err(e) => {
@@ -1154,9 +1152,6 @@ impl Parser {
                         },
                     };
 
-                    self.links.append(&mut file_parser.links);
-                    self.linked_libs.append(&mut file_parser.linked_libs);
-                    
                     let ast = match file_parser.parse(verbose) {
                         Ok(a) => a,
                         Err(vec) => {
@@ -1167,6 +1162,9 @@ impl Parser {
                             return Err(errors);
                         },
                     };
+
+                    self.links.append(&mut file_parser.links);
+                    self.linked_libs.append(&mut file_parser.linked_libs);
 
                     if verbose > 1 {
                         eprintln!("{:#?}", ast);

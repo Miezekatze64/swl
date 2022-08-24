@@ -1,9 +1,13 @@
 include "std.swl";
 
+#link "test.o"
 #link_lib "libc"
-extern func puts(char *ptr);
+extern func f(char *a, int b, int c, int d, int e, int f) -> int;
 
 func main() -> int {
-    puts("Hello, World!".to_cstr());
-    <- 42;
+    int i = 2;
+    long l = 49l;
+//    println("Hello, World!");
+    sleep(1000l);
+    <- as[int, l]; //f(as[char*, 0], 2, 3, 4, 5, 6);
 }

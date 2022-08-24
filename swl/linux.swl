@@ -108,6 +108,13 @@ func _sbrk(int inc) -> long {
     <- curbrk;
 }
 
+#link_lib "libc"
+extern func malloc(int size) -> long;
+extern func free(long ptr);
+
+//              --- OLD MALLOC CODE ---
+// this was replaced by the libc malloc implementation
+
 // fields used by _malloc and _free
 // _m_heap_start:
 //   contains the current start of the heap (program break)
@@ -137,8 +144,8 @@ struct m_struct {
 // args:
 //   size <- the number of bytes to allocate
 // returns: the address of the allocated space
-func _malloc(int size) -> int {
-    if (_m_heap_start == 0) {
+func __old__malloc(int size) -> long {
+    if (_m_heap_start == 0l) {
         _m_heap_start = _sbrk(0);
         _m_tcache     = ptr2arr(_sbrk(1000 * (8 + 8 + 1)));
     }
@@ -171,7 +178,7 @@ func _malloc(int size) -> int {
 // ------
 // args:
 //   ptr <- the address of the block to free
-func _free(int ptr) -> int {
+func __old_free(long ptr) -> int {
     int i = 0;
     while (i < _m_location) {
         m_struct index = _m_tcache[i];

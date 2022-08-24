@@ -466,7 +466,7 @@ pub fn intrinsics() -> HashMap<&'static str, &'static str> {
     [("syscall","\tpush rax\n\tpush rbx\n\tpush rcx\n\tpush \
                  rdx\n\tpop rdx\n\tpop \
                  rsi\n\tpop rdi\n\tpop rax\n\tsyscall\n\tleave\n\tret"),
-     ("convert", "\tret\n"),
+     ("convert", "\tleave\n\tret\n"),
      ("str_to_ptr", "\tadd rax, 8\n\tleave\n\tret\n"),
      ("dereference", "\tmov rax, [rax]\n\tleave\n\tret\n"),
      ("set_ptr", "\tmov [rax], rbx\n\tleave\n\tret\n"),

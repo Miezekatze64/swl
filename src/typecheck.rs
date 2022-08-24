@@ -215,8 +215,8 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(pos, ASTNodeR::SetField(ref mut expr_, ref mut name, ref mut rexpr, _)) => {
                     let struct_type = typecheck_expr(expr_, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer).dealias(aliases);
                     if let Type::Struct(ref struct_name, ref map) = struct_type {
-                        if map.contains_key(name) {
-                            let field_type = map.get(name).unwrap().0.clone();
+                        if map.iter().any(|(n, _)| n == name) {
+                            let field_type = map.iter().find(|(n, _)| n == name).unwrap().1.0.clone();
                             let rtype = typecheck_expr(rexpr, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer);
                             if !field_type.is_compatible(&rtype, aliases) {
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "imcompatible types: expected `{field_type}`, found `{rtype}`")));
@@ -286,7 +286,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     if let Type::Struct(_, map) = type_r {
                         let mut vector_: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
                         vector_.sort();
-                        let vec: Vec<usize> = vector_.iter().map(|x| map[x].0.size(aliases)).collect();
+                        let vec: Vec<usize> = vector_.iter().map(|x| map.iter().find(|(n, _)| n == x).unwrap().1.0.size(aliases)).collect();
                         
                         a.1 = ASTNodeR::ArrIndexInit(lexpr.clone(), ind.clone(), expr.clone(), vec);
                     } else {
@@ -604,13 +604,13 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     let tp = typecheck_expr(expr, functions, generic_functions, immutable_args,errors, lexer);
                     fields_.insert(name_.clone(), (tp.clone(), fields_.len()));
                 }
-                Type::Struct(name.clone(), fields_)
+                Type::Struct(name.clone(), fields_.iter().map(|(a, (b, c))| (a.to_owned(), (b.to_owned(), c.to_owned()))).collect())
             },
             ExpressionR::StructField(ref mut expr_, ref mut name, _) => {
                 let struct_type = typecheck_expr(expr_, functions, generic_functions, immutable_args,errors, lexer).dealias(aliases);
                 if let Type::Struct(ref struct_name, ref map) = struct_type {
-                    if map.contains_key(name) {
-                        let ret = map.get(name).unwrap().0.clone();
+                    if map.iter().any(|(x, _)| x == name) {
+                        let ret = map.iter().find(|(x, _)| x == name).unwrap().1.0.clone();
                         expr.1 = ExpressionR::StructField(expr_.clone(), name.clone(), Some(struct_type.clone()));
                         return ret;
                     } else {
@@ -839,8 +839,8 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                 if ! functions.contains_key(&(Some(left_type.clone()), name.clone())) {
                     errors.push((ErrorLevel::Err, error!(lexer, pos, "undefined reference to member function `{name}` from type {left_type}")));
                     if let Type::Struct(_, fields) = left_type {
-                        if fields.contains_key(name) {
-                            if let Type::Function(..) = fields[name].0 {
+                        if fields.iter().any(|(x, _)| x == name) {
+                            if let Type::Function(..) = fields.iter().find(|(x, _)| x == name).unwrap().1.0 {
                                 errors.push((ErrorLevel::Note, error!(lexer, pos, "if you wanted to call the function stored in a struct, write it like this:\n\t({lexpr}.{name})(args..)")));
                             }
                         }
@@ -925,7 +925,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     if let Type::Struct(_, ref map) = inner_tp.dealias(aliases) {
                         let mut vector_: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
                         vector_.sort();
-                        let vec: Vec<usize> = vector_.iter().map(|x| map[x].0.size(aliases)).collect();
+                        let vec: Vec<usize> = vector_.iter().map(|x| map.iter().find(|(n, _)| n == x).unwrap().1.0.size(aliases)).collect();
                         expr.1 = ExpressionR::Index(ident.clone(), a.clone(), vec);
                     } else {
                         expr.1 = ExpressionR::Index(ident.clone(), a.clone(), vec![inner_tp.size(aliases)]);

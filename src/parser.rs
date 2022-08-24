@@ -31,7 +31,7 @@ pub enum ASTNodeR {
     Intrinsic(String, String, Vec<(Type, String)>, Type),
     ArrIndexInit(Expression, Expression, Expression, Vec<usize>),
     While(Expression, Box<ASTNode>),
-    Struct(String, HashMap<String, (Type, usize)>),
+    Struct(String, Vec<(String, (Type, usize))>),
     SetField(Expression, String, Expression, Option<Type>),
     Include(String, Box<ASTNode>, Lexer),
     Break(),
@@ -1190,7 +1190,7 @@ impl Parser {
                     // expect {
                     err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors).value;
 
-                    let mut fields: HashMap<String, (Type, usize)> = HashMap::new();
+                    let mut fields: Vec<(String, (Type, usize))> = vec![];
                     loop {
                         let next_token = err_ret!(self.lexer.peek_token(), errors);
                         if next_token.ttype == TokenType::Special && next_token.value == "}" {
@@ -1200,7 +1200,7 @@ impl Parser {
                         let typ = err_ret!(self.parse_type(), errors);
                         let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
                         err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
-                        fields.insert(name, (typ, fields.len()));
+                        fields.push((name, (typ, fields.len())));
                     }
 
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Struct(name, fields))));

@@ -86,7 +86,7 @@ pub enum Type {
     Pointer(Box<Type>),
     Function(Vec<Type>, Box<Type>),
     Invalid,
-    Struct(String, HashMap<String, (Type, usize)>),
+    Struct(String, Vec<(String, (Type, usize))>),
     Var(String),
     Bounded(String),
 }
@@ -166,17 +166,11 @@ impl std::fmt::Display for Type {
             Type::Invalid => "__invalid__".into(),
             Type::Struct(name, fields) => {
                 // convert hashmap to vector
-                let mut vector_: Vec<(usize, String)> = fields.iter()
-                    .map(|(x, (_, s))| (*s, x.clone())).collect();
-                vector_.sort();
-                let vector: Vec<(String, Type)> = vector_.iter()
-                    .map(|x| (x.1.clone(), fields[&x.1].0.clone())).collect();
-
-
+                
                 let mut s = format!("struct {name} {{");
-                for (i, (n, t)) in vector.iter().enumerate() {
+                for (i, (n, (t, _))) in fields.iter().enumerate() {
                     write!(s, "{t} {n}")?;
-                    if i < vector.len() - 1 {
+                    if i < fields.len() - 1 {
                         s += ", ";
                     }
                 }
@@ -274,14 +268,14 @@ impl Type {
                 if a_name == b_name {
                     let mut comp = true;
                     for (string, typ) in a_fields.iter() {
-                        if ! b_fields.contains_key(string) {
+                        if ! b_fields.iter().any(|(n, _)| n == string) {
                             return false;
                         }
-                        comp &= typ.0.is_compatible(&b_fields[string].0,
+                        comp &= typ.0.is_compatible(&b_fields.iter().find(|(s, _)| s == string).unwrap().1.0,
                                                     aliases);
                     }
                     for (string, _) in b_fields {
-                        if ! a_fields.contains_key(&string) {
+                        if ! a_fields.iter().any(|(n, _)| n == &string) {
                             return false;
                         }
                     }

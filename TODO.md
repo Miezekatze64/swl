@@ -2,7 +2,7 @@
 
 ## Compiler
 
-<!-- - [ ] IMPORTANT -- FIX ORDER OF STRUCT FIELDS!!! -- IMPORTANT -->
+- [x] IMPORTANT -- FIX ORDER OF STRUCT FIELDS!!! -- IMPORTANT
 
 - [x] add casting
 

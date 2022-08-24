@@ -178,12 +178,9 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, true));
             
             let mut offset = 0;
-            if let Some(Type::Struct(_, map)) = struct_type {
+            if let Some(Type::Struct(_, fields)) = struct_type {
                 // convert hashmap to vector
-                let mut vector_: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                vector_.sort();
-                let vector: Vec<(String, Type)> = vector_.iter().map(|x| (x.clone(), map[x].0.clone())).collect();
-                for (key, tp) in vector {
+                for (key, (tp, _)) in fields {
                     if key == field {
                         break;
                     }
@@ -238,12 +235,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                             let len = globals.get(name).unwrap();
                             if *len < 8 {
                                 ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                            } else if let Some(Type::Struct(_, map)) = tp {
-                                let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                                vector.sort();
+                            } else if let Some(Type::Struct(_, fields)) = tp {
                                 let mut offset = 0;
-                                for (index, key) in vector.iter().enumerate() {
-                                    let vals = &map[key];
+                                for (index, (_, vals)) in fields.iter().enumerate() {
                                     let sz = vals.0.size(&aliases);
                                     ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                                     offset += sz;
@@ -266,12 +260,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                             let len = globals.get(name).unwrap();
                             if *len < 8 {
                                 ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                            } else if let Type::Struct(_, map) = tp.dealias(&aliases) {
-                                let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                                vector.sort();
+                            } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
                                 let mut offset = 0;
-                                for (index, key) in vector.iter().enumerate() {
-                                    let vals = &map[key];
+                                for (index, (_, vals)) in fields.iter().enumerate() {
                                     let sz = vals.0.size(&aliases);
                                     ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                                     offset += sz;
@@ -336,12 +327,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 let size = vals.1;
                 if size < 8 {
                     ret.push(Inst::VarSet(0, vals.1, vals.0))
-                } else if let Type::Struct(_, map) = tp.dealias(&aliases) {
-                    let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                    vector.sort();
+                } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
                     let mut offset = vals.0;
-                    for (index, key) in vector.iter().enumerate() {
-                        let vals = &map[key];
+                    for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::VarSet(index, sz, offset));
                         offset -= sz;
@@ -360,12 +348,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 let len = globals.get(name).unwrap();
                 if *len < 8 {
                     ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                } else if let Type::Struct(_, map) = tp {
-                    let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                    vector.sort();
+                } else if let Type::Struct(_, fields) = tp {
                     let mut offset = 0;
-                    for (index, key) in vector.iter().enumerate() {
-                        let vals = &map[key];
+                    for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                         offset += sz;
@@ -404,12 +389,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 let size = vals.1;
                 if size < 8 {
                     ret.push(Inst::VarSet(0, vals.1, vals.0))
-                } else if let Some(Type::Struct(_, map)) = tp {
-                    let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                    vector.sort();
+                } else if let Some(Type::Struct(_, fields)) = tp {
                     let mut offset = vals.0;
-                    for (index, key) in vector.iter().enumerate() {
-                        let vals = &map[key];
+                    for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::VarSet(index, sz, offset));
                         offset -= sz;
@@ -428,12 +410,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 let len = globals.get(name).unwrap();
                 if *len < 8 {
                     ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                } else if let Some(Type::Struct(_, map)) = tp {
-                    let mut vector: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                    vector.sort();
+                } else if let Some(Type::Struct(_, fields)) = tp {
                     let mut offset = 0;
-                    for (index, key) in vector.iter().enumerate() {
-                        let vals = &map[key];
+                    for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                         offset += sz;
@@ -507,16 +486,14 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             ret.push(Inst::Break(loop_idx));
         }
         ASTNodeR::SetField(lexpr, name, rexpr, struct_type) => {
-            if let Some(Type::Struct(_, map)) = struct_type {
-                let map_result = &map[&name];
-                let mut vec: Vec<String> = map.iter().map(|(x, _)| x.clone()).collect();
-                vec.sort();
+            if let Some(Type::Struct(_, fields)) = struct_type {
+                let map_result = &fields.iter().find(|(x, _)| x == &name).unwrap().1;
                 let mut off = 0;
-                for key in vec {
+                for (key, (tp, _)) in fields.clone() {
                     if key == name {
                         break;
                     }
-                    off += map[&key].0.size(&aliases);
+                    off += tp.size(&aliases);
                 }
                 ret.append(&mut gen_expr(lexpr, 0, offsets, globals, &aliases, true));
                 ret.append(&mut gen_expr(rexpr, 1, offsets, globals, &aliases, false));

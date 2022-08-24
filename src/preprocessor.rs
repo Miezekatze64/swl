@@ -17,11 +17,11 @@ fn pos_to_line_char(source: Vec<char>, pos: usize) -> (usize, usize) {
 }
 
 pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>, Vec<String>) {
-    let mut i          : usize = 0;
-    let mut to_skip    : Vec<(usize, usize)> = vec![];
-    let mut links      : Vec<String> = vec![];
-    let mut links_libs : Vec<String> = vec![];
-    
+    let mut i             : usize = 0;
+    let mut to_skip       : Vec<(usize, usize)> = vec![];
+    let mut links         : Vec<String> = vec![];
+    let mut links_libs    : Vec<String> = vec![];
+
     while i < file.len() {
         let ch = file[i];
         if i > 1 {
@@ -52,7 +52,8 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
             while file[i] != ' ' {i += 1};
             let directive = file.iter().skip(dir_start).take(i - dir_start).collect::<String>();
             while file[i] != ' ' {i += 1};
-            to_skip.push((dir_start, i - dir_start));
+            to_skip.push((dir_start - 1, i - dir_start + 1));
+
             match directive.as_str() {
                 "link"|"link_lib" => {
                     // expect string
@@ -73,10 +74,11 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
                     let file = file.iter().skip(str_start).take(i - str_start).collect::<String>();
 
                     (if directive == "link".to_owned() {&mut links} else {&mut links_libs}).push(file);
-                }
+                },
                 _ => {
                     let (l, c) = pos_to_line_char(file.clone(), dir_start);
-                    eprintln!("{file}:{line}:{ch}: Invalid preprocesser directive `{directive}`",
+                    eprintln!("{file}:{line}:{ch}: Invalid preprocesser \
+                               directive `{directive}`",
                               file = filename,
                               line = l+1,
                               ch = c+1,

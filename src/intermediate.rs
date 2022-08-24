@@ -202,7 +202,7 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             let lsz = ltp.size(aliases);
             let rsz = rtp.size(aliases);
 
-            let bits_mask = 2u32.pow(rsz as u32 * 8) - 1;
+            let bits_mask = 2u128.pow(rsz as u32 * 8) - 1;
             
             if lsz >= rsz {
                 ret.push(Inst::Val(index+1, Type::Primitive(PrimitiveType::Int), bits_mask.to_string()));

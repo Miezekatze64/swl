@@ -1,10 +1,14 @@
 use std::fs;
 
+use crate::preprocessor;
+
 use {crate::{util, util::{indent, PrimitiveType, Type, BinaryOp, UnaryOp, ErrorLevel, Op, Error}, error}, std::{io, collections::HashMap}, crate::lexer::{TokenType, Lexer, Token}};
 
 #[derive(Debug, Clone)]
 pub struct Parser {
-    pub lexer: Lexer,
+    pub lexer       : Lexer,
+    pub links       : Vec<String>,
+    pub linked_libs : Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -436,8 +440,11 @@ macro_rules! err_add {
 
 impl Parser {
     pub fn new(src: Vec<char>, filename: String, verbose: usize) -> Result<Self, io::Error> {
+        let (contents, l, ll) = preprocessor::preprocess(src, filename.clone());
         Ok(Parser {
-            lexer: Lexer::new(filename, src, verbose)?
+            lexer: Lexer::new(filename, contents, verbose)?,
+            links: l,
+            linked_libs: ll,
         })
     }
 
@@ -1130,6 +1137,9 @@ impl Parser {
                             return Err(errors);
                         },
                     };
+
+                    self.links.append(&mut file_parser.links);
+                    self.linked_libs.append(&mut file_parser.linked_libs);
                     
                     let ast = match file_parser.parse(verbose) {
                         Ok(a) => a,

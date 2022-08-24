@@ -1,4 +1,4 @@
-// include "std.swl";
+include "std.swl";
 
 #link_lib "libc"
 #link_lib "libX11"

@@ -133,7 +133,7 @@ fn main() {
 
     
     let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();
-    let (contents, links, links_libs) = preprocessor::preprocess(contents, filename.clone());
+//    let (contents, links, links_libs) = preprocessor::preprocess(contents, filename.clone());
     
     // construct parser
     let mut parser = parser::Parser::new(contents, filename.clone(), verbose).unwrap_or_else(|a| {
@@ -257,9 +257,9 @@ fn main() {
                 let mut outfile = path;
                 outfile.push_str(&name);
 
-                let mut linked_files = links.clone();
+                let mut linked_files = parser.links.clone();
                 
-                for lib in links_libs {
+                for lib in parser.linked_libs {
                     // search for lib
                     let path_str = "/usr/lib/".to_owned() + &lib + ".so";
                     let lib_path = Path::new(&path_str);

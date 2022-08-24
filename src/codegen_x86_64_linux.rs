@@ -21,9 +21,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
         3 => "rdx",
         4 => "rdi",
         5 => "rsi",
-        6 => "r8d",
-        7 => "r9d",
-        8 => "r10d",
+        6 => "r8",
+        7 => "r9",
+        8 => "r10",
         a => unimplemented!("index: {a}")
     };
 
@@ -75,8 +75,8 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
     
     ret.push_str("_start:\n\
               \tmov [ARGS], rsp\n\
-              \tpush rbp\n\
-              \tmov rbp, rsp\n\
+              \txor rbp, rbp\n\
+              \txor rax, rax\n\
               ");
 
     let mut intrinsic_labels: Vec<String> = vec![];
@@ -417,7 +417,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                          \tpush rcx\n\
                          \tpush rdx\n\
                          \tpush rdi\n\
+                         \tpush rsi\n\
                          \
+                         \tpop r9\n\
                          \tpop r8\n\
                          \tpop rcx\n\
                          \tpop rdx\n\

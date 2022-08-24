@@ -99,14 +99,16 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                         let _ = write!(string, "\tsub rsp, {ind}\n\tmov\
                                                 [rbp-{ind}], {}\n",
                                        register(index),
-                                       ind = offsets[&vec[a].1].0 + add_off);
+                                       ind = ((offsets[&vec[a].1].0 + add_off) / 16 + 1) * 16
+                        );
                         sz -= 8;
                         add_off += 8;
                     }
                     let _ = write!(string, "\tsub rsp, {ind}\n\tmov \
                                             [rbp-{ind}], {}\n",
                                    register_sz(index, sz),
-                                   ind = offsets[&vec[a].1].0 + add_off);
+                                   ind = ((offsets[&vec[a].1].0 + add_off)  / 16 + 1) * 16
+                    );
                 }
                 format!(";; FUNCTION DECL {name}\nf_{name}:\n\tpush \
                          rbp\n\tmov rbp, rsp\n{string}")
@@ -189,9 +191,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 let register = register(reg);
                 if register != "rax" {
                     format!(";; RETURN\n\tmov rax, {register}\
-                             \n\tleave\n\tret\n")
+                             \n\tpop rbp\n\tret\n")
                 } else {
-                    ";; RETURN\n\tleave\n\tret\n".into()
+                    ";; RETURN\n\tpop rbp\n\tret\n".into()
                 }
             },
             Inst::UnOp(reg, sz, op) => {
@@ -266,7 +268,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
             Inst::VarSet(reg, sz, index) => {
                 format!(";; SET VAR {index}\n\tsub rsp, {ind}\n\tmov {tp} \
                          [rbp-{ind}], {}\n",
-                        register_sz(reg, sz), ind = index, tp = datatype(sz))
+                        register_sz(reg, sz), ind = (index / 16 + 1) * 16, tp = datatype(sz))
             },
             Inst::Var(reg, index, sz, is_ref) => {
                 if is_ref {
@@ -412,6 +414,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
             },
             Inst::Extern(name) => {
                 format!(";; EXTERN {name}\nf_{name}:\n\
+                         \tpush rbp\n\
+                         \tmov rbp, rsp\n\
+                         \
                          \tpush rax\n\
                          \tpush rbx\n\
                          \tpush rcx\n\
@@ -425,7 +430,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                          \tpop rdx\n\
                          \tpop rsi\n\
                          \tpop rdi\n\
-                         \tcall {name}\n\tret\n")
+                         \tcall {name}\n\
+                         \tpop rbp\n\
+                         \tret\n")
             },
 
         }.as_str())

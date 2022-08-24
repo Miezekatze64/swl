@@ -96,18 +96,20 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                     let mut sz = offsets[&vec[a].1].1;
                     let mut add_off = 0;
                     while sz > 8 {
-                        let _ = write!(string, "\tsub rsp, {ind}\n\tmov\
+                        let _ = write!(string, "\tsub rsp, {ind_aligned}\n\tmov\
                                                 [rbp-{ind}], {}\n",
                                        register(index),
-                                       ind = ((offsets[&vec[a].1].0 + add_off) / 16 + 1) * 16
+                                       ind         = offsets[&vec[a].1].0 + add_off,
+                                       ind_aligned = ((offsets[&vec[a].1].0 + add_off) / 16 + 1) * 16,
                         );
                         sz -= 8;
                         add_off += 8;
                     }
-                    let _ = write!(string, "\tsub rsp, {ind}\n\tmov \
+                    let _ = write!(string, "\tsub rsp, {ind_aligned}\n\tmov \
                                             [rbp-{ind}], {}\n",
                                    register_sz(index, sz),
-                                   ind = ((offsets[&vec[a].1].0 + add_off)  / 16 + 1) * 16
+                                   ind         = offsets[&vec[a].1].0 + add_off,
+                                   ind_aligned = ((offsets[&vec[a].1].0 + add_off)  / 16 + 1) * 16
                     );
                 }
                 format!(";; FUNCTION DECL {name}\nf_{name}:\n\tpush \
@@ -191,9 +193,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 let register = register(reg);
                 if register != "rax" {
                     format!(";; RETURN\n\tmov rax, {register}\
-                             \n\tpop rbp\n\tret\n")
+                             \n\tleave\n\tret\n")
                 } else {
-                    ";; RETURN\n\tpop rbp\n\tret\n".into()
+                    ";; RETURN\n\tleave\n\tret\n".into()
                 }
             },
             Inst::UnOp(reg, sz, op) => {
@@ -266,9 +268,9 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 }
             },
             Inst::VarSet(reg, sz, index) => {
-                format!(";; SET VAR {index}\n\tsub rsp, {ind}\n\tmov {tp} \
+                format!(";; SET VAR {index}\n\tsub rsp, {ind_aligned}\n\tmov {tp} \
                          [rbp-{ind}], {}\n",
-                        register_sz(reg, sz), ind = (index / 16 + 1) * 16, tp = datatype(sz))
+                        register_sz(reg, sz), ind_aligned = (index / 16 + 1) * 16, ind = index, tp = datatype(sz))
             },
             Inst::Var(reg, index, sz, is_ref) => {
                 if is_ref {
@@ -295,11 +297,11 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                 if ! intrinsic_labels.contains(&iname) {
                     intrinsic_labels.push(iname.clone());
                     format!(";; INTRINSIC {iname}\nf_{fname}:\
-                             \n\tjmp intrinsic_{iname}\nintrinsic_{iname}:\
+                             \n\tpush rbp\n\tmov rbp, rsp\n\tjmp intrinsic_{iname}\nintrinsic_{iname}:\
                              \n{}\n", intrinsics().get(iname.as_str()).unwrap())
                 } else {
                     format!(";; INTRINSIC {iname}\nf_{fname}:\
-                             \n\tjmp intrinsic_{iname}\n")
+                             \n\tpush rbp\n\tmov rbp, rsp\n\tjmp intrinsic_{iname}\n")
                 }
             },
             Inst::RetVal(reg) => {
@@ -431,7 +433,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
                          \tpop rsi\n\
                          \tpop rdi\n\
                          \tcall {name}\n\
-                         \tpop rbp\n\
+                         \tleave\n\
                          \tret\n")
             },
 
@@ -463,12 +465,12 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Ve
 pub fn intrinsics() -> HashMap<&'static str, &'static str> {
     [("syscall","\tpush rax\n\tpush rbx\n\tpush rcx\n\tpush \
                  rdx\n\tpop rdx\n\tpop \
-                 rsi\n\tpop rdi\n\tpop rax\n\tsyscall\n\tret"),
+                 rsi\n\tpop rdi\n\tpop rax\n\tsyscall\n\tleave\n\tret"),
      ("convert", "\tret\n"),
-     ("str_to_ptr", "\tadd rax, 8\n\tret\n"),
-     ("dereference", "\tmov rax, [rax]\n\tret\n"),
-     ("set_ptr", "\tmov [rax], rbx\n\tret\n"),
-     ("get_args", "\tmov rax, [ARGS]\n\tret\n")
+     ("str_to_ptr", "\tadd rax, 8\n\tleave\n\tret\n"),
+     ("dereference", "\tmov rax, [rax]\n\tleave\n\tret\n"),
+     ("set_ptr", "\tmov [rax], rbx\n\tleave\n\tret\n"),
+     ("get_args", "\tmov rax, [ARGS]\n\tleave\n\tret\n")
     ]
         .iter()
         .cloned()

@@ -213,7 +213,7 @@ fn main() {
             // optimize AST
             optimizer::optimize(&mut ast, &aliases);
 
-            let (intermediate, globals) = intermediate::gen(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
+            let (intermediate, globals, externs) = intermediate::gen(ast.1, &mut HashMap::new(), &globals, aliases, 0, 1, true);
             if verbose > 2 {
                 eprintln!("{:#?}", intermediate);
             }
@@ -223,7 +223,7 @@ fn main() {
                 if verbose > 0 {
                     eprintln!("[*] generating assembly");
                 }
-                let asm = generate(intermediate, &globals);
+                let asm = generate(intermediate, &globals, &externs);
                 if verbose > 1 {
                     eprintln!("{}", asm);
                 }

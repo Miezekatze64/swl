@@ -23,7 +23,7 @@
 
 (eval-and-compile
     (defconst swl-keywords
-        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "include" "break" "<-" "from" "for" "typeclass" "instance")
+        '("if" "else" "func" "alias" "intrinsic" "as" "arr" "while" "struct" "ref" "deref" "include" "break" "<-" "from" "for" "typeclass" "instance" "extern")
         ))
 
 (eval-and-compile
@@ -36,6 +36,7 @@
     (,(regexp-opt swl-types 'symbols) . font-lock-type-face)
     ("\\([a-zA-Z_]+\\**\\)[^a-zA-Z_, :\t\n()]* +[a-zA-Z_]+" 1 font-lock-type-face)
     ("alias[ \t\n]+\\([^ \t\n]*\\)[ \t\n]*=[ \t\n]*.*" 1 font-lock-type-face)
+    ("\\(#[^ ]*\\)" 0 font-lock-type-face)
     ("alias[ \t\n]+[^ \t\n]*[ \t\n]*=[ \t\n]*\\[*\\([^ \t\n]*?\\)\\]*;" 1 font-lock-type-face)
     ("func \\(.*?\\)[( \t\n]" 1 font-lock-function-name-face)
     ("->[ \t\n]*\\([^ \t\n]*\\)[ \t\n]*" 1 font-lock-type-face)

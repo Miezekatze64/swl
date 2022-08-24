@@ -427,6 +427,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "cannot dereference non-pointer type {ltype}")));
                     }
                 },
+                ASTNode(_, ASTNodeR::Extern(..)) => {},
              }
         };
     }
@@ -1047,6 +1048,9 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                 },
                 ASTNode(_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
                     functions.insert((None, fname), (args.into_iter().enumerate().map(|(_, (a, _))| a).collect(), rt));
+                },
+                ASTNode(_, ASTNodeR::Extern(name, args, rt)) => {
+                    functions.insert((None, name), (args.into_iter().enumerate().map(|(_, (a, _))| a).collect(), rt));
                 },
                 ASTNode(_, ASTNodeR::TypeClass(name, arg, funcs)) => {
                     type_classes.insert(name.clone(), (arg.clone(), funcs.clone()));

@@ -55,6 +55,7 @@ const KEYWORDS: &[&str] = &[
     "from",
     "typeclass",
     "instance",
+    "extern",
 ];
 
 macro_rules! ret {

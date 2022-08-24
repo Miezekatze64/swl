@@ -33,6 +33,7 @@ pub enum Inst {
     CallReg(usize),
     Else(usize),
     DerefSet(usize, usize),
+    Extern(String),
 }
 
 fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>, is_ref: bool) -> Vec<Inst> {
@@ -222,8 +223,9 @@ fn last_ptr(offsets: &HashMap<String, (usize, usize)>) -> usize {
     last
 }
 
-pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, loop_idx: usize, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>) {
-    let mut ret = vec![];
+pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, loop_idx: usize, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>, Vec<String>) {
+    let mut ret     = vec![];
+    let mut externs = vec![];
 
     if is_top_level {
         // check for global initializations
@@ -301,7 +303,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             let mut count: usize = index;
             for i in a {
                 count += 3;
-                ret.append(&mut gen(i.1, offsets, globals, aliases.clone(), loop_idx, count, false).0);
+                let (mut res, _, mut exts) = gen(i.1, offsets, globals, aliases.clone(), loop_idx, count, false);
+                externs.append(&mut exts);
+                ret.append(&mut res);
             }
         },
         ASTNodeR::VarDec(is_global, tp, ref name) => {
@@ -552,7 +556,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         ASTNodeR::TypeAlias(..) => {},
         ASTNodeR::Struct(..) => {},
         ASTNodeR::Include(_, ast, _) => {
-            ret.append(&mut gen(ast.1, offsets, globals, aliases, 0, index, is_top_level).0);
+            let (mut res, _, mut exts) = gen(ast.1, offsets, globals, aliases, 0, index, is_top_level);
+            externs.append(&mut exts);
+            ret.append(&mut res);
         }
         ASTNodeR::TypeClass(..) => {},
         ASTNodeR::Instance(..) => {},
@@ -561,6 +567,10 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             ret.append(&mut gen_expr(r, 1, offsets, globals, &aliases, false));
             ret.push(Inst::DerefSet(0, 1));
         },
+        ASTNodeR::Extern(name, _, _) => {
+            externs.push(name.clone());
+            ret.push(Inst::Extern(name));
+        },
     }
-    (ret, globals.clone())
+    (ret, globals.clone(), externs)
 }

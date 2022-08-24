@@ -4,7 +4,7 @@ use {crate::{intermediate::Inst,
 };
 
 // TODO(#1): move codegen_x86_64_linux/generate() function into an own x86_64 file, without OS specific code
-pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
+pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<String>) -> String {
 
     let datatype = |a: usize| match a {
         0|1 => "byte",
@@ -67,12 +67,17 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
 
     let mut ret: String = "\
     global _start\n\
-    section .text\n\
-    _start:\n\
-    \tmov [ARGS], rsp\n\
-    \tpush rbp\n\
-    \tmov rbp, rsp\n\
-    ".into();
+    section .text\n".into();
+    
+    for ext in externs {
+        ret.push_str(format!("extern {ext}\n").as_str());
+    }
+    
+    ret.push_str("_start:\n\
+              \tmov [ARGS], rsp\n\
+              \tpush rbp\n\
+              \tmov rbp, rsp\n\
+              ");
 
     let mut intrinsic_labels: Vec<String> = vec![];
 
@@ -169,7 +174,7 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                                         .chars()
                                         .map(|a| format!("{}", a as u64))
                                         .collect::<String>())
-                            },
+                            }
                             _ => unreachable!()
                         }
                     }
@@ -404,6 +409,21 @@ pub fn generate(insts: Vec<Inst>, globals: &HashMap<String, usize>) -> String {
                 let reg1 = register(r1);
                 let reg2 = register(r2);
                 format!(";; DEREF SET\n\tmov [{reg1}], {reg2}\n")
+            },
+            Inst::Extern(name) => {
+                format!(";; EXTERN {name}\nf_{name}:\n\
+                         \tpush rax\n\
+                         \tpush rbx\n\
+                         \tpush rcx\n\
+                         \tpush rdx\n\
+                         \tpush rdi\n\
+                         \
+                         \tpop r8\n\
+                         \tpop rcx\n\
+                         \tpop rdx\n\
+                         \tpop rsi\n\
+                         \tpop rdi\n\
+                         \tcall {name}\n\tret\n")
             },
 
         }.as_str())

@@ -1,8 +1,9 @@
 include "std.swl";
 
 #link_lib "libc"
-#link_lib "libX11"
+extern func puts(char *ptr);
 
 func main() -> int {
+    puts("Hello, World!".to_cstr());
     <- 42;
 }

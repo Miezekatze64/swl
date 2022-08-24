@@ -39,6 +39,7 @@ pub enum ASTNodeR {
     TypeClass(String, String, Functions),
     Instance(String, Type, Vec<ASTNode>),
     DerefSet(Expression, Expression),
+    Extern(String, Vec<(Type, String)>, Type),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +136,20 @@ impl std::fmt::Display for ASTNodeR {
                 write!(f, ") ")?;
                 if *ret_type != Type::Primitive(PrimitiveType::Void) {
                     write!(f, "-> {ret_type} ")?;
+                }
+                write!(f, ";")
+            },
+            ASTNodeR::Extern(name, args, ret) => {
+                write!(f, "extern func {name}(")?;
+                for (index, (arg_type, arg_name)) in args.iter().enumerate() {
+                    write!(f, "{arg_type} {arg_name}")?;
+                    if index < args.len()-1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ") ")?;
+                if *ret != Type::Primitive(PrimitiveType::Void) {
+                    write!(f, "-> {ret} ")?;
                 }
                 write!(f, ";")
             },
@@ -1353,6 +1368,21 @@ impl Parser {
 
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::DerefSet(lexpr, rexpr))));
                 },
+                "extern" => {
+                    if ! is_root {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "extern function declerations are only allowed at top-level")));
+                        return Err(errors);
+                    }
+                    
+                    err_ret!(self.expect(Some(TokenType::Keyword), Some("func".into())), errors);
+                    let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                    err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
+                    
+                    let (args, ret) = parse_function_decl(self, errors.clone())?;
+                    err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
+                    
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Extern(name, args, ret))));
+                }
                 _ => {}
             },
             TokenType::Undef => return self.parse_block_statement(is_root, verbose, &[";"]),

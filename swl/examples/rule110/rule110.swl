@@ -57,13 +57,15 @@ func main() -> int {
             state[i] = true;
         }
     }
-    
-//    state[599] = true;
+
+    if (false) {}
+
+    state[599] = true;
 
     while (true) {
         dump(state);
         step(state);
-//        sleep(20);
+        sleep(20l);
     }
     
     <- 0;

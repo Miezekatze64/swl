@@ -1,5 +1,5 @@
 use crate::util;
-use std::{fs, io};
+use std::io;
 use util::{ErrorLevel, Error, is_valid_type};
 use crate::error;
 
@@ -67,9 +67,9 @@ macro_rules! ret {
 }
 
 impl Lexer {
-    pub fn new(filename: String, verbose: usize) -> Result<Self, io::Error> {
+    pub fn new(filename: String, src: Vec<char>, verbose: usize) -> Result<Self, io::Error> {
         Ok(Lexer {
-            source: fs::read_to_string(filename.clone())?.chars().collect(),
+            source: src,
             pos: 0,
             filename,
             line: 0,

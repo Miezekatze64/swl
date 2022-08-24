@@ -1,3 +1,5 @@
+use std::fs;
+
 use {crate::{util, util::{indent, PrimitiveType, Type, BinaryOp, UnaryOp, ErrorLevel, Op, Error}, error}, std::{io, collections::HashMap}, crate::lexer::{TokenType, Lexer, Token}};
 
 #[derive(Debug, Clone)]
@@ -433,9 +435,9 @@ macro_rules! err_add {
 }
 
 impl Parser {
-    pub fn new(filename: String, verbose: usize) -> Result<Self, io::Error> {
+    pub fn new(src: Vec<char>, filename: String, verbose: usize) -> Result<Self, io::Error> {
         Ok(Parser {
-            lexer: Lexer::new(filename, verbose)?
+            lexer: Lexer::new(filename, src, verbose)?
         })
     }
 
@@ -1117,7 +1119,11 @@ impl Parser {
                     if verbose > 0 {
                         eprintln!("[*] generatinng AST for included file `{filename}`");
                     }
-                    let mut file_parser = match Parser::new(filename.clone(), verbose) {
+
+                    let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();
+                    // TODO: preprocessor here
+                    
+                    let mut file_parser = match Parser::new(contents, filename.clone(), verbose) {
                         Ok(a) => a,
                         Err(e) => {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "ERROR during loading of file: {e}")));

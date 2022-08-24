@@ -18,6 +18,8 @@
 
 - [x] make all functions first-class
 
+- [ ] add library linking (calling of external c functions)
+
 - [ ] add REPL to interpreter
 
 - [ ] remove syscall() intrinsic -> create more abstract intrinsics (e. g. exec()) -> make interpreter platform independent

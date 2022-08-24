@@ -1,10 +1,8 @@
 // include "std.swl";
 
+#link_lib "libc"
+#link_lib "libX11"
+
 func main() -> int {
-    int i = 35;
-    while (false) {
-        i += 42;
-    }
-    int j = 34;
-    <- i + j;
+    <- 42;
 }

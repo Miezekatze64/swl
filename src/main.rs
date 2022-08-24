@@ -7,10 +7,11 @@ mod intermediate;
 mod optimizer;
 mod codegen_x86_64_linux;
 mod interpreter;
+mod preprocessor;
 
 // including used stdlib function
 use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
-          time::SystemTime};
+          time::SystemTime, path::Path};
 
 /// Enum representing possible target types
 // TODO(#2): parse target types (-t/--target)
@@ -130,8 +131,12 @@ fn main() {
         println!("PATH: {path}, NAME: {name}");
     }
 
+    
+    let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();
+    let (contents, links, links_libs) = preprocessor::preprocess(contents, filename.clone());
+    
     // construct parser
-    let mut parser = parser::Parser::new(filename.clone(), verbose).unwrap_or_else(|a| {
+    let mut parser = parser::Parser::new(contents, filename.clone(), verbose).unwrap_or_else(|a| {
         eprintln!("Error reading file: {}", a);
         exit(1);
     });
@@ -251,12 +256,25 @@ fn main() {
                 
                 let mut outfile = path;
                 outfile.push_str(&name);
+
+                let mut linked_files = links.clone();
+                
+                for lib in links_libs {
+                    // search for lib
+                    let path_str = "/usr/lib/".to_owned() + &lib + ".so";
+                    let lib_path = Path::new(&path_str);
+                    if lib_path.exists() {
+                        linked_files.push(lib_path.to_str().unwrap().to_string());
+                    }
+                }
+
+                let linked_files_str = linked_files.join(" ");
                 
                 if verbose > 0 {
-                    eprintln!("[*] CMD: ld -o {outfile} {obj_path}");
+                    eprintln!("[*] CMD: ld -o {outfile} {obj_path} {linked_files_str} --dynamic-linker /lib/ld-linux-x86-64.so.2");
                 }
                 
-                let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).output().unwrap();
+                let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).args(linked_files).arg("--dynamic-linker").arg("/lib/ld-linux-x86-64.so.2").output().unwrap();
                 if ! ld.status.success() {
                     eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
                     error = true;

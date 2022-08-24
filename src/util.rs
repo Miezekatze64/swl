@@ -136,6 +136,7 @@ impl std::hash::Hash for Type {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
     Int,
+    Long,
     Float,
     Char,
     Void,

@@ -7,7 +7,7 @@ extern func f(char *a, int b, int c, int d, int e, int f) -> int;
 func main() -> int {
     int i = 2;
     long l = 49l;
-//    println("Hello, World!");
+    println("Hello, World!");
     sleep(1000l);
-    <- as[int, l]; //f(as[char*, 0], 2, 3, 4, 5, 6);
+    <- f(as[char*, 0], 2, 3, 4, 5, as[int, l]);
 }

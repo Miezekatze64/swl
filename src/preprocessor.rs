@@ -73,7 +73,7 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
                     while file[i] != '"' { i += 1; }
                     let file = file.iter().skip(str_start).take(i - str_start).collect::<String>();
 
-                    (if directive == "link".to_owned() {&mut links} else {&mut links_libs}).push(file);
+                    (if directive == *"link" {&mut links} else {&mut links_libs}).push(file);
                 },
                 _ => {
                     let (l, c) = pos_to_line_char(file.clone(), dir_start);
@@ -89,7 +89,7 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
     }
 
     to_skip.sort();
-    let mut new_file = file.clone();
+    let mut new_file = file;
     for (a, l) in to_skip.iter().rev() {
         for _ in 0..*l {
             new_file.remove(*a);

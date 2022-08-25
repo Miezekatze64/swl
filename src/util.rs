@@ -435,7 +435,7 @@ impl Op {
                                     if rb == Type::Primitive(PrimitiveType::Int) || rb == Type::Primitive(PrimitiveType::Char) {
                                         a.clone()
                                     } else if rb == Type::Primitive(PrimitiveType::Long) {
-                                        rb.clone()
+                                        rb
                                     } else {
                                         Type::Invalid
                                     }
@@ -607,7 +607,7 @@ pub fn parse_args(vec: Vec<String>) -> Result<(PosArgs, GnuArgs, UnixArgs), Stri
     match state {
         NONE => {},
         GNU => {
-            gnu_args.insert(tmp_gnu_name.clone(), String::new());
+            gnu_args.insert(tmp_gnu_name, String::new());
         },
         UNIX => {
             unix_args.insert(tmp_unix_name, String::new());

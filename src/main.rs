@@ -24,10 +24,10 @@ enum Target {
     Wasm,
 }
 
-const COLOR_RED:   &'static str = "\x1b[31m";
-const COLOR_GREEN: &'static str = "\x1b[32m";
-const COLOR_YELLOW: &'static str = "\x1b[33m";
-const COLOR_RESET: &'static str = "\x1b[0m";
+const COLOR_RED:    &str = "\x1b[31m";
+const COLOR_GREEN:  &str = "\x1b[32m";
+const COLOR_YELLOW: &str = "\x1b[33m";
+const COLOR_RESET:  &str = "\x1b[0m";
 
 /// Returns the usage of the compiler as a string
 fn usage(prog_name: String) -> String {

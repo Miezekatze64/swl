@@ -1,9 +1,8 @@
 use std::{process::exit, collections::HashMap, fs::File, io::{stdin, Read, stderr, Write}, time::Duration};
-use libc;
 
 use crate::{intermediate::Inst, util::{Type, PrimitiveType, BinaryOp}};
 
-fn find_function(intermediate: &Vec<Inst>, f: &String) -> usize {
+fn find_function(intermediate: &[Inst], f: &String) -> usize {
     for (i, inst) in intermediate.iter().enumerate() {
         if let Inst::Func(nm, _) = inst {
             if nm == f {
@@ -19,7 +18,7 @@ fn find_function(intermediate: &Vec<Inst>, f: &String) -> usize {
     exit(1);
 }
 
-fn find_loop_end(intermediate: &Vec<Inst>, id: usize) -> usize {
+fn find_loop_end(intermediate: &[Inst], id: usize) -> usize {
     for (i, inst) in intermediate.iter().enumerate() {
         if let Inst::Endwhile(id_) = inst {
             if id == *id_ {
@@ -31,7 +30,7 @@ fn find_loop_end(intermediate: &Vec<Inst>, id: usize) -> usize {
     exit(1);
 }
 
-fn find_if_else_end(intermediate: &Vec<Inst>, id: usize) -> (usize, usize) {
+fn find_if_else_end(intermediate: &[Inst], id: usize) -> (usize, usize) {
     let mut a = 0;
     for (i, inst) in intermediate.iter().enumerate() {
         if let Inst::Else(id_) = inst {
@@ -124,14 +123,14 @@ const SEGMENT: u64 = 0b11 << 62;
 const VALUE:   u64 = (0b1 << 62) - 1;
 
 enum FileDescriptor {
-    STDIN,
-    STDOUT,
-    STDERR,
+    Stdin,
+    Stdout,
+    Stderr,
     #[allow(unused)]
     File(File),
 }
 
-pub fn interpret(intermediate: &Vec<Inst>) -> ! {
+pub fn interpret(intermediate: &[Inst]) -> ! {
     let mut stack:      Vec<u64>                              = vec![];
     let mut registers:  [Register; 10]                        = [0; 10];
     let mut vars:       Vec<u8>                               = vec![];
@@ -148,18 +147,18 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
 
     let strace: bool = true;
 
-    fds.push(FileDescriptor::STDIN);
-    fds.push(FileDescriptor::STDOUT);
-    fds.push(FileDescriptor::STDERR);
+    fds.push(FileDescriptor::Stdin);
+    fds.push(FileDescriptor::Stdout);
+    fds.push(FileDescriptor::Stderr);
 
     // setup args:
     globals.append(&mut 1u64.to_le_bytes().to_vec() /* argc */);
     globals.append(&mut 24u64.to_le_bytes().to_vec() /* argv[0] */);
     globals.append(&mut 0u64.to_le_bytes().to_vec() /* argv END */);
     globals.append(&mut 0u64.to_le_bytes().to_vec() /* envp END */);
-    globals.append(&mut vec!['.' as u8, '/' as u8, 'm' as u8, 'a' as u8, 'i' as u8, 'n' as u8, 0, 0] /* argv[0]*/);
+    globals.append(&mut vec![b'.', b'/', b'm', b'a', b'i', b'n', 0, 0] /* argv[0]*/);
 
-    let arg_ptr = 0 | GLOBAL_SEG;
+    let arg_ptr = GLOBAL_SEG;
     
     let mut ip = 0;
     loop {
@@ -269,28 +268,28 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
             Inst::BinOp((r1, r2), sz, op) => {
                 match op {
                     BinaryOp::Add => {
-                        registers[*r1] = registers[*r1] + registers[*r2];
+                        registers[*r1] += registers[*r2];
                     },
                     BinaryOp::Sub => {
-                        registers[*r1] = registers[*r1] - registers[*r2];
+                        registers[*r1] -= registers[*r2];
                     },
                     BinaryOp::Mul => {
-                        registers[*r1] = registers[*r1] * registers[*r2];
+                        registers[*r1] *= registers[*r2];
                     },
                     BinaryOp::Div => {
-                        registers[*r1] = registers[*r1] / registers[*r2];
+                        registers[*r1] /= registers[*r2];
                     },
                     BinaryOp::Mod => {
-                        registers[*r1] = registers[*r1] % registers[*r2];
+                        registers[*r1] %= registers[*r2];
                     },
                     BinaryOp::BitwiseAnd => {
-                        registers[*r1] = registers[*r1] & registers[*r2];
+                        registers[*r1] &= registers[*r2];
                     },
                     BinaryOp::BitwiseOr => {
-                        registers[*r1] = registers[*r1] | registers[*r2];
+                        registers[*r1] |= registers[*r2];
                     },
                     BinaryOp::Eq => {
-                        let mask = ((1u128 << sz*8) - 1) as u64;
+                        let mask = ((1u128 << (sz*8)) - 1) as u64;
                         registers[*r1] = (registers[*r1] & mask == registers[*r2] & mask) as u64;
                     },
                     BinaryOp::BoolAnd => {
@@ -310,10 +309,9 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                         registers[*r1] = ((registers[*r1] as i64) >= (registers[*r2] as i64)) as u64;
                     },
                     BinaryOp::Neq => {
-                        registers[*r1] = !((registers[*r1] as i64) <= (registers[*r2] as i64)) as u64;
+                        registers[*r1] = ((registers[*r1] as i64) != (registers[*r2] as i64)) as u64;
                     },
                 }
-                *sz as u64;
                 ip += 1;
             },
             Inst::Val(reg, tp, val) => {
@@ -354,7 +352,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 if *is_ref {
                     registers[*reg] = idx as u64 | VAR_SEG;
                 } else {
-                    let bytes: Vec<u8> = vars.iter().skip(idx).take(8).map(|x| *x).collect();
+                    let bytes: Vec<u8> = vars.iter().skip(idx).take(8).copied().collect();
                     let mut arr: [u8; 8] = [0; 8];
                     arr.copy_from_slice(&bytes[..]);
                     registers[*reg] = u64::from_le_bytes(arr);
@@ -395,17 +393,17 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 
                                 if count > 0 {
                                     match fds[fd as usize] {
-                                        FileDescriptor::STDIN => {
+                                        FileDescriptor::Stdin => {
                                             stdin().take(count).read_to_end(&mut bytes).unwrap();
-                                            if bytes.len() > 0 {
+                                            if !bytes.is_empty() {
                                                 assert_eq!(count as usize, bytes.len());
                                             }
                                     },
-                                    FileDescriptor::STDOUT => {
+                                    FileDescriptor::Stdout => {
                                         eprintln!("FATAL: Attempt to read from stdout");
                                         exit(1);
                                     }
-                                    FileDescriptor::STDERR => {
+                                    FileDescriptor::Stderr => {
                                         eprintln!("FATAL: Attempt to read from stderr");
                                         exit(1);
                                     },
@@ -418,9 +416,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     GLOBAL_SEG => {
                                         for (i, a) in bytes.iter().enumerate() {
                                             if (val as usize + i) >= globals.len() {
-                                                for _ in globals.len() ..= (buf as usize + i) {
-                                                    globals.push(0);
-                                                }
+                                                globals.append(&mut vec![0; (buf as usize) + i - globals.len() + 1]);
                                             }
                                             globals[val as usize + i] = *a;
                                         }
@@ -447,21 +443,19 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 let buf   = registers[2];
                                 let count = registers[3];
 
-                                let string;
-                                
-                                match buf & SEGMENT {
+                                let string = match buf & SEGMENT {
                                     GLOBAL_SEG => {
-                                        let bytes: Vec<u8> = globals.to_owned().
-                                            into_iter().skip((buf & VALUE) as usize).take(count as usize).collect();
-                                        string = String::from_utf8(bytes).unwrap();
+                                        let bytes: Vec<u8> = globals.
+                                            iter().copied().skip((buf & VALUE) as usize).take(count as usize).collect();
+                                        String::from_utf8(bytes).unwrap()
                                     },
                                     HEAP_SEG => {
-                                        let bytes: Vec<u8> = heap.to_owned().
-                                            into_iter().skip((buf & VALUE) as usize).take(count as usize).collect();
-                                        string = String::from_utf8(bytes).unwrap();
+                                        let bytes: Vec<u8> = heap.iter().
+                                            copied().skip((buf & VALUE) as usize).take(count as usize).collect();
+                                        String::from_utf8(bytes).unwrap()
                                     }
                                     _ => unimplemented!("SEGMENT: {}", buf & SEGMENT)
-                                }
+                                };
 
                                 if strace {
                                     eprintln!("write({fd}, {buf}, {count}) -> {}", registers[0]);
@@ -469,12 +463,12 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                 }
 
                                 match fds[fd as usize] {
-                                    FileDescriptor::STDIN => {
+                                    FileDescriptor::Stdin => {
                                         eprintln!("FATAL: Attempt to write to stdin");
                                         exit(1);
                                     },
-                                    FileDescriptor::STDOUT => print!("{}", string),
-                                    FileDescriptor::STDERR => eprint!("{}", string),
+                                    FileDescriptor::Stdout => print!("{}", string),
+                                    FileDescriptor::Stderr => eprint!("{}", string),
                                     FileDescriptor::File(_) => unimplemented!(),
                                 }
                             },
@@ -561,7 +555,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     let arg = deref!(ptr, globals, heap, vars);
                                     let string = get_str!(arg, globals, heap, vars);
 
-                                    if string[0] == 'q' as u8 {
+                                    if string[0] == b'q' {
                                         exit(42);
                                     }
                                     
@@ -596,17 +590,17 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                                     for (i, mut a) in args.into_iter().enumerate() {
                                         let arg_ptr = libc::malloc(a.len()) as *mut i8;
                                         libc::strcpy(arg_ptr, a.as_mut_ptr() as *mut i8);
-                                        *argv.offset(i as isize) = arg_ptr;
+                                        *argv.add(i) = arg_ptr;
                                     }
-                                    *argv.offset(argc as isize) = 0 as *const i8;
+                                    *argv.add(argc) = std::ptr::null::<i8>();
 
                                     let envp = libc::malloc((envc+1) * 8) as *mut *const i8;
                                     for (i, mut a) in envs.into_iter().enumerate() {
                                         let env_ptr = libc::malloc(a.len()) as *mut i8;
                                         libc::strcpy(env_ptr, a.as_mut_ptr() as *mut i8);
-                                        *envp.offset(i as isize) = env_ptr;
+                                        *envp.add(i) = env_ptr;
                                     }
-                                    *envp.offset(argc as isize) = 0 as *const i8;
+                                    *envp.add(argc) = std::ptr::null::<i8>();
                                     
                                     registers[0] = libc::execve(fname_ptr,
                                                                 argv,
@@ -691,7 +685,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
             },
             Inst::Index(reg0, reg1, sz_vec, is_ref) => {
                 if *is_ref {
-                    registers[*reg0] = registers[*reg1] + 8 + registers[*reg0];
+                    registers[*reg0] += registers[*reg1] + 8;
                 } else {
                     let rr = sz_vec.len();
                     registers[*reg1] += 8 + registers[*reg0];
@@ -716,9 +710,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                         GLOBAL_SEG => {
                             for (i, v) in registers[*r0].to_le_bytes().iter().take(sz_vec[0]).enumerate() {
                                 if (val as usize + i) >= globals.len() {
-                                    for _ in globals.len() ..= (val as usize + i) {
-                                        globals.push(0);
-                                    }
+                                    globals.append(&mut vec![0; val as usize + i - globals.len() + 1]);
                                 }
                                 globals[val as usize + i] = *v;
                             }
@@ -742,9 +734,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                             GLOBAL_SEG => {
                                 for (i, a) in registers[r].to_le_bytes().iter().take(sz_vec[off]).enumerate() {
                                     if (val as usize + i) >= globals.len() {
-                                        for _ in globals.len() ..= (val as usize + i) {
-                                            globals.push(0);
-                                        }
+                                        globals.append(&mut vec![0; (val as usize + i) - globals.len() + 1]);
                                     }
                                     globals[val as usize + i] = *a;
                                 }
@@ -764,15 +754,13 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
             Inst::Global(reg, name, _, off, is_ref) => {
                 if *is_ref {
                     unimplemented!()
+                } else if global_idx.contains_key(name) {
+                    let bytes: Vec<u8> = globals.iter().skip(global_idx[name] + *off).take(8).copied().collect();
+                    let mut arr: [u8; 8] = [0; 8];
+                    arr.copy_from_slice(&bytes[..]);
+                    registers[*reg] = u64::from_le_bytes(arr);
                 } else {
-                    if global_idx.contains_key(name) {
-                        let bytes: Vec<u8> = globals.iter().skip(global_idx[name] + *off).take(8).map(|x| *x).collect();
-                        let mut arr: [u8; 8] = [0; 8];
-                        arr.copy_from_slice(&bytes[..]);
-                        registers[*reg] = u64::from_le_bytes(arr);
-                    } else {
-                        registers[*reg] = 0;
-                    }
+                    registers[*reg] = 0;
                 }
                 ip += 1;
             },
@@ -798,20 +786,20 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                 let val = registers[*reg] + *off as u64;
                 registers[*reg] = match val & SEGMENT {
                     GLOBAL_SEG => {
-                        let bytes: Vec<u8> = globals.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
+                        let bytes: Vec<u8> = globals.iter().skip((val & VALUE) as usize).take(8).copied().collect();
                         let mut arr: [u8; 8] = [0; 8];
                         arr.copy_from_slice(&bytes[..]);
                         u64::from_le_bytes(arr)
                     },
                     HEAP_SEG => {
-                        let bytes: Vec<u8> = heap.iter().skip((val & VALUE) as usize).take(8).map(|x| *x).collect();
+                        let bytes: Vec<u8> = heap.iter().skip((val & VALUE) as usize).take(8).copied().collect();
                         let mut arr: [u8; 8] = [0; 8];
                         arr.copy_from_slice(&bytes[..]);
                         u64::from_le_bytes(arr)
                     },
                     VAR_SEG => {
                         let rval = val - (*off * 2) as u64;
-                        let bytes: Vec<u8> = vars.iter().skip((rval & VALUE) as usize).take(8).map(|x| *x).collect();
+                        let bytes: Vec<u8> = vars.iter().skip((rval & VALUE) as usize).take(8).copied().collect();
                         let mut arr: [u8; 8] = [0; 8];
                         arr.copy_from_slice(&bytes[..]);
                         u64::from_le_bytes(arr)
@@ -830,9 +818,7 @@ pub fn interpret(intermediate: &Vec<Inst>) -> ! {
                     GLOBAL_SEG => {
                         for (i, a) in registers[*reg1].to_le_bytes().iter().enumerate() {
                             if (val as usize + i) >= globals.len() {
-                                for _ in globals.len() ..= (val as usize + i) {
-                                    globals.push(0);
-                                }
+                                globals.append(&mut vec![0; val as usize + i - globals.len() + 1]);
                             }
                             globals[val as usize + i] = *a;
                         }

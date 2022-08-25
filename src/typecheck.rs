@@ -987,7 +987,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                 };
                 
                 let allowed = rvalid && lvalid;
-                return if ! allowed {
+                if ! allowed {
                     errors.push((ErrorLevel::Err,
                                  error!(lexer, pos,
                                         "invalid cast {rtp} -> {tp}")

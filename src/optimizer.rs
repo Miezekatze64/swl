@@ -6,49 +6,39 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
     match &mut expr.1 {
         ExpressionR::T(ea, op_, eb, _) => {            
             optimize_expr(ea, aliases, const_vars.clone());
-            optimize_expr(eb, aliases, const_vars.clone());
+            optimize_expr(eb, aliases, const_vars);
             if let ExpressionR::Val(ta, va) = &ea.1 {
                 if let ExpressionR::Val(tb, vb) = &eb.1 {
                     if let crate::util::Op::Binary(op) = op_ {
                         match op {
                             BinaryOp::Add => {
-                                if ta.is_numeric() && tb.is_numeric() {
-                                    if ta.is_integral() && tb.is_integral() {
-                                        let c = va.parse::<u64>().unwrap() + vb.parse::<u64>().unwrap();
-                                        expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
-                                    }
+                                if ta.is_integral() && tb.is_integral() {
+                                    let c = va.parse::<u64>().unwrap() + vb.parse::<u64>().unwrap();
+                                    expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
                                 }
                             },
                             BinaryOp::Sub => {
-                                if ta.is_numeric() && tb.is_numeric() {
-                                    if ta.is_integral() && tb.is_integral() {
-                                        let c = va.parse::<u64>().unwrap() - vb.parse::<u64>().unwrap();
-                                        expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
-                                    }
+                                if ta.is_integral() && tb.is_integral() {
+                                    let c = va.parse::<u64>().unwrap() - vb.parse::<u64>().unwrap();
+                                    expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
                                 }
                             },
                             BinaryOp::Mul => {
-                                if ta.is_numeric() && tb.is_numeric() {
-                                    if ta.is_integral() && tb.is_integral() {
-                                        let c = va.parse::<u64>().unwrap() * vb.parse::<u64>().unwrap();
-                                        expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
-                                    }
+                                if ta.is_integral() && tb.is_integral() {
+                                    let c = va.parse::<u64>().unwrap() * vb.parse::<u64>().unwrap();
+                                    expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
                                 }
                             },
                             BinaryOp::Div => {
-                                if ta.is_numeric() && tb.is_numeric() {
-                                    if ta.is_integral() && tb.is_integral() {
-                                        let c = va.parse::<u64>().unwrap() / vb.parse::<u64>().unwrap();
-                                        expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
-                                    }
+                                if ta.is_integral() && tb.is_integral() {
+                                    let c = va.parse::<u64>().unwrap() / vb.parse::<u64>().unwrap();
+                                    expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
                                 }
                             },
                             BinaryOp::Mod => {
-                                if ta.is_numeric() && tb.is_numeric() {
-                                    if ta.is_integral() && tb.is_integral() {
-                                        let c = va.parse::<u64>().unwrap() % vb.parse::<u64>().unwrap();
-                                        expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
-                                    }
+                                if ta.is_integral() && tb.is_integral() {
+                                    let c = va.parse::<u64>().unwrap() % vb.parse::<u64>().unwrap();
+                                    expr.1 = ExpressionR::Val(Op::combine_type(op_, ta, tb, aliases), c.to_string());
                                 }
                             },
                             BinaryOp::Eq => {
@@ -95,12 +85,12 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
         ExpressionR::ArrAlloc(_, _) => {},
         ExpressionR::Index(e1, e2, _) => {
             optimize_expr(e1, aliases, const_vars.clone());
-            optimize_expr(e2, aliases, const_vars.clone());
+            optimize_expr(e2, aliases, const_vars);
         },
         ExpressionR::UnaryOp(_, _, _) => {},
         ExpressionR::StructLiteral(_, _) => {},
         ExpressionR::StructField(e1, ..) => {
-            optimize_expr(e1, aliases, const_vars.clone());
+            optimize_expr(e1, aliases, const_vars);
         },
         ExpressionR::Ref(_) => {},
         ExpressionR::Deref(_) => {},
@@ -167,10 +157,8 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == exp.1 {
                     *a = *fst.clone();
-                } else if ExpressionR::Val(b, "false".into()) == exp.1 {
-                    if snd.is_some() {
-                        *a = *snd.clone().unwrap();
-                    }
+                } else if ExpressionR::Val(b, "false".into()) == exp.1 && snd.is_some() {
+                    *a = *snd.clone().unwrap();
                 }
             },
 //            ASTNodeR::FunctionDecl(_, _, _, _, _) => {},

@@ -444,6 +444,8 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(_, ASTNodeR::Extern(..)) => {},
              }
         };
+    } else {
+        unreachable!("value is not a block");
     }
 }
 

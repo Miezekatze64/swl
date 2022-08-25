@@ -823,6 +823,45 @@ impl Parser {
             }
         }
 
+        fn parse_if(parser: &mut Parser, pos: usize, verbose: usize,
+                    mut errors: Vec<Error>)
+                    ->Result<Option<ASTNode>, Vec<Error>> {
+            // next token: '('
+            err_ret!(parser.expect(Some(TokenType::Special),
+                                   Some("(".into())), errors);
+
+            let predicate = parser.parse_expr(&[")"])?;
+
+            // next token: '{'
+            err_ret!(parser.expect(Some(TokenType::Special),
+                                   Some("{".into())), errors);
+
+            let block = parser.parse_block(pos, verbose)?;
+
+            // check for else
+            let next_token = get_peek_token!(parser.lexer, errors);
+            let block2 = if next_token.ttype == TokenType::Keyword && next_token.value == "else" {
+                    parser.lexer.next_token().unwrap();
+
+                    let nt = get_token!(parser.lexer, errors);
+                    if nt.ttype == TokenType::Special && nt.value == "{" {
+                    Some(Box::new(parser.parse_block(pos, verbose)?))
+                } else if nt.ttype == TokenType::Keyword && nt.value == "if" {
+                    Some(Box::new(ASTNode(nt.pos, ASTNodeR::Block(vec![
+                        parse_if(parser, nt.pos, verbose, errors)?.unwrap()
+                    ]))))
+                } else {
+                    let ntv = nt.value;
+                    errors.push((ErrorLevel::Err, error!(parser.lexer, nt.pos, "unexpected token `{ntv}`, block or `if` expected.")));
+                    return Err(errors);
+                }
+            } else {
+                None
+            };
+
+            Ok(Some(ASTNode(pos, ASTNodeR::If(predicate.0, Box::new(block), block2))))
+        }
+
 
         match token.ttype {
             TokenType::Int | TokenType::Long | TokenType::Float | TokenType::Char |
@@ -1009,29 +1048,7 @@ impl Parser {
                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "`if` not allowed at top level")));
                         return Err(errors);
                     }
-                    // next token: '('
-                    err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors);
-
-                    let predicate = self.parse_expr(&[")"])?;
-
-                    // next token: '{'
-                    err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors);
-                    
-                    let block = self.parse_block(token.pos, verbose)?;
-
-                    // check for else
-                    let next_token = get_peek_token!(self.lexer, errors);
-                    let block2 = if next_token.ttype == TokenType::Keyword && next_token.value == "else" {
-                        self.lexer.next_token().unwrap();
-                        // next token: '{'
-                        err_ret!(self.expect(Some(TokenType::Special), Some("{".into())), errors);
-                        
-                        Some(Box::new(self.parse_block(token.pos, verbose)?))
-                    } else {
-                        None
-                    };
-
-                    return Ok(Some(ASTNode(token.pos, ASTNodeR::If(predicate.0, Box::new(block), block2))));
+                    return parse_if(self, token.pos, verbose, errors.clone());
                     
                 },
                 "while" => {

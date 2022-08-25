@@ -99,7 +99,7 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
         },
         ExpressionR::UnaryOp(_, _, _) => {},
         ExpressionR::StructLiteral(_, _) => {},
-        ExpressionR::StructField(e1, _, _) => {
+        ExpressionR::StructField(e1, ..) => {
             optimize_expr(e1, aliases, const_vars.clone());
         },
         ExpressionR::Ref(_) => {},
@@ -190,7 +190,7 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                     to_remove.push(i);
                 }
             },
-            ASTNodeR::SetField(e1, _, e2, _) => {
+            ASTNodeR::SetField(e1, _, e2, ..) => {
                 optimize_expr(e1, aliases, const_vars.clone());
                 optimize_expr(e2, aliases, const_vars.clone());
             },

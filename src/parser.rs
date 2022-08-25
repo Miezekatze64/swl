@@ -32,7 +32,7 @@ pub enum ASTNodeR {
     ArrIndexInit(Expression, Expression, Expression, Vec<usize>),
     While(Expression, Box<ASTNode>),
     Struct(String, Vec<(String, (Type, usize))>),
-    SetField(Expression, String, Expression, Option<Type>),
+    SetField(Expression, String, Expression, Option<Type>, bool),
     Include(String, Box<ASTNode>, Lexer),
     Break(),
     MemberFunction(Type, Expression, String, Vec<Expression>),
@@ -57,7 +57,7 @@ pub enum ExpressionR {
     Index(Box<Expression>, Box<Expression>, Vec<usize>),
     UnaryOp(UnaryOp, Box<Expression>, u32),
     StructLiteral(String, HashMap<String, Expression>),
-    StructField(Box<Expression>, String, Option<Type>),
+    StructField(Box<Expression>, String, Option<Type>, bool),
     Ref(Box<Expression>),
     Deref(Box<Expression>),
     MemberFunction(Type, Box<Expression>, String, Vec<Expression>),
@@ -172,8 +172,12 @@ impl std::fmt::Display for ASTNodeR {
                 }
                 write!(f, "}}")
             },
-            ASTNodeR::SetField(left, field, right, _) => {
-                write!(f, "{left}.{field} = {right};")
+            ASTNodeR::SetField(left, field, right, _,deref) => {
+                if *deref {
+                    write!(f, "{left}->{field} = {right};")
+                } else {
+                    write!(f, "{left}.{field} = {right};")
+                }
             },
             ASTNodeR::Include(file, _, _) => {
                 write!(f, "include \"{file}\";")
@@ -313,8 +317,12 @@ impl std::fmt::Display for ExpressionR {
                 }
                 write!(f, "}}")
             },
-            ExpressionR::StructField(expr, field, _) => {
-                write!(f, "{expr}.{field}")
+            ExpressionR::StructField(expr, field, _, deref) => {
+                if *deref {
+                    write!(f, "{expr}->{field}")
+                } else {
+                    write!(f, "{expr}.{field}")
+                }
             },
             ExpressionR::Ref(expr) => {
                 write!(f, "ref {expr}")
@@ -882,11 +890,11 @@ impl Parser {
                         }
                     },
                     ExpressionR::StructLiteral(..) => unreachable!(),
-                    ExpressionR::StructField(strct, field, _) => {
+                    ExpressionR::StructField(strct, field, _, deref) => {
                         err_ret!(self.expect(Some(TokenType::Operator),
                                              Some("=".into())), errors);
                         let expr = self.parse_expr(seperators)?.0;
-                        return Ok(Some(ASTNode(token.pos, ASTNodeR::SetField(*strct, field, expr, None))));
+                        return Ok(Some(ASTNode(token.pos, ASTNodeR::SetField(*strct, field, expr, None, deref))));
                     },
                     ExpressionR::MemberFunction(tp, expr, name, args) => {
                         return Ok(Some(ASTNode(token.pos, ASTNodeR::MemberFunction(tp, *expr, name, args))));
@@ -1444,7 +1452,7 @@ impl Parser {
 
                     Ok(Box::new(Expression(ident_pos, ExpressionR::StructLiteral(ident, fields), None)))
                 },
-                "."|"[" => {
+                "."|"->"|"[" => {
                     Ok(Box::new(Expression(token.pos, ExpressionR::Var(ident), None)))
                 },
                 a => if seperators.contains(&a) {
@@ -1634,13 +1642,14 @@ impl Parser {
                 }
 
                 res = Expression(ident_expr.0, ExpressionR::Index(Box::new(ident_expr.clone()), Box::new(index.0), vec![]), None);
-            } else if tk.ttype == TokenType::Special && tk.value == "." {
+            } else if tk.ttype == TokenType::Special && (tk.value == "." || tk.value == "->") {
                 self.lexer.next_token().unwrap();
                 let ident = err_ret!(self.expect(Some(TokenType::Ident), None), errors);
                 let ident_expr = err_add!(self.parse_ident_expr(ident.clone().value, ident.pos, seperators), errors);
+                
                 match ident_expr.1 {
                     ExpressionR::Var(ref field) => {
-                        let expr = Expression(ident_expr.0, ExpressionR::StructField(Box::new(res.clone()), field.clone(), None), None);
+                        let expr = Expression(ident_expr.0, ExpressionR::StructField(Box::new(res.clone()), field.clone(), None, tk.value == "->"), None);
                         res = expr;
                         continue;
                     },

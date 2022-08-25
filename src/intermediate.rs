@@ -174,8 +174,8 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             ret.push(Inst::Pop(index));
             ret.push(Inst::Index(index, index+1, expr_vec, is_ref));
         },
-        ExpressionR::StructField(expr, field, struct_type) => {
-            ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, true));
+        ExpressionR::StructField(expr, field, struct_type, deref) => {
+            ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, !deref));
             
             let mut offset = 0;
             if let Some(Type::Struct(_, fields)) = struct_type {
@@ -485,7 +485,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         ASTNodeR::Break() => {
             ret.push(Inst::Break(loop_idx));
         }
-        ASTNodeR::SetField(lexpr, name, rexpr, struct_type) => {
+        ASTNodeR::SetField(lexpr, name, rexpr, struct_type, deref) => {
             if let Some(Type::Struct(_, fields)) = struct_type {
                 let map_result = &fields.iter().find(|(x, _)| x == &name).unwrap().1;
                 let mut off = 0;
@@ -495,7 +495,7 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                     }
                     off += tp.size(&aliases);
                 }
-                ret.append(&mut gen_expr(lexpr, 0, offsets, globals, &aliases, true));
+                ret.append(&mut gen_expr(lexpr, 0, offsets, globals, &aliases, !deref));
                 ret.append(&mut gen_expr(rexpr, 1, offsets, globals, &aliases, false));
                 ret.push(Inst::SetField(0, 1, off, map_result.0.size(&aliases)));
             } else {

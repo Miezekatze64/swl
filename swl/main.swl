@@ -1,13 +1,25 @@
-include "std.swl";
+// include "std.swl";
 
-#link "test.o"
+// #link "test.o"
 #link_lib "libc"
-extern func f(char *a, int b, int c, int d, int e, int f) -> int;
+extern func malloc(int size) -> long;
+// extern func f(char *a, int b, int c, int d, int e, int f) -> int;
+
+struct Test {
+    int a;
+    int b;
+}
 
 func main() -> int {
-    int i = 2;
-    long l = 49l;
-    println("Hello, World!");
-    sleep(1000l);
-    <- f(as[char*, 0], 2, 3, 4, 5, as[int, l]);
+//    int i = 2;
+//    long l = 49l;
+//    println("Hello, World!");
+//    sleep(1000l);
+
+    Test *ptr = as[Test*, malloc(8)];
+    ptr->a = 42;
+    ptr->b = 69;
+    
+    
+    <- ptr->a;   //f(as[char*, 0], 2, 3, 4, 5, as[int, l]);
 }

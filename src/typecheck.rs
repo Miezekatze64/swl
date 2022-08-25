@@ -212,8 +212,20 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(_, ASTNodeR::Block(..)) => {
                     typecheck((a, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), false, lexer);
                 },
-                ASTNode(pos, ASTNodeR::SetField(ref mut expr_, ref mut name, ref mut rexpr, _)) => {
-                    let struct_type = typecheck_expr(expr_, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer).dealias(aliases);
+                ASTNode(pos, ASTNodeR::SetField(ref mut expr_, ref mut name, ref mut rexpr, _, deref)) => {
+                    let struct_type_ = typecheck_expr(expr_, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer).dealias(aliases);
+
+                    let struct_type = if *deref {
+                        if let Type::Pointer(stu) = struct_type_ {
+                            *stu
+                        } else {
+                            errors.push((ErrorLevel::Err, error!(lexer, *pos, "type `{struct_type_}` is not a pointer, but pointer type was expected")));
+                            continue;
+                        }
+                    } else {
+                        struct_type_
+                    };
+                    
                     if let Type::Struct(ref struct_name, ref map) = struct_type {
                         if map.iter().any(|(n, _)| n == name) {
                             let field_type = map.iter().find(|(n, _)| n == name).unwrap().1.0.clone();
@@ -222,10 +234,12 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                                 errors.push((ErrorLevel::Err, error!(lexer, *pos, "imcompatible types: expected `{field_type}`, found `{rtype}`")));
                                 continue;
                             }
-                            a.1 = ASTNodeR::SetField(expr_.clone(), name.clone(), rexpr.clone(), Some(struct_type));
+                            a.1 = ASTNodeR::SetField(expr_.clone(), name.clone(), rexpr.clone(), Some(struct_type), *deref);
                         } else {
                             errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefinded field `{name}` for type `{struct_name}`")));
                         }
+                    } else {
+                        errors.push((ErrorLevel::Err, error!(lexer, *pos, "type `{struct_type}` is not a struct, but struct type was expected")));
                     }
                 }
                 ASTNode(pos, ASTNodeR::If(ref mut expr, ref mut block, ref mut block2)) => {
@@ -606,12 +620,23 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                 }
                 Type::Struct(name.clone(), fields_.iter().map(|(a, (b, c))| (a.to_owned(), (b.to_owned(), c.to_owned()))).collect())
             },
-            ExpressionR::StructField(ref mut expr_, ref mut name, _) => {
-                let struct_type = typecheck_expr(expr_, functions, generic_functions, immutable_args,errors, lexer).dealias(aliases);
+            ExpressionR::StructField(ref mut expr_, ref mut name, _, deref) => {
+                let struct_type_ = typecheck_expr(expr_, functions, generic_functions, immutable_args,errors, lexer).dealias(aliases);
+                let struct_type = if *deref {
+                    if let Type::Pointer(stu) = struct_type_ {
+                        *stu
+                    } else {
+                        errors.push((ErrorLevel::Err, error!(lexer, pos, "type `{struct_type_}` is not a pointer, but pointer type was expected")));
+                        return Type::Invalid;
+                    }
+                } else {
+                    struct_type_
+                };
+                
                 if let Type::Struct(ref struct_name, ref map) = struct_type {
                     if map.iter().any(|(x, _)| x == name) {
                         let ret = map.iter().find(|(x, _)| x == name).unwrap().1.0.clone();
-                        expr.1 = ExpressionR::StructField(expr_.clone(), name.clone(), Some(struct_type.clone()));
+                        expr.1 = ExpressionR::StructField(expr_.clone(), name.clone(), Some(struct_type.clone()), *deref);
                         return ret;
                     } else {
                         errors.push((ErrorLevel::Err, error!(lexer, pos, "undefinded field `{name}` for type `{struct_name}`")));

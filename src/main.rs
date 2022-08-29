@@ -17,12 +17,14 @@ use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
 
 /// Enum representing possible target types
 // TODO(#2): parse target types (-t/--target)
-#[allow(unused)]
+#[derive(PartialEq, Eq)]
 enum Target {
     Linux,
+    #[allow(unused)]
     Bsd,
     Mac,
     Windows,
+    #[allow(unused)]
     Wasm,
 }
 
@@ -39,6 +41,7 @@ fn usage(prog_name: String) -> String {
              \t--output    | -o {COLOR_YELLOW}=>{COLOR_RESET} set output filename\n\
              \t--help      | -h {COLOR_YELLOW}=>{COLOR_RESET} display this help message and exit\n\
              \t--interpret | -i {COLOR_YELLOW}=>{COLOR_RESET} interpret program instead of compiling\n\
+             \t--target    | -t {COLOR_YELLOW}=>{COLOR_RESET} set target of compilation (e. g. linux-x86_64)\n\
              ")
 }
 
@@ -280,20 +283,38 @@ fn main() {
                 outfile.push_str(&name);
 
                 let mut linked_files = parser.links.clone();
+                let linked_libs  = parser.linked_libs.clone();
                 
-                for lib in parser.linked_libs {
+                for lib in linked_libs {
                     // search for lib
                     let lib_str = "-l".to_owned() + &lib;
                     linked_files.push(lib_str);
                 }
 
                 let linked_files_str = linked_files.join(" ");
+
+
+                let ld = match target {
+                    Target::Linux => {
+                        if verbose > 0 {
+                            eprintln!("[*] CMD: ld -o {outfile} {obj_path} {linked_files_str} --dynamic-linker /lib/ld-linux-x86-64.so.2");
+                        }
+
+                        Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).args(linked_files).arg("--dynamic-linker").arg("/lib/ld-linux-x86-64.so.2").output().unwrap()
+                    },
+                    Target::Windows => {
+                        let has_mingw = Command::new("x86_64-w64-mingw32-ld").output().is_ok();
+                        let linker = if has_mingw { "x86_64-w64-mingw32-ld" } else { "ld" };
+                            
+                        if verbose > 0 {
+                            eprintln!("[*] CMD: {linker} -o {outfile} {obj_path} {linked_files_str} --image-base 0x10000000");
+                        }
+
+                        Command::new(linker).arg("-o").arg(outfile.clone()).arg(obj_path).args(linked_files).arg("--dynamic-linker").arg("/lib/ld-linux-x86-64.so.2").arg("--image-base").arg("0x10000000").output().unwrap()
+                    }
+                    _ => unreachable!("should have already exited")
+                };
                 
-                if verbose > 0 {
-                    eprintln!("[*] CMD: ld -o {outfile} {obj_path} {linked_files_str} --dynamic-linker /lib/ld-linux-x86-64.so.2");
-                }
-                
-                let ld = Command::new("ld").arg("-o").arg(outfile.clone()).arg(obj_path).args(linked_files).arg("--dynamic-linker").arg("/lib/ld-linux-x86-64.so.2").output().unwrap();
                 if ! ld.status.success() {
                     eprintln!("ERROR executing ld:\n{}", std::str::from_utf8(&ld.stderr).unwrap());
                     error = true;

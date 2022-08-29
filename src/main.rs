@@ -5,6 +5,7 @@ mod parser;
 mod typecheck;
 mod intermediate;
 mod optimizer;
+mod codegen_x86_64;
 mod codegen_x86_64_linux;
 mod interpreter;
 mod preprocessor;
@@ -54,18 +55,33 @@ fn main() {
     let (pos_args, gnu_args, unix_args) = match util::parse_args(vec) {
         Ok(a) => a,
         Err(e) => {
-            println!("ERROR during argument parsing: {e}");
-            return;
+            eprintln!("ERROR during argument parsing: {e}");
+            exit(1);
         },
     };
 
-    // temporarily fix target to Linux
-    let target = Target::Linux;
+    let t = if gnu_args.contains_key("target") {
+        &gnu_args["target"]
+    } else if unix_args.contains_key(&'t') {
+        &unix_args[&'t']
+    } else {
+        "linux"
+    };
+
+    let target = match t {
+        "linux" | "gnu" | "linux-x86_64" | "x86_64-linux-gnu" => Target::Linux,
+        "windows" | "win64" | "x86_64-w64" | "windows-x86_64" => Target::Windows,
+        "darwin" | "macos" | "darwin-x86_64" | "x86_64-apple-darwin" => Target::Mac,
+        _ => {
+            eprintln!("Unknown target: {t}");
+            exit(1);
+        }
+    };
 
     // get architecture-specific functions
     let arch_result = match target {
         Target::Linux => {
-            Ok((codegen_x86_64_linux::intrinsics, codegen_x86_64_linux::generate))
+            Ok((codegen_x86_64::intrinsics, codegen_x86_64_linux::generate))
         },
         Target::Bsd => {
             Err("BSD")

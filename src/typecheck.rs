@@ -964,7 +964,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                 let rtp = typecheck_expr(rexpr, functions, generic_functions,
                                          immutable_args, errors, lexer);
 
-                let rvalid = match rtp {
+                let rvalid = match rtp.dealias(aliases) {
                     Type::Primitive(ref primr) => 
                         primr == &PrimitiveType::Float ||
                         primr == &PrimitiveType::Int ||
@@ -975,7 +975,7 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
                     _ => false
                 };
 
-                let lvalid = match tp {
+                let lvalid = match tp.dealias(aliases) {
                     Type::Primitive(ref priml) => 
                         priml == &PrimitiveType::Float ||
                         priml == &PrimitiveType::Int ||

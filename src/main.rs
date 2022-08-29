@@ -28,10 +28,10 @@ enum Target {
     Wasm,
 }
 
-const COLOR_RED:    &str = "\x1b[31m";
-const COLOR_GREEN:  &str = "\x1b[32m";
-const COLOR_YELLOW: &str = "\x1b[33m";
-const COLOR_RESET:  &str = "\x1b[0m";
+pub const COLOR_RED:    &str = "\x1b[31m";
+pub const COLOR_GREEN:  &str = "\x1b[32m";
+pub const COLOR_YELLOW: &str = "\x1b[33m";
+pub const COLOR_RESET:  &str = "\x1b[0m";
 
 /// Returns the usage of the compiler as a string
 fn usage(prog_name: String) -> String {
@@ -175,7 +175,7 @@ fn main() {
     if let Err(ref e) = a {
         for a in e {
             let (t, v) = a;
-            eprintln!("{}: {}", t, v);
+            eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v);
         }
         error = true;
     }
@@ -200,7 +200,7 @@ fn main() {
             Err((e, a, g)) => {
                 for a in e.iter() {
                     let (t, v) = a;
-                    eprintln!("{}: {}", t, v);
+                    eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v);
                 };
                 if e.into_iter().any(|(lvl, _)| lvl == util::ErrorLevel::Err) {
                     checked = false;

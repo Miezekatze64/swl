@@ -1,3 +1,6 @@
+use crate::{COLOR_RED, COLOR_GREEN, COLOR_RESET};
+use std::process::exit;
+
 fn pos_to_line_char(source: Vec<char>, pos: usize) -> (usize, usize) {
     assert!(pos < source.len());
     let mut p: usize = 0;
@@ -14,6 +17,29 @@ fn pos_to_line_char(source: Vec<char>, pos: usize) -> (usize, usize) {
     }
 
     (line, ch)
+}
+
+macro_rules! parse_str {
+    ($file:expr, $i:expr, $dir_start:expr, $filename:expr) => {
+        | | -> Option<String> {
+            while $file[$i] == ' ' || $file[$i] == '\t' { $i += 1; }
+            if $file[$i] != '"' {
+                let (l, c) = pos_to_line_char($file.clone(), $dir_start);
+                eprintln!("{file}:{line}:{ch}: Invalid character `{}`, `\"` expected",
+                          $file[$i],
+                          file = $filename,
+                          line = l+1,
+                          ch = c+1,
+                );
+                return None;
+            }
+            $i += 1;
+            let str_start = $i;
+            while $file[$i] != '"' { $i += 1; }
+            let string = $file.iter().skip(str_start).take($i - str_start).collect::<String>();
+            Some(string)
+        }()
+    };
 }
 
 pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>, Vec<String>) {
@@ -57,23 +83,25 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
             match directive.as_str() {
                 "link"|"link_lib" => {
                     // expect string
-                    while file[i] == ' ' || file[i] == '\t' { i += 1; }
-                    if file[i] != '"' {
-                        let (l, c) = pos_to_line_char(file.clone(), dir_start);
-                        eprintln!("{file}:{line}:{ch}: Invalid character `{}`, `\"` expected",
-                                  file[i],
-                                  file = filename,
-                                  line = l+1,
-                                  ch = c+1,
-                        );
-                            continue;
-                    }
-                    i += 1;
-                    let str_start = i;
-                    while file[i] != '"' { i += 1; }
-                    let file = file.iter().skip(str_start).take(i - str_start).collect::<String>();
+                    let file = match parse_str!(file, i, dir_start, filename) {
+                        Some(a) => a,
+                        None => continue,
+                    };
 
                     (if directive == *"link" {&mut links} else {&mut links_libs}).push(file);
+                },
+                "error" => {
+                    let msg = match parse_str!(file, i, dir_start, filename) {
+                        Some(a) => a,
+                        None => continue,
+                    };
+                    let (l, c) = pos_to_line_char(file.clone(), dir_start);
+                    eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}{msg}",
+                                   file = filename,
+                                   line = l+1,
+                                   ch = c+1,
+                    );
+                    exit(1);
                 },
                 _ => {
                     let (l, c) = pos_to_line_char(file.clone(), dir_start);

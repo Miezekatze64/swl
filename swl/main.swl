@@ -1,4 +1,4 @@
-// include "std.swl";
+include "std.swl";
 func main() -> int {
     <- 42;
 }

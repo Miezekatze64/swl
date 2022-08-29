@@ -19,7 +19,9 @@ macro_rules! error_str {
     ($lexer:expr, $pos:expr) => {
         | | -> String {
             let (l, c) = $lexer.pos_to_line_char($pos);
-            return format!("{file}:{line}:{ch}: ",
+            return format!("{COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}",
+                           COLOR_GREEN = "\x1b[32m",
+                           COLOR_RESET = "\x1b[0m",
                            file = $lexer.filename,
                            line = l+1,
                            ch = c+1,

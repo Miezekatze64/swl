@@ -7,12 +7,13 @@ mod intermediate;
 mod optimizer;
 mod codegen_x86_64;
 mod codegen_x86_64_linux;
+mod codegen_x86_64_windows;
 mod interpreter;
 mod preprocessor;
 
 // including used stdlib function
 use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
-          time::SystemTime, path::Path};
+          time::SystemTime};
 
 /// Enum representing possible target types
 // TODO(#2): parse target types (-t/--target)
@@ -79,23 +80,28 @@ fn main() {
     };
 
     // get architecture-specific functions
-    let arch_result = match target {
-        Target::Linux => {
-            Ok((codegen_x86_64::intrinsics, codegen_x86_64_linux::generate))
-        },
-        Target::Bsd => {
-            Err("BSD")
-        },
-        Target::Mac => {
-            Err("MacOS")
-        },
-        Target::Windows => {
-            Err("Windows")
-        },
-        Target::Wasm => {
-            Err("WASM")
-        },
-    };
+    type Intrinsics = fn() -> HashMap<&'static str, &'static str>;
+    type Generate   = fn(Vec<intermediate::Inst>, &HashMap<String, usize>,
+                                &Vec<String>) -> String;
+    let arch_result: Result<(Intrinsics,
+                             Generate), &'static str> =
+        match target {
+            Target::Linux => {
+                Ok((codegen_x86_64::intrinsics, codegen_x86_64_linux::generate))
+            },
+            Target::Bsd => {
+                Err("BSD")
+            },
+            Target::Mac => {
+                Err("MacOS")
+            },
+            Target::Windows => {
+                Ok((codegen_x86_64::intrinsics, codegen_x86_64_windows::generate))
+            },
+            Target::Wasm => {
+                Err("WASM")
+            },
+        };
 
     // check for errors
     let (intrinsics, generate) = match arch_result {
@@ -277,14 +283,8 @@ fn main() {
                 
                 for lib in parser.linked_libs {
                     // search for lib
-                    let path_str = "/usr/lib/".to_owned() + &lib + ".so";
-                    let lib_path = Path::new(&path_str);
-                    if lib_path.exists() {
-                        linked_files.push(lib_path.to_str().unwrap().to_string());
-                    } else {
-                        eprintln!("ERROR: Unknown shared library: {lib}");
-                        exit(1);
-                    }
+                    let lib_str = "-l".to_owned() + &lib;
+                    linked_files.push(lib_str);
                 }
 
                 let linked_files_str = linked_files.join(" ");

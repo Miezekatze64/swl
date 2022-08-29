@@ -1,7 +1,7 @@
 // include "std.swl";
 
 // #link "test.o"
-#link_lib "libc"
+#link_lib "c"
 extern func malloc(int size) -> long;
 // extern func f(char *a, int b, int c, int d, int e, int f) -> int;
 

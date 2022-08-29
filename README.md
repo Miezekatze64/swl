@@ -216,8 +216,8 @@ state of development, do not expect anything to work as you want it to....</b>
 
 - Linking with shared libraries:
   ```swl
-  #link_lib "libc"
-  #link_lib "libSDL"
+  #link_lib "c"
+  #link_lib "SDL2"
   ```
 
 - External functions (defined in libraries / object files):

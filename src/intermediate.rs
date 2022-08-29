@@ -220,69 +220,77 @@ fn last_ptr(offsets: &HashMap<String, (usize, usize)>) -> usize {
     last
 }
 
+fn global_init(ast: &ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>, ret: &mut Vec<Inst>) {
+    // check for global initializations
+    if let ASTNodeR::Block(a) = ast {
+        for inst in a {
+            match &inst.1 {
+                ASTNodeR::VarInit(ref name, ref expr, tp) => {
+                    ret.append(&mut gen_expr(expr.clone(), 0, offsets, globals, &aliases, false));
+                    if ! offsets.contains_key(name) {
+                        let len = globals.get(name).unwrap();
+                        if *len < 8 {
+                            ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
+                        } else if let Some(Type::Struct(_, fields)) = tp {
+                            let mut offset = 0;
+                            for (index, (_, vals)) in fields.iter().enumerate() {
+                                let sz = vals.0.size(&aliases);
+                                ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
+                                offset += sz;
+                            }
+                        } else {
+                            let mut sz = *len;
+                            let mut index = 0;
+                            while sz > 8 {
+                                ret.push(Inst::GlobalSet(index/8, name.clone(), 8, index));
+                                index += 8;
+                                sz -= 8;
+                            }
+                            ret.push(Inst::GlobalSet(index/8, name.clone(), sz, index));
+                        }
+                    }
+                },
+                ASTNodeR::VarDecInit(_, tp, ref name, ref expr) => {
+                    ret.append(&mut gen_expr(expr.clone(), 0, offsets, globals, &aliases, false));
+                    if ! offsets.contains_key(name) {
+                        let len = globals.get(name).unwrap();
+                        if *len < 8 {
+                            ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
+                        } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
+                            let mut offset = 0;
+                            for (index, (_, vals)) in fields.iter().enumerate() {
+                                let sz = vals.0.size(&aliases);
+                                ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
+                                offset += sz;
+                            }
+                        } else {
+                            let mut sz = *len;
+                            let mut index = 0;
+                            while sz > 8 {
+                                ret.push(Inst::GlobalSet(index/8, name.clone(), 8, index));
+                                index += 8;
+                                sz -= 8;
+                            }
+                            ret.push(Inst::GlobalSet(index/8, name.clone(), sz, index));
+                        }
+                    }
+                },
+                ASTNodeR::Include(_, ast, _) => {
+                    global_init(&ast.1, offsets, globals, aliases, ret);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, loop_idx: usize, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>, Vec<String>) {
     let mut ret     = vec![];
     let mut externs = vec![];
 
     if is_top_level {
-        // check for global initializations
-        if let ASTNodeR::Block(ref a) = ast {
-            for inst in a {
-                match &inst.1 {
-                    ASTNodeR::VarInit(ref name, ref expr, tp) => {
-                        ret.append(&mut gen_expr(expr.clone(), 0, offsets, globals, &aliases, false));
-                        if ! offsets.contains_key(name) {
-                            let len = globals.get(name).unwrap();
-                            if *len < 8 {
-                                ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                            } else if let Some(Type::Struct(_, fields)) = tp {
-                                let mut offset = 0;
-                                for (index, (_, vals)) in fields.iter().enumerate() {
-                                    let sz = vals.0.size(&aliases);
-                                    ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
-                                    offset += sz;
-                                }
-                            } else {
-                                let mut sz = *len;
-                                let mut index = 0;
-                                while sz > 8 {
-                                    ret.push(Inst::GlobalSet(index/8, name.clone(), 8, index));
-                                    index += 8;
-                                    sz -= 8;
-                                }
-                                ret.push(Inst::GlobalSet(index/8, name.clone(), sz, index));
-                            }
-                        }
-                    },
-                    ASTNodeR::VarDecInit(_, tp, ref name, ref expr) => {
-                        ret.append(&mut gen_expr(expr.clone(), 0, offsets, globals, &aliases, false));
-                        if ! offsets.contains_key(name) {
-                            let len = globals.get(name).unwrap();
-                            if *len < 8 {
-                                ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                            } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
-                                let mut offset = 0;
-                                for (index, (_, vals)) in fields.iter().enumerate() {
-                                    let sz = vals.0.size(&aliases);
-                                    ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
-                                    offset += sz;
-                                }
-                            } else {
-                                let mut sz = *len;
-                                let mut index = 0;
-                                while sz > 8 {
-                                    ret.push(Inst::GlobalSet(index/8, name.clone(), 8, index));
-                                    index += 8;
-                                    sz -= 8;
-                                }
-                                ret.push(Inst::GlobalSet(index/8, name.clone(), sz, index));
-                            }
-                        }
-                    },
-                    _ => {}
-                }
-            }
-        }
+
+        global_init(&ast, offsets, globals, &aliases, &mut ret);
         
         // call main function
         ret.push(Inst::Call("main".into()));

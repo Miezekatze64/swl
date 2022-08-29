@@ -13,8 +13,6 @@ include "windows.swl";
 intrinsic set_ptr      as set_ptr(_a* ptr, int val);
 intrinsic set_ptr      as set_addr(int ptr, int val);
 
-intrinsic get_args     as __get_args()                               -> [char*];
-
 // the default string type (an array of characters)
 // strings are fixed-sized arrays and so immutable
 // member-functions always return a new instance
@@ -63,21 +61,6 @@ func to_string(char* self) -> string from char* {
     <- cstr_to_str(self);
 }
     
-// converts a char array to a null-terminated, c-like string
-// --------
-// returns: the pointer to the string
-func to_cstr(string self) -> char* from string {
-    long ptr = malloc(self.len() + 8);
-    int i = 0;
-
-    while (i < self.len()) {
-        deref (as[char*, ptr+i]) = self[i];
-        i += 1;
-    }
-
-    deref as[char*, ptr+self.len()] = as[char, 0];
-    <- as[char*, ptr];
-}
 
 // returns the program's arguments as a char* array
 // -----
@@ -87,34 +70,6 @@ func args() -> [char*] {
     <- _args;
 }
 
-// returns the program's environment as a char* array
-// -----
-// returns: the environment
-func env() -> [char*] {
-    [char*] _args = __get_args();
-    int argc = arrlen(_args);
-    int i = 0;
-    
-    while (true) {
-        char *ptr = _args[i + argc + 1];
-        int iptr  = as[int, ptr];
-        if (iptr == 0) {
-            break;
-        }
-        i += 1;
-    }
-
-    int envc = i;
-    [char*] envp = alloc_array(envc * (8 + 8) + 8);
-    envp[0] = as[char*, 0];
-    int i  = 0;
-    while (i < envc) {
-        char *env = _args[i + argc + 1]; 
-        envp[i] = env;
-        i += 1;
-    }
-    <- envp;
-}
 
 // returns the program's environment as a char* pointer
 // -----
@@ -124,19 +79,6 @@ func envp() -> char** {
 }
     
 /** MEMORY UTILS **/
-
-
-// allocates an array with a given number of bytes on the heap
-// ------
-// args:
-//   size <- the number of bytes to allocate
-// returns: an array at the newly allocated space
-func alloc_array(int size) -> [unchecked] {
-    long ptr     = malloc(8+size);
-    deref as[long*, ptr] = as[long, size];
-    [int] array = ptr2arr(ptr);
-    <- array;
-}
 
 // frees an earlier allocated array
 // ------

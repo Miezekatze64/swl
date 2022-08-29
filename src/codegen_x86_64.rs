@@ -3,7 +3,7 @@ use {crate::{intermediate::Inst,
      std::{fmt::Write, collections::HashMap}
 };
 
-pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<String>, exit: &'static str) -> String {
+pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<String>, exit: &'static str, extern_: fn(String) -> String) -> String {
 
     let datatype = |a: usize| match a {
         0|1 => "byte",
@@ -426,26 +426,7 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                 format!(";; DEREF SET\n\tmov [{reg1}], {reg2}\n")
             },
             Inst::Extern(name) => {
-                format!(";; EXTERN {name}\nf_{name}:\n\
-                         \tpush rbp\n\
-                         \tmov rbp, rsp\n\
-                         \
-                         \tpush rax\n\
-                         \tpush rbx\n\
-                         \tpush rcx\n\
-                         \tpush rdx\n\
-                         \tpush rdi\n\
-                         \tpush rsi\n\
-                         \
-                         \tpop r9\n\
-                         \tpop r8\n\
-                         \tpop rcx\n\
-                         \tpop rdx\n\
-                         \tpop rsi\n\
-                         \tpop rdi\n\
-                         \tcall {name}\n\
-                         \tleave\n\
-                         \tret\n")
+                extern_(name)
             },
 
         }.as_str())

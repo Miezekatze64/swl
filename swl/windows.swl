@@ -7,7 +7,34 @@ intrinsic dereference  as arrlen([unchecked] str)                          -> in
 intrinsic str_to_ptr   as arr2addr([unchecked] str)                        -> long;
 intrinsic convert      as ptr2arr(long ptr)                                -> [unchecked];
 
-func print(string str) {};
+#link_lib "kernel32"
+alias HANDLE  = void*;
+alias DWORD   = int;
+alias LPVOID  = void*;
+alias LPDWORD = DWORD*;
+
+LPVOID NULL   = as[void*, 0];
+extern func GetLastError() -> DWORD;
+extern func GetStdHandle(DWORD handle) -> HANDLE;
+extern func WriteConsoleA(HANDLE hConsoleOutput, LPVOID lpBuffer, DWORD nNumberOfCharsToWrite,
+    LPDWORD lpNumberOfCharsWritten, LPVOID  lpReserved) -> HANDLE;
+
+DWORD STD_OUTPUT_HANDLE     = 4294967284;
+LPVOID INVALID_HANDLE_VALUE = as[LPVOID, -1l];
+
+func get_value() -> DWORD {
+    <- STD_OUTPUT_HANDLE;
+}
+    
+func print(string str) {
+    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    if (stdoutHandle != NULL && stdoutHandle != INVALID_HANDLE_VALUE) {
+        DWORD written = 0;
+        WriteConsoleA(stdoutHandle, as[LPVOID, arr2addr(str)], arrlen(str), ref written, NULL);
+    }
+}
+
 func eprint(string str) {};
 
 
@@ -40,6 +67,23 @@ func exit(int status) {
 
 /* OTHER UTILITY FUNCTIONS */
 
+intrinsic get_args     as __get_args()                               -> [char*];
+func env() -> [int] {
+    <- __unsafe_convert(0);
+}
+    
+// allocates an array with a given number of bytes on the heap
+// ------
+// args:
+//   size <- the number of bytes to allocate
+// returns: an array at the newly allocated space
+func alloc_array(int size) -> [unchecked] {
+    long ptr     = malloc(8+size);
+    deref as[long*, ptr] = as[long, size];
+    [int] array = ptr2arr(ptr);
+    <- array;
+}
+    
 #link_lib "msvcrt"
 extern func malloc(int size) -> long;
 extern func free(long ptr);

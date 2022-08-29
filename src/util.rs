@@ -477,7 +477,7 @@ impl Op {
                     },
                     _ => Type::Invalid,
                 },
-                BinaryOp::Eq | BinaryOp::Neq => if (a == b) ||
+                BinaryOp::Eq | BinaryOp::Neq => if (a.dealias(aliases) == b.dealias(aliases)) ||
                     (a == &Type::Primitive(PrimitiveType::Unchecked) ||
                      b == &Type::Primitive(PrimitiveType::Unchecked)) {
                     Type::Primitive(PrimitiveType::Bool)

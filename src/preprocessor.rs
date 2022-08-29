@@ -1,4 +1,4 @@
-use crate::{COLOR_RED, COLOR_GREEN, COLOR_RESET};
+use crate::{COLOR_RED, COLOR_GREEN, COLOR_RESET, Target};
 use std::process::exit;
 
 fn pos_to_line_char(source: Vec<char>, pos: usize) -> (usize, usize) {
@@ -42,11 +42,18 @@ macro_rules! parse_str {
     };
 }
 
-pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>, Vec<String>) {
+#[derive(PartialEq, Eq)]
+enum Action {
+    Delete,
+    Ignore
+}
+
+pub fn preprocess(file: Vec<char>, filename: String, tgt: Target) -> (Vec<char>, Vec<String>, Vec<String>) {
     let mut i             : usize = 0;
     let mut to_skip       : Vec<(usize, usize)> = vec![];
     let mut links         : Vec<String> = vec![];
     let mut links_libs    : Vec<String> = vec![];
+    let mut action_stack  : Vec<(usize, Action)> = vec![];
 
     while i < file.len() {
         let ch = file[i];
@@ -75,9 +82,9 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
             continue;
         } else if ch == '#' {
             let dir_start = i + 1;
-            while file[i] != ' ' {i += 1};
+            while !file[i].is_whitespace() {i += 1};
             let directive = file.iter().skip(dir_start).take(i - dir_start).collect::<String>();
-            while file[i] != ' ' {i += 1};
+            while !file[i].is_whitespace() {i += 1};
             to_skip.push((dir_start - 1, i - dir_start + 1));
 
             match directive.as_str() {
@@ -103,14 +110,60 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
                     );
                     exit(1);
                 },
+                "target" => {
+                    let target_ = match parse_str!(file, i, dir_start, filename) {
+                        Some(a) => a,
+                        None => continue,
+                    };
+                    let target = match target_.as_str() {
+                        "linux" => Target::Linux,
+                        "windows" => Target::Windows,
+                        _ => {
+                            let (l, c) = pos_to_line_char(file.clone(), dir_start);
+                            eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}invalid target {target_}",
+                                   file = filename,
+                                   line = l+1,
+                                   ch = c+1,
+                            );
+                            exit(1);
+                        }
+                    };
+
+                    if tgt != target {
+                        action_stack.push((i+1, Action::Delete));
+                    } else {
+                        action_stack.push((i+1, Action::Ignore));
+                    }
+                },
+                "end" => {
+                    if action_stack.is_empty() {
+                        let (l, c) = pos_to_line_char(file.clone(), dir_start);
+                        eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}#end does not end anything",
+                                  file = filename,
+                                  line = l+1,
+                                  ch = c+1,
+                        );
+                        exit(1);
+                    }
+                    let (ind, action) = action_stack.pop().unwrap();
+                    if action == Action::Delete {
+                        for (v, item) in file.iter().enumerate().take(i).skip(ind) {
+                            if *item != '\n' {
+                                to_skip.push((v, 1));
+                            }
+                        }
+                    }
+                }
                 _ => {
                     let (l, c) = pos_to_line_char(file.clone(), dir_start);
-                    eprintln!("{file}:{line}:{ch}: Invalid preprocesser \
+                    eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}Invalid preprocesser \
                                directive `{directive}`",
                               file = filename,
                               line = l+1,
                               ch = c+1,
-                )}
+                    );
+                    exit(1);
+                }
             }
         }
         i += 1;
@@ -119,8 +172,8 @@ pub fn preprocess(file: Vec<char>, filename: String) -> (Vec<char>, Vec<String>,
     to_skip.sort();
     let mut new_file = file;
     for (a, l) in to_skip.iter().rev() {
-        for _ in 0..*l {
-            new_file.remove(*a);
+        for i in 0..*l {
+            new_file[a+i] = ' ';
         }
     }
     

@@ -1,7 +1,12 @@
 /* SWL STANDARD LIBRARY */
 
-#error "TODO"
+#target "linux"
 include "linux.swl";
+#end
+
+#target "windows"
+include "windows.swl";
+#end
 
 // used intrinsics
 
@@ -172,6 +177,23 @@ func strcpy_off(string a, int a_off, string b, int b_off) {
 
 /** IO UTILS **/
 
+// prints a given string to stdout, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
+func println([char] str) {
+    print(str);
+    print("\n");
+}
+
+// prints a given string to stderr, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
+func eprintln([char] str) {
+    eprint(str);
+    eprint("\n");
+}
 
 func get_line([char] buf) -> int {
     int bytes = 0;
@@ -198,66 +220,6 @@ func getch() -> char {
     }
 }
 
-// prints a given string to stdout
-// ------
-// args:
-//   str <- the string to print
-func print([char] str) {
-    write(1l, arr2addr(str), arrlen(str));
-}
-
-// prints a given string to stderr
-// ------
-// args:
-//   str <- the string to print
-func eprint([char] str) {
-    write(2l, arr2addr(str), arrlen(str));
-}
-
-// prints a given string to stdout, followed by a line feed
-// ------
-// args:
-//   str <- the string to print
-func println([char] str) {
-    print(str);
-    print("\n");
-}
-
-// prints a given string to stderr, followed by a line feed
-// ------
-// args:
-//   str <- the string to print
-func eprintln([char] str) {
-    print(str);
-    print("\n");
-}
-
-
-
-// runs a given command
-// -----
-// args:
-//   command <- the command
-func system(string command) {
-    [char*] args = alloc_array(8*4);
-    args[0] = "/usr/bin/sh".to_cstr();
-    args[1] = "-c".to_cstr();
-    args[2] = command.to_cstr();
-    args[3] = as[char*, 0];
-
-    int pid = fork();
-    if (pid == 0) {
-        execve("/usr/bin/sh".to_cstr(), args, env());
-        exit(0);
-    }
-    while (true) {
-       long ret = syscall4(61, as[long, pid], 0l, 0l, 0l);
-       if (ret <= 0l) {
-           break;
-       }
-       sleep(10l);
-    }
-}
 
 /** STRING UTILS **/
 

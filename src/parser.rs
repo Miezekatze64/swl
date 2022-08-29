@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::preprocessor;
+use crate::{preprocessor, Target};
 
 use {crate::{util, util::{indent, PrimitiveType, Type, BinaryOp, UnaryOp, ErrorLevel, Op, Error}, error}, std::{io, collections::HashMap}, crate::lexer::{TokenType, Lexer, Token}};
 
@@ -9,6 +9,7 @@ pub struct Parser {
     pub lexer       : Lexer,
     pub links       : Vec<String>,
     pub linked_libs : Vec<String>,
+    pub target      : Target,
 }
 
 #[derive(Debug, Clone)]
@@ -463,12 +464,13 @@ macro_rules! err_add {
 }
 
 impl Parser {
-    pub fn new(src: Vec<char>, filename: String, verbose: usize) -> Result<Self, io::Error> {
-        let (contents, l, ll) = preprocessor::preprocess(src, filename.clone());
+    pub fn new(src: Vec<char>, filename: String, verbose: usize, target: Target) -> Result<Self, io::Error> {
+        let (contents, l, ll) = preprocessor::preprocess(src, filename.clone(), target);
         Ok(Parser {
             lexer: Lexer::new(filename, contents, verbose)?,
             links: l,
             linked_libs: ll,
+            target,
         })
     }
 
@@ -1169,7 +1171,7 @@ impl Parser {
                     }
 
                     let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();
-                    let mut file_parser = match Parser::new(contents, filename.clone(), verbose) {
+                    let mut file_parser = match Parser::new(contents, filename.clone(), verbose, self.target) {
                         Ok(a) => a,
                         Err(e) => {
                             errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "ERROR during loading of file: {e}")));

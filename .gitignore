@@ -6,7 +6,7 @@
 !swlc
 !LICENSE
 !build
-
+*.exe
 
 # Added by cargo
 #

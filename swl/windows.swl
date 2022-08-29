@@ -1,0 +1,72 @@
+/** SYSCALL WRAPPER FUNCTIONS (LINUX x86_64) **/
+
+alias string = [char];
+
+intrinsic convert      as __unsafe_convert(_a i)                           -> unchecked;
+intrinsic dereference  as arrlen([unchecked] str)                          -> int;
+intrinsic str_to_ptr   as arr2addr([unchecked] str)                        -> long;
+intrinsic convert      as ptr2arr(long ptr)                                -> [unchecked];
+
+func print(string str) {};
+func eprint(string str) {};
+
+
+// opens a file with a given path, mode, and flags
+// ------
+// args:
+//   path <- the path to the file to open
+//   mode <- the mode to open the file with
+//   flags <- the flags to open the file with
+// returns: the file descriptor of the opened file
+func open(string path, long flags, long mode) -> long {
+    <- -1l;
+}
+
+// closes a given file descriptor
+// ------
+// args:
+//   fd <- the file descriptor to close   
+func close(long fd) {
+}
+
+// exits the current process
+// ------
+// args:
+//   status <- the status to exit with
+func exit(int status) {
+    
+}
+
+
+/* OTHER UTILITY FUNCTIONS */
+
+#link_lib "msvcrt"
+extern func malloc(int size) -> long;
+extern func free(long ptr);
+
+
+// reads contents from stdin in a given array buffer, until it is full
+// ------
+// args:
+//   buf <- the buffer
+func input([char] buf) -> int {
+    <- -1;
+//    <- read(0, arr2addr(buf), arrlen(buf));
+}
+
+// replaces the current process with the given process
+// -----
+// args:
+//   filename <- the filename of the process
+//   argv     <- args of the process
+//   envp     <- environment of the process
+func execve(char *filename, [char*] argv, [char*] envp) {
+}
+
+// sleeps a given amount of milliseconds
+// -----
+// args:
+//   millis <- the time
+func sleep(long millis) {
+
+}

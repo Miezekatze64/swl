@@ -17,8 +17,8 @@ use std::{fs, env::args, process::{exit, Command}, collections::HashMap,
 
 /// Enum representing possible target types
 // TODO(#2): parse target types (-t/--target)
-#[derive(PartialEq, Eq)]
-enum Target {
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Target {
     Linux,
     #[allow(unused)]
     Bsd,
@@ -161,7 +161,7 @@ fn main() {
 //    let (contents, links, links_libs) = preprocessor::preprocess(contents, filename.clone());
     
     // construct parser
-    let mut parser = parser::Parser::new(contents, filename.clone(), verbose).unwrap_or_else(|a| {
+    let mut parser = parser::Parser::new(contents, filename.clone(), verbose, target).unwrap_or_else(|a| {
         eprintln!("Error reading file: {}", a);
         exit(1);
     });
@@ -281,6 +281,9 @@ fn main() {
                 
                 let mut outfile = path;
                 outfile.push_str(&name);
+                if target == Target::Windows {
+                    outfile.push_str(".exe");
+                }
 
                 let mut linked_files = parser.links.clone();
                 let linked_libs  = parser.linked_libs.clone();

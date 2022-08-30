@@ -319,6 +319,7 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
                     Type::Primitive(PrimitiveType::Bool)   => if val == "true" {1} else {0},
                     Type::Primitive(PrimitiveType::Char)   => val.bytes().next().unwrap() as u64,
                     Type::Primitive(PrimitiveType::Int)    => uc!(val.parse::<i64>().unwrap()),
+                    Type::Primitive(PrimitiveType::Long)   => uc!(val.parse::<i64>().unwrap()),
                     Type::Primitive(PrimitiveType::Float)  => uc!(val.parse::<f64>().unwrap()),
                     Type::Array(a) => {
                         if **a == Type::Primitive(PrimitiveType::Char) {
@@ -340,7 +341,7 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
                             unreachable!()
                         }
                     },
-                    _ => unreachable!(),
+                    _ => unreachable!("{}", tp),
                 };
 
                 registers[*reg] = register;

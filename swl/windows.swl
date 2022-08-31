@@ -12,20 +12,19 @@ alias HANDLE  = void*;
 alias DWORD   = int;
 alias LPVOID  = void*;
 alias LPDWORD = DWORD*;
+alias BOOL    = bool;
 
 LPVOID NULL   = as[void*, 0];
 extern func GetLastError() -> DWORD;
 extern func GetStdHandle(DWORD handle) -> HANDLE;
 extern func WriteConsoleA(HANDLE hConsoleOutput, LPVOID lpBuffer, DWORD nNumberOfCharsToWrite,
     LPDWORD lpNumberOfCharsWritten, LPVOID  lpReserved) -> HANDLE;
+extern func ExitProcess(int uExitCode);
 
 DWORD STD_OUTPUT_HANDLE     = 4294967284;
+DWORD STD_INPUT_HANDLE      = 4294967286;
 LPVOID INVALID_HANDLE_VALUE = as[LPVOID, -1l];
 
-func get_value() -> DWORD {
-    <- STD_OUTPUT_HANDLE;
-}
-    
 func print(string str) {
     HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -35,7 +34,19 @@ func print(string str) {
     }
 }
 
-func eprint(string str) {};
+func unimplemented(string msg) {
+    print("UNIMPLEMENTED: ");
+    print(msg);
+    print("\n");
+    exit(1);
+}
+
+func eprint(string str) {
+    unimplemented("eprint");
+}
+
+extern func ReadConsoleA(HANDLE  hConsoleInput, LPVOID  lpBuffer, DWORD nNumberOfCharsToRead, LPDWORD lpNumberOfCharsRead, LPVOID  pInputControl) -> BOOL;
+
 
 // opens a file with a given path, mode, and flags
 // ------
@@ -45,6 +56,7 @@ func eprint(string str) {};
 //   flags <- the flags to open the file with
 // returns: the file descriptor of the opened file
 func open(string path, long flags, long mode) -> long {
+    unimplemented("open");
     <- -1l;
 }
 
@@ -53,6 +65,7 @@ func open(string path, long flags, long mode) -> long {
 // args:
 //   fd <- the file descriptor to close   
 func close(long fd) {
+    unimplemented("close");
 }
 
 // exits the current process
@@ -60,7 +73,19 @@ func close(long fd) {
 // args:
 //   status <- the status to exit with
 func exit(int status) {
+    ExitProcess(status);
+}
+
+extern system as func system_(char *ptr);
     
+alias LPCSTR = char*;
+extern func ShellExecuteA(LPVOID hwnd, LPCSTR lpOperation, LPCSTR lpFile, LPCSTR lpParameters, LPVOID lpDirectory, int nShowCmd);
+
+int SW_HIDE = 0;
+#link_lib "shell32"
+func system([char] cmd) {
+    ShellExecuteA(NULL, "open".to_cstr(), "cmd.exe".to_cstr(), "/C echo HI".to_cstr(), NULL, SW_HIDE);
+    unimplemented("system");
 }
 
 
@@ -93,8 +118,9 @@ extern func free(long ptr);
 // args:
 //   buf <- the buffer
 func input([char] buf) -> int {
-    <- -1;
-//    <- read(0, arr2addr(buf), arrlen(buf));
+    int chars_read = -1;
+    ReadConsoleA(GetStdHandle(STD_INPUT_HANDLE), as[LPVOID, arr2addr(buf)], arrlen(buf), ref chars_read, NULL);
+    <- chars_read;
 }
 
 // replaces the current process with the given process
@@ -103,13 +129,30 @@ func input([char] buf) -> int {
 //   filename <- the filename of the process
 //   argv     <- args of the process
 //   envp     <- environment of the process
-func execve(char *filename, [char*] argv, [char*] envp) {
-}
+//func execve(char *filename, [char*] argv, [char*] envp) {
+//    unimplemented("execve");
+//}
 
 // sleeps a given amount of milliseconds
 // -----
 // args:
 //   millis <- the time
 func sleep(long millis) {
+    unimplemented("sleep");
+}
 
+// converts a char array to a null-terminated, c-like string
+// --------
+// returns: the pointer to the string
+func to_cstr(string self) -> char* from string {
+    long ptr = malloc(arrlen(self) + 8);
+    int i = 0;
+
+    while (i < arrlen(self)) {
+        deref (as[char*, ptr+i]) = self[i];
+        i += 1;
+    }
+
+    deref as[char*, ptr+arrlen(self)] = as[char, 0];
+    <- as[char*, ptr];
 }

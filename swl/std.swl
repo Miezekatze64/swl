@@ -142,7 +142,13 @@ func get_line([char] buf) -> int {
     while (bytes < arrlen(buf)) {
         buf[bytes] = getch();
         if (buf[bytes] == '\n') {
+// because of '\r\n' in windows
+#target "windows"
+            <- bytes;
+#end
+#target "linux"
             <- bytes + 1;
+#end
         } else {
             bytes += 1;
         }

@@ -5,7 +5,7 @@ func main() -> int {
     string buf = arr[char, 100];
     while (true) {
         int bytes = get_line(buf);
-        buf[bytes] = NULL;
+        buf[bytes - 1] = NULL;
         system(buf);
     }
     <- 0;

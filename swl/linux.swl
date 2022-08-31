@@ -311,13 +311,16 @@ func env() -> [char*] {
     <- envp;
 }
 
+extern system as func system_(char *ptr);
     
 // runs a given command
 // -----
 // args:
 //   command <- the command
 func system(string command) {
-    [char*] args = alloc_array(8*4);
+    system_(command.to_cstr());
+    <-;
+    [char*] args = alloc_array(8*5);
     args[0] = "/usr/bin/sh".to_cstr();
     args[1] = "-c".to_cstr();
     args[2] = command.to_cstr();

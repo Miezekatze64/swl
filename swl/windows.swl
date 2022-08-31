@@ -84,10 +84,8 @@ extern func ShellExecuteA(LPVOID hwnd, LPCSTR lpOperation, LPCSTR lpFile, LPCSTR
 int SW_HIDE = 0;
 #link_lib "shell32"
 func system([char] cmd) {
-    ShellExecuteA(NULL, "open".to_cstr(), "cmd.exe".to_cstr(), "/C echo HI".to_cstr(), NULL, SW_HIDE);
-    unimplemented("system");
+    system_(cmd.to_cstr());
 }
-
 
 /* OTHER UTILITY FUNCTIONS */
 

@@ -40,7 +40,7 @@ pub enum ASTNodeR {
     TypeClass(String, String, Functions),
     Instance(String, Type, Vec<ASTNode>),
     DerefSet(Expression, Expression),
-    Extern(String, Vec<(Type, String)>, Type),
+    Extern(String, String, Vec<(Type, String)>, Type),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -140,8 +140,8 @@ impl std::fmt::Display for ASTNodeR {
                 }
                 write!(f, ";")
             },
-            ASTNodeR::Extern(name, args, ret) => {
-                write!(f, "extern func {name}(")?;
+            ASTNodeR::Extern(ename, name, args, ret) => {
+                write!(f, "extern {ename} as func {name}(")?;
                 for (index, (arg_type, arg_name)) in args.iter().enumerate() {
                     write!(f, "{arg_type} {arg_name}")?;
                     if index < args.len()-1 {
@@ -1181,11 +1181,8 @@ impl Parser {
 
                     let ast = match file_parser.parse(verbose) {
                         Ok(a) => a,
-                        Err(vec) => {
-                            for e in vec {
-                                eprintln!("ERROR during parsing of included file `{filename}`:");
-                                eprintln!("{}: {}", e.0, e.1);
-                            }
+                        Err(mut vec) => {
+                            errors.append(&mut vec);
                             return Err(errors);
                         },
                     };
@@ -1399,6 +1396,15 @@ impl Parser {
                         errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "extern function declerations are only allowed at top-level")));
                         return Err(errors);
                     }
+
+                    let mut nm: Option<String> = None;
+
+                    let nxt = get_peek_token!(self.lexer, errors);
+                    if nxt.ttype == TokenType::Ident {
+                        self.lexer.next_token().unwrap();
+                        nm = Some(nxt.value);
+                        err_ret!(self.expect(Some(TokenType::Keyword), Some("as".into())), errors);
+                    }
                     
                     err_ret!(self.expect(Some(TokenType::Keyword), Some("func".into())), errors);
                     let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
@@ -1406,8 +1412,10 @@ impl Parser {
                     
                     let (args, ret) = parse_function_decl(self, errors.clone())?;
                     err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
+
+                    let ename = nm.unwrap_or(name.clone());
                     
-                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Extern(name, args, ret))));
+                    return Ok(Some(ASTNode(token.pos, ASTNodeR::Extern(ename, name, args, ret))));
                 }
                 _ => {}
             },

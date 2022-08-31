@@ -3,7 +3,7 @@ use {crate::{intermediate::Inst,
      std::{fmt::Write, collections::HashMap}
 };
 
-pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<String>, exit: &'static str, extern_: fn(String) -> String) -> String {
+pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<(String, String)>, start: &'static str, exit: &'static str, extern_: fn(String, String) -> String) -> String {
 
     let datatype = |a: usize| match a {
         0|1 => "byte",
@@ -68,15 +68,11 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
     global _start\n\
     section .text\n".into();
     
-    for ext in externs {
+    for (ext, _) in externs {
         ret.push_str(format!("extern {ext}\n").as_str());
     }
     
-    ret.push_str("_start:\n\
-              \tmov [ARGS], rsp\n\
-              \txor rbp, rbp\n\
-              \txor rax, rax\n\
-              ");
+    ret.push_str(start);
 
     let mut intrinsic_labels: Vec<String> = vec![];
     let mut arr_index: usize = 0;
@@ -425,8 +421,8 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                 let reg2 = register(r2);
                 format!(";; DEREF SET\n\tmov [{reg1}], {reg2}\n")
             },
-            Inst::Extern(name) => {
-                extern_(name)
+            Inst::Extern(ename, name) => {
+                extern_(ename, name)
             },
 
         }.as_str())

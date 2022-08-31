@@ -33,7 +33,7 @@ pub enum Inst {
     CallReg(usize),
     Else(usize),
     DerefSet(usize, usize),
-    Extern(String),
+    Extern(String, String),
 }
 
 fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: &HashMap<String, Type>, is_ref: bool) -> Vec<Inst> {
@@ -284,7 +284,7 @@ fn global_init(ast: &ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, gl
     }
 }
 
-pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, loop_idx: usize, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>, Vec<String>) {
+pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals: &HashMap<String, usize>, aliases: HashMap<String, Type>, loop_idx: usize, index:  usize, is_top_level: bool) -> (Vec<Inst>, HashMap<String, usize>, Vec<(String, String)>) {
     let mut ret     = vec![];
     let mut externs = vec![];
 
@@ -552,9 +552,9 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             ret.append(&mut gen_expr(r, 1, offsets, globals, &aliases, false));
             ret.push(Inst::DerefSet(0, 1));
         },
-        ASTNodeR::Extern(name, _, _) => {
-            externs.push(name.clone());
-            ret.push(Inst::Extern(name));
+        ASTNodeR::Extern(ename, name, _, _) => {
+            externs.push((ename.clone(), name.clone()));
+            ret.push(Inst::Extern(ename, name));
         },
     }
     (ret, globals.clone(), externs)

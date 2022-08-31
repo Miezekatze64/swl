@@ -85,7 +85,7 @@ fn main() {
     // get architecture-specific functions
     type Intrinsics = fn() -> HashMap<&'static str, &'static str>;
     type Generate   = fn(Vec<intermediate::Inst>, &HashMap<String, usize>,
-                                &Vec<String>) -> String;
+                                &Vec<(String, String)>) -> String;
     let arch_result: Result<(Intrinsics,
                              Generate), &'static str> =
         match target {

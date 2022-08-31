@@ -881,7 +881,7 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
                 }
                 ip += 1;
             },
-            Inst::Extern(_) => unimplemented!("extern functions"),
+            Inst::Extern(..) => unimplemented!("extern functions"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use crate::{preprocessor, Target};
 
@@ -1217,6 +1217,11 @@ impl Parser {
 
                     if verbose > 0 {
                         eprintln!("[*] generatinng AST for included file `{filename}`");
+                    }
+
+                    if ! Path::new(&filename).exists() {
+                        errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "could not include file `{filename}`: File does not exist")));
+                        return Err(errors);
                     }
 
                     let contents = fs::read_to_string(filename.clone()).expect("File read error: ").chars().collect();

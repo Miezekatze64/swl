@@ -52,11 +52,11 @@ macro_rules! error_arrow {
 macro_rules! error {
     ($lexer:expr, $pos:expr, $msg_fmt:literal) => {
         | | -> String {
-            return format!("{err}{msg} (at {f}:{l})",
+            return format!("{err}{msg}" /*(at {f}:{l})"*/,
                            err = $crate::error_str!($lexer, $pos),
                            msg = format!($msg_fmt),
-                           f = file!(),
-                           l = line!()
+//                           f = file!(),
+//                           l = line!()
             )
         }()
     }
@@ -90,7 +90,7 @@ pub enum Type {
     Invalid,
     Struct(String, Vec<(String, (Type, usize))>),
     Var(String),
-    Bounded(String),
+    Bounded(String, String),
 }
 
 impl PartialEq for Type {
@@ -130,7 +130,7 @@ impl std::hash::Hash for Type {
                 ret.hash(state);
             },
             Type::Var(a) => ("_".to_string() + a).hash(state),
-            Type::Bounded(a) => a.hash(state),
+            Type::Bounded(a, b) => (a.to_owned()+b).hash(state),
         }
     }
 }
@@ -192,7 +192,7 @@ impl std::fmt::Display for Type {
                 s
             },
             Type::Var(a) => a.to_string(),
-            Type::Bounded(a) => format!("Bounded<{a}>"),
+            Type::Bounded(a, b) => format!("Bounded<{a} {b}>"),
         }.as_str())
     }
 }
@@ -225,7 +225,7 @@ impl Type {
                     self.clone()
                 }
             },
-            Type::Bounded(_) => self.clone(),
+            Type::Bounded(..) => self.clone(),
         }
     }
 
@@ -325,7 +325,7 @@ impl Type {
             Type::Var(a) => {
                 unreachable!("unevavluated type-variable `{a}`")
             },
-            Type::Bounded(a) => unreachable!("unevaluated bounded generic from typeclass `{a}`"),
+            Type::Bounded(n, a) => unreachable!("unevaluated bounded generic `{n}` from typeclass `{a}`"),
         }
     }
 

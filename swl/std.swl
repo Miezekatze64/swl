@@ -1,5 +1,4 @@
 /* SWL STANDARD LIBRARY */
-
 #target "linux"
 include "linux.swl";
 #end
@@ -7,6 +6,44 @@ include "linux.swl";
 #target "windows"
 include "windows.swl";
 #end
+// TYPECLASSES
+
+// represent all types, that can be converted to a string
+typeclass Showable a {
+    func to_string(a val) -> string;
+}
+
+
+// default implementations:
+instance Showable int {
+    func to_string(int val) -> string {
+        <- itoa(val);
+    }
+}
+
+instance Showable bool {
+    func to_string(bool b) -> string {
+        if (b) {
+            <- "true";
+        } else {
+            <- "false";
+        }
+    }
+}
+
+instance Showable char {
+    func to_string(char c) -> string {
+        string str = alloc_array(1);
+        str[0] = c;
+        <- str;
+    }
+ }
+
+instance Showable [char] {
+    func to_string([char] str) -> string {
+        <- str;
+    }
+}
 
 // used intrinsics
 
@@ -119,22 +156,39 @@ func strcpy_off(string a, int a_off, string b, int b_off) {
 
 /** IO UTILS **/
 
+
 // prints a given string to stdout, followed by a line feed
 // ------
 // args:
 //   str <- the string to print
-func println([char] str) {
-    print(str);
-    print("\n");
+func print<Showable _s>(_s value) {
+    print_(to_string(value));
 }
 
 // prints a given string to stderr, followed by a line feed
 // ------
 // args:
 //   str <- the string to print
-func eprintln([char] str) {
-    eprint(str);
-    eprint("\n");
+func eprint<Showable _s>(_s value) {
+    eprint_(to_string(value));
+}
+
+// prints a given string to stdout, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
+func println<Showable _s>(_s value) {
+    print_(to_string(value));
+    print_("\n");
+}
+
+// prints a given string to stderr, followed by a line feed
+// ------
+// args:
+//   str <- the string to print
+func eprintln<Showable _s>(_s value) {
+    eprint_(to_string(value));
+    eprint_("\n");
 }
 
 func get_line([char] buf) -> int {
@@ -380,42 +434,3 @@ func sqrt(int a) -> int {
     <- x;
 }
 
-
-// TYPECLASSES
-
-// represent all types, that can be converted to a string
-typeclass Showable a {
-    func to_string(a val) -> string;
-}
-
-
-// default implementations:
-instance Showable int {
-    func to_string(int val) -> string {
-        <- itoa(val);
-    }
-}
-
-instance Showable bool {
-    func to_string(bool b) -> string {
-        if (b) {
-            <- "true";
-        } else {
-            <- "false";
-        }
-    }
-}
-
-instance Showable char {
-    func to_string(char c) -> string {
-        string str = alloc_array(1);
-        str[0] = c;
-        <- str;
-    }
- }
-
-instance Showable [char] {
-    func to_string([char] str) -> string {
-        <- str;
-    }
-}

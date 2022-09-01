@@ -196,8 +196,8 @@ fn main() {
         }
 
         // typecheck the AST
-        match typecheck::check(ast, parser.lexer.clone(), intrinsics) {
-            Err((e, a, g)) => {
+        match typecheck::check(ast, parser.lexer.clone(), intrinsics, true) {
+            Err((e, (g, a, ..))) => {
                 for a in e.iter() {
                     let (t, v) = a;
                     eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v);

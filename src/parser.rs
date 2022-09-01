@@ -263,7 +263,7 @@ impl std::fmt::Display for ExpressionR {
                                "{name}[INVALID, SHOULD BE A STRUCT LITERAL]"),
                     Type::Function(_, _) => write!(f, "[INVALID] This sould be a lambda functino not a 'function literal'..."),
                     Type::Var(val) => write!(f, "{val}[INVALID, TYPE VARIABLE]"),
-                    Type::Bounded(a) => write!(f, "Bounded<{a}>[INVALID]"),
+                    Type::Bounded(a, b) => write!(f, "Bounded<{a}, {b}>[INVALID]"),
                 }
             },
             ExpressionR::Var(var) => {
@@ -1132,9 +1132,58 @@ impl Parser {
                     // parse function name
                     let name = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
 
+                    let mut bounds: HashMap<String, String> = HashMap::new();
+                    let ntk = get_peek_token!(self.lexer, errors);
+                    if ntk.ttype == TokenType::Operator && ntk.value == "<" {
+                        self.lexer.next_token().unwrap();
+                        // parse generic bounds
+                        loop {
+                            let class = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+                            let nm = err_ret!(self.expect(Some(TokenType::Ident), None), errors).value;
+
+                            if ! nm.starts_with('_') {
+                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "bounded generics / type variables have to start with an `_`")));
+                                return Err(errors);
+                            }
+                            
+                            bounds.insert(nm, class);
+                            
+                            let ntk = get_token!(self.lexer, errors);
+                            if ntk.ttype == TokenType::Special && ntk.value == "," {
+                                continue;
+                            } else if ntk.ttype == TokenType::Operator && ntk.value == ">" {
+                                break;
+                            } else {
+                                let ntv = ntk.value;
+                                errors.push((ErrorLevel::Err, error!(self.lexer, token.pos, "unexpected token `{ntv}`, `,` or `>` exptected")));
+                                return Err(errors);
+                            }
+                        }
+                    }
+
                     err_ret!(self.expect(Some(TokenType::Special), Some("(".into())), errors).value;
                     
-                    let (args, ret_type) = err_add!(parse_function_decl(self, errors.clone()), errors);
+                    let (args_, ret_type_) = err_add!(parse_function_decl(self, errors.clone()), errors);
+
+                    let args = args_.into_iter().map(|(x, n)| (if let Type::Var(ref t) = x {
+                        if bounds.contains_key(t) {
+                            Type::Bounded(t.to_owned(), bounds[t].clone())
+                        } else {
+                            x
+                        }
+                    } else {
+                        x
+                    }, n)).collect();
+
+                    let ret_type = if let Type::Var(ref t) = ret_type_ {
+                        if bounds.contains_key(t) {
+                            Type::Bounded(t.to_owned(), bounds[t].clone())
+                        } else {
+                            ret_type_
+                        }
+                    } else {
+                        ret_type_
+                    };
 
                     let mut from_type = None;
                     

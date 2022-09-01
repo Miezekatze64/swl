@@ -1,9 +1,7 @@
 include "std.swl";
-    
+
 func main() -> int {
-//    [char] buf = arr[char, 100];
-//    input(buf);
-//    print(buf);
-    system("dir");
+    println("Hello, World!");
+    eprintln(42);
     <- 42;
 }

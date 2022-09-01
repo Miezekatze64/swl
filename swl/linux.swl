@@ -115,6 +115,7 @@ func _sbrk(int inc) -> long {
 extern func malloc(int size) -> long;
 extern func free(long ptr);
 
+/*
 //              --- OLD MALLOC CODE ---
 // this was replaced by the libc malloc implementation
 
@@ -185,7 +186,7 @@ func __old_free(long ptr) -> int {
     int i = 0;
     while (i < _m_location) {
         m_struct index = _m_tcache[i];
-        if (ptr == index.ptr /*&& index.is_block*/) {
+        if (ptr == index.ptr /*&& index.is_block*\/) {
             // free it
             _m_tcache[i].is_block = false;
             // test for merge left
@@ -213,7 +214,7 @@ func __old_free(long ptr) -> int {
 
     <- -1;
 }
-
+*/
 // reads contents from stdin in a given array buffer, until it is full
 // ------
 // args:
@@ -345,7 +346,7 @@ func system(string command) {
 // ------
 // args:
 //   str <- the string to print
-func print([char] str) {
+func print_([char] str) {
     write(1l, arr2addr(str), arrlen(str));
 }
 
@@ -353,7 +354,7 @@ func print([char] str) {
 // ------
 // args:
 //   str <- the string to print
-func eprint([char] str) {
+func eprint_([char] str) {
     write(2l, arr2addr(str), arrlen(str));
 }
 

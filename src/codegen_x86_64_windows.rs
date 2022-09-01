@@ -15,7 +15,11 @@ fn extern_(ename: String, name: String) -> String {
              \tpop rdx\n\
              \tpop rcx\n\
              \tpush rsp\n\
+             \tpush rsi\n\
+             \tpush rdi\n\
              \tcall {ename}\n\
+             \tpop rdi\n\
+             \tpop rsi\n\
              \tpop rsp\n\
              \tleave\n\
              \tret\n")

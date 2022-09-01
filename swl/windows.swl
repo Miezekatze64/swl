@@ -2,7 +2,7 @@
 
 alias string = [char];
 
-intrinsic convert      as __unsafe_convert(_a i)                           -> unchecked;
+intrinsic convert      as __unsafe_convert(unchecked i)                    -> unchecked;
 intrinsic dereference  as arrlen([unchecked] str)                          -> int;
 intrinsic str_to_ptr   as arr2addr([unchecked] str)                        -> long;
 intrinsic convert      as ptr2arr(long ptr)                                -> [unchecked];
@@ -25,7 +25,7 @@ DWORD STD_OUTPUT_HANDLE     = 4294967284;
 DWORD STD_INPUT_HANDLE      = 4294967286;
 LPVOID INVALID_HANDLE_VALUE = as[LPVOID, -1l];
 
-func print(string str) {
+func print_(string str) {
     HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
     if (stdoutHandle != NULL && stdoutHandle != INVALID_HANDLE_VALUE) {
@@ -35,13 +35,13 @@ func print(string str) {
 }
 
 func unimplemented(string msg) {
-    print("UNIMPLEMENTED: ");
-    print(msg);
-    print("\n");
+    print_("UNIMPLEMENTED: ");
+    print_(msg);
+    print_("\n");
     exit(1);
 }
 
-func eprint(string str) {
+func eprint_(string str) {
     unimplemented("eprint");
 }
 

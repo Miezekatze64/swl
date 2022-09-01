@@ -45,6 +45,12 @@ instance Showable [char] {
     }
 }
 
+instance Showable char* {
+    func to_string(char *ptr) -> string {
+        <- cstr_to_str(ptr);
+    }
+}
+
 // used intrinsics
 
 intrinsic set_ptr      as set_ptr(_a* ptr, int val);

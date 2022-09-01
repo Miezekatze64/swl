@@ -1475,7 +1475,7 @@ fn typecheck_generics(generic_functions: &mut HashMap<String, GenericFunc>,
         let mut ret = Type::Invalid;
 
         if ! remove_original(root_arr, &func, &mut pos, &mut block, &mut args, &mut ret) {
-            unreachable!("original definition not found!!")
+            unreachable!("original definition not found!! <- {func}")
         }
 
         // add generic function declarations to AST

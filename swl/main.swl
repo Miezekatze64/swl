@@ -1,7 +1,7 @@
-include "std.swl";
-
+//include "std.swl";
+    
 func main() -> int {
-    println("Hello, World!");
-    eprintln(42);
+//    println("Hello, World!");
+//    eprintln(42);
     <- 42;
 }

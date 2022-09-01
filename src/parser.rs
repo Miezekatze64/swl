@@ -1467,7 +1467,7 @@ impl Parser {
                     let (args, ret) = parse_function_decl(self, errors.clone())?;
                     err_ret!(self.expect(Some(TokenType::Special), Some(";".into())), errors);
 
-                    let ename = nm.unwrap_or(name.clone());
+                    let ename = nm.unwrap_or_else(|| name.clone());
                     
                     return Ok(Some(ASTNode(token.pos, ASTNodeR::Extern(ename, name, args, ret))));
                 }

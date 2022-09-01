@@ -196,7 +196,7 @@ fn main() {
         }
 
         // typecheck the AST
-        match typecheck::check(ast, parser.lexer.clone(), intrinsics, true) {
+        match typecheck::check(ast, parser.lexer.clone(), intrinsics, true, verbose) {
             Err((e, (g, a, ..))) => {
                 for a in e.iter() {
                     let (t, v) = a;

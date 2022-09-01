@@ -49,7 +49,7 @@ fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut 
 }
 
 // check
-fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer) {
+fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &mut Lexer, verbose: usize) {
     let (node, functions, vars, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics) = largs;
     if let ASTNode(_, ASTNodeR::Block(ref mut arr)) = node {
         let vars_sub = &mut vars.clone();
@@ -86,7 +86,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     vars |= has_vars(ret);
 
                     if ! vars {
-                        typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), (tp.as_ref().map(|x| x.dealias(&ac)), func.clone()), false, lexer);
+                        typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), (tp.as_ref().map(|x| x.dealias(&ac)), func.clone()), false, lexer, verbose);
                     }
 
                 },
@@ -257,7 +257,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     a.1 = ASTNodeR::MemberFunction(left_type, lexpr.clone(), name.clone(), vec.clone());
                 }
                 ASTNode(_, ASTNodeR::Block(..)) => {
-                    typecheck((a, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), false, lexer);
+                    typecheck((a, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), false, lexer, verbose);
                 },
                 ASTNode(pos, ASTNodeR::SetField(ref mut expr_, ref mut name, ref mut rexpr, _, deref)) => {
                     let struct_type_ = typecheck_expr(expr_, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer).dealias(aliases);
@@ -294,9 +294,9 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                     }
-                    typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer);
+                    typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer, verbose);
                     if block2.is_some() {
-                        typecheck((block2.as_deref_mut().unwrap(), functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer);
+                        typecheck((block2.as_deref_mut().unwrap(), functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), is_loop, lexer, verbose);
                     }
                 },
                 ASTNode(pos, ASTNodeR::While(ref mut expr, ref mut block)) => {
@@ -304,7 +304,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     if bool_type != Type::Invalid && ! Type::Primitive(PrimitiveType::Bool).is_compatible(&bool_type, aliases) {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "incompatible types: expected `bool`, found `{bool_type}`")));
                     }
-                    typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), true, lexer);
+                    typecheck((block, functions, vars_sub, generic_functions, type_classes, instances, aliases, globals, errors, intrinsics), f.clone(), true, lexer, verbose);
                 },
                 ASTNode(pos, ASTNodeR::Return(ref mut expr)) => {
                     let tp = typecheck_expr(expr, functions, generic_functions, (vars_sub, type_classes, instances, aliases), errors, lexer);
@@ -426,7 +426,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 ASTNode(_, ASTNodeR::TypeAlias(_, _)) => {},
                 ASTNode(_, ASTNodeR::Struct(_, _)) => {},
                 ASTNode(_, ASTNodeR::Include(_, ref mut ast, ref mut lexer_)) => {
-                    let (g, a, f, tc, insts, gf) = match check(ast, lexer_.clone(), intrinsics, false) {
+                    let (g, a, f, tc, insts, gf) = match check(ast, lexer_.clone(), intrinsics, false, verbose) {
                         Ok(v) => v,
                         Err((vec, v)) => {
                             for e in vec {
@@ -1140,7 +1140,7 @@ fn add_generic_aliases(args: Vec<(Type, String)>, new_aliases: &mut Aliases, a: 
 type Ret = (Vec<Error>, Vals);
 type GenericFunctions = HashMap<String, GenericFunc>;
 type Vals = (Globals, Aliases, Functions, TypeClasses, Instances, GenericFunctions);
-pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>, toplevel: bool) -> Result<Vals, Ret> {
+pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'static str, &'static str>, toplevel: bool, verbose: usize) -> Result<Vals, Ret> {
     let mut errors: Vec<Error> = vec![];
 
     let mut generic_functions = HashMap::new();
@@ -1362,7 +1362,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
         unreachable!();
     }
 
-    typecheck((ast, &mut functions, &vars, &mut generic_functions, &mut type_classes, &mut instances, &mut type_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer);
+    typecheck((ast, &mut functions, &vars, &mut generic_functions, &mut type_classes, &mut instances, &mut type_aliases, &mut globals, &mut errors, intrinsics), (None, "".into()), false, &mut lexer, verbose);
     check_function_ret_paths(&ast.1, &mut errors, &mut lexer);
 
     let root_arr;
@@ -1372,7 +1372,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
         unreachable!();
     }
 
-    fn check_unused(root_arr: &mut Vec<ASTNode>, lexer: &mut Lexer) -> Vec<Error> {
+    fn check_unused(root_arr: &mut Vec<ASTNode>, lexer: &mut Lexer, verbose: usize) -> Vec<Error> {
         let mut errors = vec![];
         // check for unused generic functions
         let mut to_remove = vec![];
@@ -1385,13 +1385,15 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                 vars |= has_vars(ret);
 
                 if vars {
-                    errors.push((ErrorLevel::Warn, error!(lexer, *pos, "unused generic function {name} will be removed from .asm")));
+                    if verbose > 1 {
+                        errors.push((ErrorLevel::Warn, error!(lexer, *pos, "unused generic function {name} will be removed from .asm")));
+                    }
                     to_remove.push(i);
                 }
             } else if let ASTNode(_, ASTNodeR::Include(_, ast, lexer_)) = a {
                 if let ASTNodeR::Block(nvec) = &mut ast.1 {
                     errors.append(
-                        &mut check_unused(&mut Box::new(nvec), lexer_)
+                        &mut check_unused(&mut Box::new(nvec), lexer_, verbose)
                     );
                 } else {
                     unreachable!()
@@ -1405,11 +1407,11 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
     }
 
     if toplevel {
-        let mut new_errs = typecheck_generics(&mut generic_functions, root_arr, &type_aliases, &mut functions, &mut type_classes, &mut instances, &mut globals, intrinsics, &mut lexer);
+        let mut new_errs = typecheck_generics(&mut generic_functions, root_arr, &type_aliases, &mut functions, &mut type_classes, &mut instances, &mut globals, intrinsics, &mut lexer, verbose);
 
         errors.append(&mut new_errs);
 
-        errors.append(&mut check_unused(root_arr, &mut lexer));
+        errors.append(&mut check_unused(root_arr, &mut lexer, verbose));
     }
 
     let args = (globals, type_aliases, functions, type_classes, instances, generic_functions);
@@ -1430,7 +1432,8 @@ fn typecheck_generics(generic_functions: &mut HashMap<String, GenericFunc>,
                       instances: &mut Instances,
                       globals: &mut Globals,
                       intrinsics: fn() -> HashMap<&'static str, &'static str>,
-                      lexer: &mut Lexer) -> Vec<Error> {
+                      lexer: &mut Lexer,
+                      verbose: usize) -> Vec<Error> {
 
     fn remove_original(root_arr: &mut Vec<ASTNode>, func: &String, pos: &mut usize,
                        block: &mut Box<ASTNode>,
@@ -1460,7 +1463,7 @@ fn typecheck_generics(generic_functions: &mut HashMap<String, GenericFunc>,
                 }
             }
         }
-        return false;
+        false
     }
     
     let mut errors = vec![];
@@ -1491,9 +1494,9 @@ fn typecheck_generics(generic_functions: &mut HashMap<String, GenericFunc>,
 
             let mut generics = HashMap::new();
 
-            typecheck((&mut  node, functions, &current_vars, &mut generics, type_classes, instances, &mut new_aliases, globals, &mut errors, intrinsics), (None, "".into()), false, lexer);
+            typecheck((&mut  node, functions, &current_vars, &mut generics, type_classes, instances, &mut new_aliases, globals, &mut errors, intrinsics), (None, "".into()), false, lexer, verbose);
 
-            let mut new_errs = typecheck_generics(&mut generics, root_arr, type_aliases, functions, type_classes, instances, globals, intrinsics, lexer);
+            let mut new_errs = typecheck_generics(&mut generics, root_arr, type_aliases, functions, type_classes, instances, globals, intrinsics, lexer, verbose);
 
             errors.append(&mut new_errs);
 

@@ -104,11 +104,11 @@ fn optimize_expr(expr: &mut Expression, aliases: &HashMap<String, Type>, const_v
     }
 }
 
-fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut const_vars: HashMap<String, (Type, String)>) {
+fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, const_vars: &mut HashMap<String, (Type, String)>) {
     let mut to_remove = vec![];
     for (i, a) in vec.iter_mut().enumerate() {
         match &mut a.1 {
-            ASTNodeR::Block(inner_vec) => optimize_block(inner_vec, aliases, const_vars.clone()),
+            ASTNodeR::Block(inner_vec) => optimize_block(inner_vec, aliases, const_vars),
             ASTNodeR::VarInit(v, expr, _) | ASTNodeR::VarDecInit(_, _, v, expr) => {
                 optimize_expr(expr, aliases, const_vars.clone());
                 if let ExpressionR::Val(tp, val) = &expr.1 {
@@ -117,8 +117,9 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                     const_vars.remove(v);
                 }
             },
-            ASTNodeR::VarOp(_, op, expr) => {
+            ASTNodeR::VarOp(v, op, expr) => {
                 optimize_expr(expr, aliases, const_vars.clone());
+                const_vars.remove(v);
 
                 if let ExpressionR::Val(tp, val) = &expr.1 {
                     match op {
@@ -154,6 +155,14 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
             },
             ASTNodeR::If(exp, fst, snd) => {
                 optimize_expr(exp, aliases, const_vars.clone());
+                if let ASTNodeR::Block(vec) = &mut fst.1 {
+                    optimize_block(vec, aliases, const_vars);
+                }
+                if snd.is_some() {
+                    if let ASTNodeR::Block(vec) = &mut snd.as_mut().unwrap().1 {
+                        optimize_block(vec, aliases, const_vars);
+                    }
+                }
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == exp.1 {
                     *a = *fst.clone();
@@ -170,7 +179,11 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
             },
             ASTNodeR::While(expr, _block) => {
                 // TODO: fix constant vars optimization in loops
+                const_vars.clear();
                 optimize_expr(expr, aliases, HashMap::new());
+//                if let ASTNodeR::Block(vec) = &mut block.1 {
+//                    optimize_block(vec, aliases, const_vars);
+//                }
                 let b = Type::Primitive(PrimitiveType::Bool);
                 if ExpressionR::Val(b.clone(), "true".into()) == expr.1 {
                     // TODO(#5): CONSTANT TRUE LOOP: remove WhileCheck -> replace with direct jump in IR
@@ -189,7 +202,7 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
                 }
             },
             ASTNodeR::Instance(_, _, fs) => {
-                optimize_block(fs, aliases, const_vars.clone());
+                optimize_block(fs, aliases, const_vars);
             },
             ASTNodeR::Return(expr) => {
                 optimize_expr(expr, aliases, const_vars.clone());
@@ -212,9 +225,9 @@ fn optimize_block(vec: &mut Vec<ASTNode>, aliases: &HashMap<String, Type>, mut c
     }
 }
 
-fn optimize_(ast: &mut ASTNode, aliases: &HashMap<String, Type>, const_vars: HashMap<String, (Type, String)>) {
+fn optimize_(ast: &mut ASTNode, aliases: &HashMap<String, Type>, mut const_vars: HashMap<String, (Type, String)>) {
     if let ASTNode(_, ASTNodeR::Block(vec)) = ast {
-        optimize_block(vec, aliases, const_vars);
+        optimize_block(vec, aliases, &mut const_vars);
     } else {
         unreachable!()
     }

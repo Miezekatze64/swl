@@ -70,9 +70,10 @@ alias string = [char];
 // returns: the length
 func cstrlen(char *ptr) -> int {
     int i    = 0;
+    long addr = as[long, ptr];
     while (true) {
-        bool* _ptr = as[bool*, as[int, ptr] + i];
-        if (!(deref _ptr)) {
+        char* _ptr = as[char*, addr + i];
+        if (as[int, deref _ptr] == 0) {
             break;
         }
         i += 1;
@@ -89,7 +90,7 @@ func cstr_to_str(char *cstr) -> string {
     string str = alloc_array(cstrlen(cstr));
     int i = 0;
     while (i < cstrlen(cstr)) {
-        char* _ptr = as[char*, as[int, cstr] + i];
+        char* _ptr = as[char*, as[long, cstr] + i];
         char c = deref _ptr;
         str[i] = c;
         i += 1;

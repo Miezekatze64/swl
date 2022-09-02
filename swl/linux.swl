@@ -58,6 +58,10 @@ func close(long fd) {
     syscall1(3, fd);
 }
 
+func lseek(int fd, int offset, int whence) -> long {
+    <- syscall3(8, as[long, fd], as [long, offset], as[long, whence]);
+}
+
 // changes the current program break (start of heap) to given location
 // -------
 // args:

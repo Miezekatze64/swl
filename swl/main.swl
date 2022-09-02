@@ -1,7 +1,12 @@
 //include "std.swl";
     
 func main() -> int {
-//    println("Hello, World!");
-//    eprintln(42);
-    <- 42;
+    int i = 1;
+    while (true) {
+        if (i > 60) {
+            break;
+        }
+        i += 1;
+    }
+    <- i;
 }

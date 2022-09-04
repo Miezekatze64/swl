@@ -1,12 +1,23 @@
-//include "std.swl";
+include "std.swl";
+
+struct S {
     
-func main() -> int {
-    int i = 1;
-    while (true) {
-        if (i > 60) {
-            break;
-        }
-        i += 1;
+}
+
+instance Showable long {
+    func to_string(long l) -> string {
+        <- "<long>";
     }
-    <- i;
+}
+
+instance Showable S {
+    func to_string(S s) -> string {
+        <- "struct S {}";
+    }
+}
+
+func main() -> int {
+    println(42l);
+    println(S {});
+    <- 0;
 }

@@ -514,8 +514,10 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             let mut offsets: HashMap<String, (usize, usize)> = HashMap::new();
             let mut offset = 0;
             for arg in a {
-                offsets.insert(arg.1, (offset + arg.0.size(&aliases), arg.0.size(&aliases)));
-                offset += arg.0.size(&aliases);
+                let sz_ = arg.0.size(&aliases);
+                let sz = if sz_ == 0 {1} else {sz_};
+                offsets.insert(arg.1, (offset + sz, sz));
+                offset += sz;
             }
 
             if let Some(val) = member_type {

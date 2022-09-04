@@ -98,14 +98,6 @@ func cstr_to_str(char *cstr) -> string {
     <- str;
 }
 
-// converts a null-terminated, c-like string to a char array
-// --------
-// returns: the char array
-func to_string(char* self) -> string from char* {
-    <- cstr_to_str(self);
-}
-    
-
 // returns the program's arguments as a char* array
 // -----
 // returns: the args
@@ -162,7 +154,6 @@ func strcpy_off(string a, int a_off, string b, int b_off) {
 
 
 /** IO UTILS **/
-
 
 // prints a given string to stdout, followed by a line feed
 // ------
@@ -296,13 +287,6 @@ func itoa(int i) -> string {
     <- result;
 }
 
-// converts the integer to a string
-// -----
-// returns: the string
-func to_string(int self) -> string from int {
-    <- itoa(self);
-}
-    
 // converts a boolean to a string (true -> "true", false -> "false")
 // ------
 // args:

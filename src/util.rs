@@ -120,9 +120,7 @@ impl std::hash::Hash for Type {
                 17.hash(state);
             },
             Type::Invalid => 0.hash(state),
-            Type::Struct(x, map) => {
-                map.iter().map(|(a, b)| (a.clone(), b.clone()))
-                    .collect::<Vec<(String, (Type, usize))>>().hash(state);
+            Type::Struct(x, _vec) => {
                 x.hash(state);
             },
             Type::Function(args, ret) => {

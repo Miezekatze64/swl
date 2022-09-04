@@ -18,7 +18,7 @@ type ListArgs<'a> = (&'a mut ASTNode, &'a mut Functions, &'a Vars, &'a mut HashM
 fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut String) {
     match tp {
         Type::Primitive(_)                => {},
-        Type::Custom(_)                   => {},
+        Type::Custom(s)                   => todo!("Custom: {s}"),
         Type::Array(ref a)                => hash_vars(*a.clone(), current_vars, new_func_name),
         Type::Pointer(ref a)              => hash_vars(*a.clone(), current_vars, new_func_name),
         Type::Function(ref args, ref ret) => {
@@ -39,9 +39,10 @@ fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut 
         },
         Type::Bounded(ref a, _) => {
             let mut hasher = DefaultHasher::new();
+            println!("TYPE: {}", current_vars[a]);
             current_vars[a].hash(&mut hasher);
             let hash = hasher.finish();
-            
+
             new_func_name.push_str(hash.to_string().as_str());
             new_func_name.push('_');
         },
@@ -179,7 +180,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
 
                     let mut new_func_name: String = String::new();
                     for tp in func_args.iter() {
-                        hash_vars(tp.clone(), current_vars.clone(), &mut new_func_name);
+                        hash_vars(tp.dealias(aliases), current_vars.clone(), &mut new_func_name);
                     }
 
                     let has_vars = ! new_func_name.is_empty();
@@ -425,36 +426,6 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                 },
                 ASTNode(_, ASTNodeR::TypeAlias(_, _)) => {},
                 ASTNode(_, ASTNodeR::Struct(_, _)) => {},
-                ASTNode(_, ASTNodeR::Include(_, ref mut ast, ref mut lexer_)) => {
-                    let (g, a, f, tc, insts, gf) = match check(ast, lexer_.clone(), intrinsics, false, verbose) {
-                        Ok(v) => v,
-                        Err((vec, v)) => {
-                            for e in vec {
-                                errors.push(e);
-                            }
-                            v
-                        },
-                    };
-
-                    for (k, v) in g {
-                        globals.insert(k, v);
-                    }
-                    for (k, v) in a {
-                        aliases.insert(k, v);
-                    }
-                    for (k, v) in f {
-                        functions.insert(k, v);
-                    }
-                    for (k, v) in tc {
-                        type_classes.insert(k, v);
-                    }
-                    for (k, v) in insts {
-                        instances.insert(k, v);
-                    }
-                    for (k, v) in gf {
-                        generic_functions.insert(k, v);
-                    }
-                }
                 ASTNode(pos, ASTNodeR::Intrinsic(iname, ..)) => {
                     if ! intrinsics().contains_key(iname.as_str()) {
                         errors.push((ErrorLevel::Err, error!(lexer, *pos, "undefined reference to compiler intrinsic `{iname}`")));
@@ -497,6 +468,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                     }
                 },
                 ASTNode(_, ASTNodeR::Extern(..)) => {},
+                ASTNode(_, ASTNodeR::Include(..)) => {},
              }
         };
     } else {
@@ -611,7 +583,21 @@ fn infer_types(typa: Type, typb: &mut Type, current_vars: &mut HashMap<String, T
             }
         },
         Type::Invalid => todo!(),
-        Type::Struct(_, _) => todo!(),
+        Type::Struct(_, ref mut args) => {
+            if let Type::Struct(_, ref argsa) = typa {
+                for (i, (_, (arg, _))) in args.iter_mut().enumerate() {
+                    if arg.dealias(aliases) != *arg {
+                        // nothing to infer
+                        continue;
+                    }
+                    
+                    infer_types(argsa[i].1.0.clone().dealias(aliases), arg, current_vars, lexer, pos, expr.clone(), aliases);
+                }
+            } else {
+                errors.push((ErrorLevel::Err, error!(lexer, pos, "`{expr}` is not a struct, but a struct was expected")));
+                return errors;
+            }
+        },
         Type::Bounded(..) => {},
     }
     errors
@@ -898,12 +884,18 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
 
                 let mut new_func_name: String = String::new();
                 let mut has_var: bool = false;
+                println!("FUNC: {lexpr}");
                 for tp in func_args.iter() {
-                    hash_vars(tp.clone(), current_vars.clone(), &mut new_func_name);
+                    println!("TYPE: {:?}", tp.dealias(aliases));
+                    hash_vars(tp.dealias(aliases), current_vars.clone(), &mut new_func_name);
+                    println!("HASH: {new_func_name}");
                     has_var |= has_vars(tp);
                 }
-                hash_vars(ret_type.clone(), current_vars.clone(), &mut new_func_name);
+                println!("TYPE: {:?}", ret_type.dealias(aliases));
+                hash_vars(ret_type.dealias(aliases), current_vars.clone(), &mut new_func_name);
+                println!("HASH: {new_func_name}");
                 has_var |= has_vars(&ret_type);
+                println!("--------");
 
                 if let Some(ref a) = type_class {
                     // check for instance
@@ -1103,7 +1095,7 @@ fn add_generic_alias(left: &Type, right: &Type, new_aliases: &mut Aliases) {
             if let Type::Pointer(inner) = right {
                 add_generic_alias(a, inner, new_aliases);
             } else {
-                unreachable!()
+                unreachable!("Type {right} is not a pointer")
             }
         },
         Type::Function(args, ret) => {
@@ -1154,19 +1146,19 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
     let mut globals:      Globals     = HashMap::new();
 
     if let ASTNode(_, ASTNodeR::Block(arr)) = ast {
-        for a in arr.clone() {
+        for a in arr.iter_mut() {
             match a {
                 ASTNode(_, ASTNodeR::TypeAlias(alias, typ)) => {
-                    type_aliases.insert(alias, typ);
+                    type_aliases.insert(alias.clone(), typ.clone());
                 },
                 ASTNode(_, ASTNodeR::Struct(name, fields)) => {
-                    type_aliases.insert(name.clone(), Type::Struct(name, fields));
+                    type_aliases.insert(name.clone(), Type::Struct(name.clone(), fields.clone()));
                 },
                 ASTNode(_, ASTNodeR::Intrinsic(_, fname, args, rt)) => {
-                    functions.insert((None, fname), (args.into_iter().enumerate().map(|(_, (a, _))| a).collect(), rt));
+                    functions.insert((None, fname.clone()), (args.into_iter().enumerate().map(|(_, (a, _))| a.clone()).collect(), rt.clone()));
                 },
                 ASTNode(_, ASTNodeR::Extern(_, name, args, rt)) => {
-                    functions.insert((None, name), (args.into_iter().enumerate().map(|(_, (a, _))| a).collect(), rt));
+                    functions.insert((None, name.clone()), (args.into_iter().enumerate().map(|(_, (a, _))| a.clone()).collect(), rt.clone()));
                 },
                 ASTNode(_, ASTNodeR::TypeClass(name, arg, funcs)) => {
                     type_classes.insert(name.clone(), (arg.clone(), funcs.clone()));
@@ -1178,7 +1170,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                         };
 
                         let mut args = vec![];
-                        for t in v.0 {
+                        for t in v.0.clone() {
                             args.push(if Type::Custom(arg.clone()) == t.dealias(&type_aliases) {
                                 Type::Bounded(arg.clone(), name.clone())
                             } else {
@@ -1189,10 +1181,40 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                         let ret = if Type::Custom(arg.clone()) == v.1.dealias(&type_aliases) {
                             Type::Bounded(arg.clone(), name.clone())
                         } else {
-                            v.1
+                            v.1.clone()
                         };
 
-                        functions.insert((from, k.1), (args, ret));
+                        functions.insert((from, k.1.clone()), (args, ret));
+                    }
+                },
+                ASTNode(_, ASTNodeR::Include(_, ref mut ast, lexer_)) => {
+                    let (g, a, f, tc, insts, gf) = match check(ast, lexer_.clone(), intrinsics, false, verbose) {
+                        Ok(v) => v,
+                        Err((vec, v)) => {
+                            for e in vec {
+                                errors.push(e);
+                            }
+                            v
+                        },
+                    };
+
+                    for (k, v) in g {
+                        globals.insert(k, v);
+                    }
+                    for (k, v) in a {
+                        type_aliases.insert(k, v);
+                    }
+                    for (k, v) in f {
+                        functions.insert(k, v);
+                    }
+                    for (k, v) in tc {
+                        type_classes.insert(k, v);
+                    }
+                    for (k, v) in insts {
+                        instances.insert(k, v);
+                    }
+                    for (k, v) in gf {
+                        generic_functions.insert(k, v);
                     }
                 }
                 _ => {}
@@ -1324,7 +1346,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                             } else {
                                 a.clone()
                             };
-                            hash_vars(tp, current_vars.clone(), &mut new_func_name);
+                            hash_vars(tp.dealias(&type_aliases), current_vars.clone(), &mut new_func_name);
                         }
                         
                         let tp = if let Type::Custom(b) = ret.dealias(&type_aliases) {
@@ -1333,7 +1355,7 @@ pub fn check(ast: &mut ASTNode, mut lexer: Lexer, intrinsics: fn() -> HashMap<&'
                             ret.clone()
                         };
                         
-                        hash_vars(tp, current_vars, &mut new_func_name);
+                        hash_vars(tp.dealias(&type_aliases), current_vars, &mut new_func_name);
 
                         new_func_name.push_str(fname);
                         
@@ -1530,7 +1552,13 @@ fn has_vars(tp: &Type) -> bool {
             vars
         },
         Type::Invalid             => false,
-        Type::Struct(_, _)        => todo!(),
+        Type::Struct(_, args)     => {
+            let mut vars: bool = false;
+            for arg in args {
+                vars |= has_vars(&arg.1.0);
+            }
+            vars
+        },
         Type::Var(_)              => true,
         Type::Bounded(..)         => true,
     }

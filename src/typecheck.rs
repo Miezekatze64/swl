@@ -39,7 +39,6 @@ fn hash_vars(tp: Type, current_vars: HashMap<String, Type>, new_func_name: &mut 
         },
         Type::Bounded(ref a, _) => {
             let mut hasher = DefaultHasher::new();
-            println!("TYPE: {}", current_vars[a]);
             current_vars[a].hash(&mut hasher);
             let hash = hasher.finish();
 
@@ -884,18 +883,12 @@ fn typecheck_expr(expr: &mut Expression, functions: &mut Functions, generic_func
 
                 let mut new_func_name: String = String::new();
                 let mut has_var: bool = false;
-                println!("FUNC: {lexpr}");
                 for tp in func_args.iter() {
-                    println!("TYPE: {:?}", tp.dealias(aliases));
                     hash_vars(tp.dealias(aliases), current_vars.clone(), &mut new_func_name);
-                    println!("HASH: {new_func_name}");
                     has_var |= has_vars(tp);
                 }
-                println!("TYPE: {:?}", ret_type.dealias(aliases));
                 hash_vars(ret_type.dealias(aliases), current_vars.clone(), &mut new_func_name);
-                println!("HASH: {new_func_name}");
                 has_var |= has_vars(&ret_type);
-                println!("--------");
 
                 if let Some(ref a) = type_class {
                     // check for instance

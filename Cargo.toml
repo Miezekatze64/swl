@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 libc = "0.2"
+supports-color = "*"
 
 [[bin]]
 name = "swl"

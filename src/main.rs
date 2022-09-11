@@ -28,10 +28,34 @@ pub enum Target {
     Wasm,
 }
 
-pub const COLOR_RED:    &str = "\x1b[31m";
-pub const COLOR_GREEN:  &str = "\x1b[32m";
-pub const COLOR_YELLOW: &str = "\x1b[33m";
-pub const COLOR_RESET:  &str = "\x1b[0m";
+pub fn color_red() -> &'static str {
+    if supports_color::on(supports_color::Stream::Stdout).is_some() {
+        "\x1b[31m"
+    } else {
+        ""
+    }
+}
+pub fn color_green() -> &'static str {
+    if supports_color::on(supports_color::Stream::Stdout).is_some() {
+        "\x1b[32m"
+    } else {
+        ""
+    }
+}
+pub fn color_yellow() -> &'static str {
+    if supports_color::on(supports_color::Stream::Stdout).is_some() {
+        "\x1b[33m"
+    } else {
+        ""
+    }
+}
+pub fn color_reset() -> &'static str {
+    if supports_color::on(supports_color::Stream::Stdout).is_some() {
+        "\x1b[0m"
+    } else {
+        ""
+    }
+}
 
 /// Returns the usage of the compiler as a string
 fn usage(prog_name: String) -> String {
@@ -42,7 +66,10 @@ fn usage(prog_name: String) -> String {
              \t--help      | -h {COLOR_YELLOW}=>{COLOR_RESET} display this help message and exit\n\
              \t--interpret | -i {COLOR_YELLOW}=>{COLOR_RESET} interpret program instead of compiling\n\
              \t--target    | -t {COLOR_YELLOW}=>{COLOR_RESET} set target of compilation (e. g. linux-x86_64)\n\
-             ")
+             ",
+            COLOR_GREEN = color_green(),
+            COLOR_YELLOW = color_yellow(),
+            COLOR_RESET = color_reset())
 }
 
 /// The main function of the compiler
@@ -135,7 +162,9 @@ fn main() {
     let filename: String = match pos_args.get(0) {
         Some(a) => a.to_string(),
         None => {
-            eprintln!("{COLOR_RED}ERROR: <filename> not given{COLOR_RESET}\n{}", usage(arg0));
+            eprintln!("{COLOR_RED}ERROR: <filename> not given{COLOR_RESET}\n{}", usage(arg0),
+                      COLOR_RED = color_red(),
+                      COLOR_RESET = color_reset());
             exit(1);
         },
     };
@@ -175,7 +204,9 @@ fn main() {
     if let Err(ref e) = a {
         for a in e {
             let (t, v) = a;
-            eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v);
+            eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v,
+                      COLOR_RED = color_red(),
+                      COLOR_RESET = color_reset());
         }
         error = true;
     }
@@ -200,7 +231,9 @@ fn main() {
             Err((e, (g, a, ..))) => {
                 for a in e.iter() {
                     let (t, v) = a;
-                    eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v);
+                    eprintln!("{COLOR_RED}{}: {COLOR_RESET}{}", t, v,
+                              COLOR_RED = color_red(),
+                              COLOR_RESET = color_reset());
                 };
                 if e.into_iter().any(|(lvl, _)| lvl == util::ErrorLevel::Err) {
                     checked = false;

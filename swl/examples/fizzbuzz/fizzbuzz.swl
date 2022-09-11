@@ -10,7 +10,7 @@ func fizzbuzz_(int i) -> string {
     if (i % 3 == 0) {
         <- "Fizz";
     }
-    <- i.to_string();
+    <- to_string(i);
 }
 
 func fizzbuzz(int max) {

@@ -1,4 +1,4 @@
-use crate::{COLOR_RED, COLOR_GREEN, COLOR_RESET, Target};
+use crate::{color_red, color_green, color_reset, Target};
 use std::process::exit;
 
 fn pos_to_line_char(source: Vec<char>, pos: usize) -> (usize, usize) {
@@ -104,9 +104,12 @@ pub fn preprocess(file: Vec<char>, filename: String, tgt: Target) -> (Vec<char>,
                     };
                     let (l, c) = pos_to_line_char(file.clone(), dir_start);
                     eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}{msg}",
-                                   file = filename,
-                                   line = l+1,
-                                   ch = c+1,
+                              file = filename,
+                              line = l+1,
+                              ch = c+1,
+                              COLOR_RED = color_red(),
+                              COLOR_GREEN = color_green(),
+                              COLOR_RESET = color_reset()
                     );
                     exit(1);
                 },
@@ -121,9 +124,12 @@ pub fn preprocess(file: Vec<char>, filename: String, tgt: Target) -> (Vec<char>,
                         _ => {
                             let (l, c) = pos_to_line_char(file.clone(), dir_start);
                             eprintln!("{COLOR_RED}error: {COLOR_GREEN}{file}:{line}:{ch}: {COLOR_RESET}invalid target {target_}",
-                                   file = filename,
-                                   line = l+1,
-                                   ch = c+1,
+                                      file = filename,
+                                      line = l+1,
+                                      ch = c+1,
+                                      COLOR_RED = color_red(),
+                                      COLOR_GREEN = color_green(),
+                                      COLOR_RESET = color_reset(),
                             );
                             exit(1);
                         }
@@ -142,6 +148,9 @@ pub fn preprocess(file: Vec<char>, filename: String, tgt: Target) -> (Vec<char>,
                                   file = filename,
                                   line = l+1,
                                   ch = c+1,
+                                  COLOR_RED = color_red(),
+                                  COLOR_GREEN = color_green(),
+                                  COLOR_RESET = color_reset(),
                         );
                         exit(1);
                     }
@@ -161,6 +170,9 @@ pub fn preprocess(file: Vec<char>, filename: String, tgt: Target) -> (Vec<char>,
                               file = filename,
                               line = l+1,
                               ch = c+1,
+                              COLOR_RED = color_red(),
+                              COLOR_GREEN = color_green(),
+                              COLOR_RESET = color_reset(),
                     );
                     exit(1);
                 }

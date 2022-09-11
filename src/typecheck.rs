@@ -219,7 +219,7 @@ fn typecheck(largs: ListArgs, f: (Option<Type>, String), is_loop: bool, lexer: &
                         a.1 = ASTNodeR::FunctionCall(Box::new(Expression(*pos,
                                                                     ExpressionR::Var(new_func_name),
                                                                     Some(Type::Function(new_args, Box::new(ret_type))))),
-                                                orig_vec);
+                                                args.to_vec());
                     }
                     
                 },

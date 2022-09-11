@@ -1,5 +1,11 @@
 use {std::collections::HashMap, crate::{parser::{ExpressionR, ASTNodeR, Expression}, util::{Op, PrimitiveType, BinaryOp, Type, UnaryOp}}};
 
+macro_rules! ceil {
+    ($val:expr) => {
+        if $val > ($val as i64) as f32 {($val as i64)+1} else {$val as i64}
+    };
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Inst {
     Func(String, HashMap<String, (usize, usize)>),
@@ -17,8 +23,8 @@ pub enum Inst {
     Var(usize, usize, usize, bool),
     RetVal(usize),
     Intrinsic(String, String),
-    Push(usize),
-    Pop(usize),
+    Push(usize, usize),
+    Pop(usize, usize),
     Arr(usize, usize),
     Index(usize, usize, Vec<usize>, bool),
     ArraySet(usize, usize, usize, Vec<usize>),
@@ -26,13 +32,13 @@ pub enum Inst {
     GlobalSet(usize, String, usize, usize),
     Jump(String),
     Field(usize, usize, Type),
-    Deref(usize),
+    Deref(usize, usize),
     SetField(usize, usize, usize, usize),
     Break(usize),
     FuncPtr(usize, String),
     CallReg(usize),
     Else(usize),
-    DerefSet(usize, usize),
+    DerefSet(usize, usize, usize),
     Extern(String, String),
 }
 
@@ -41,16 +47,16 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
     let Expression(_pos, expr, tp) = expr;
     match expr {
         ExpressionR::UnaryOp(op, fst, _) => {
-            ret.push(Inst::Push(index));
+            ret.push(Inst::Push(index, 8));
             ret.append(&mut gen_expr(*fst, index, indicies, globals, aliases, false));
-            ret.push(Inst::Pop(index));
+            ret.push(Inst::Pop(index, 8));
             ret.push(Inst::UnOp(index, tp.unwrap().size(aliases), op));
         },
         ExpressionR::T(fst, op, snd, _) => {
             ret.append(&mut gen_expr(*fst.clone(), index, indicies, globals, aliases, false));
-            ret.push(Inst::Push(index));
+            ret.push(Inst::Push(index, 8));
             ret.append(&mut gen_expr(*snd, index+1, indicies, globals, aliases, false));
-            ret.push(Inst::Pop(index));
+            ret.push(Inst::Pop(index, 8));
             if let Op::Binary(op) = op {
                 ret.push(Inst::BinOp((index, index+1), fst.2.unwrap().size(aliases), op));
             } else {
@@ -61,10 +67,23 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             // convert hashmap to vector
             let mut vector: Vec<String> = fields.iter().map(|(x, _)| x.clone()).collect();
             vector.sort();
-            
-            for (i, key) in vector.into_iter().enumerate() {
-                ret.append(&mut gen_expr(fields[&key].clone(), index+i, indicies, globals, aliases, false));
+
+            let mut sz = 0;
+            for key in vector.iter().rev() {
+                ret.append(&mut gen_expr(fields[key].clone(), 0, indicies, globals, aliases, false));
+                let size = fields[key].2.as_ref().unwrap().size(aliases);
+                ret.push(Inst::Push(0, size));
+                sz += size;
             }
+
+            let mut i = sz;
+            let mut r = 0;
+            while i > 8 {
+                ret.push(Inst::Pop(r, 8));
+                i -= 8;
+                r += 1;
+            }
+            ret.push(Inst::Pop(r, i));
         },
         ExpressionR::Val(tp, val) => {
             if !is_ref {
@@ -82,8 +101,8 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             } else if globals.contains_key(&name) {
                 let size = *globals.get(&name).unwrap();
                 if size < 8 || is_ref {
-                    ret.push(Inst::Global(index, name, 8, 0, is_ref));
-                }  else {
+                    ret.push(Inst::Global(index, name, size, 0, is_ref));
+                } else {
                     let mut sz = size;
                     let mut ind = 0;
                     while sz > 8 {
@@ -100,16 +119,22 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
         ExpressionR::F(expr, args) => {
             let mut ind = 0;
             for a in args.clone() {
+                let sz = a.2.as_ref().unwrap().size(aliases);
                 ret.append(&mut gen_expr(a, ind, indicies, globals, aliases, false));
-                ret.push(Inst::Push(ind));
-                ind += 1;
+                for _ in 0 .. ceil!(sz as f32 / 8.0) {
+                    ret.push(Inst::Push(ind, 8));
+                    ind += 1;
+                }
             }
             let find = ind;
             ret.append(&mut gen_expr(*expr, find, indicies, globals, aliases, false));
 
-            for _ in args.iter().rev() {
-                ind -= 1;
-                ret.push(Inst::Pop(ind));
+            for a in args.iter().rev() {
+                let sz = a.2.as_ref().unwrap().size(aliases);
+                for _ in 0 .. ceil!(sz as f32 / 8.0) {
+                    ind -= 1;
+                    ret.push(Inst::Pop(ind, 8));
+                }
             }
 
             ret.push(Inst::CallReg(find));
@@ -129,13 +154,13 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             let mut ind = 1;
             for a in args.clone() {
                 ret.append(&mut gen_expr(a, ind, indicies, globals, aliases, false));
-                ret.push(Inst::Push(ind));
+                ret.push(Inst::Push(ind, 8));
                 ind += 1;
             }
 
             for _ in args.iter().rev() {
                 ind -= 1;
-                ret.push(Inst::Pop(ind));
+                ret.push(Inst::Pop(ind, 8));
             }
             
             ret.push(Inst::Call(ltype.to_label() + &name));
@@ -154,7 +179,7 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
         },
         ExpressionR::Deref(expr) => {
             ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, false));
-            ret.push(Inst::Deref(index));
+            ret.push(Inst::Deref(index, tp.unwrap().size(aliases)));
         }
         ExpressionR::Arr(_) => {
             todo!();
@@ -169,9 +194,9 @@ fn gen_expr(expr: Expression, index: usize, indicies: &mut HashMap<String, (usiz
             ret.append(&mut gen_expr(*expr, index, indicies, globals, aliases, false));
             ret.push(Inst::Val(index+1, Type::Primitive(PrimitiveType::Int), tp.unwrap().size(aliases).to_string()));
             ret.push(Inst::BinOp((index, index+1), 8, BinaryOp::Mul));
-            ret.push(Inst::Push(index));
+            ret.push(Inst::Push(index, 8));
             ret.append(&mut gen_expr(*lexpr, index+1, indicies, globals, aliases, false));
-            ret.push(Inst::Pop(index));
+            ret.push(Inst::Pop(index, 8));
             ret.push(Inst::Index(index, index+1, expr_vec, is_ref));
         },
         ExpressionR::StructField(expr, field, struct_type, deref) => {
@@ -335,35 +360,35 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 let size = vals.1;
                 if size < 8 {
                     ret.push(Inst::VarSet(0, vals.1, vals.0))
-                } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
+/*                } else if let Type::Struct(_, fields) = tp.dealias(&aliases) {
                     let mut offset = vals.0;
                     for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::VarSet(index, sz, offset));
                         offset -= sz;
                     }
-                } else {
+*/              } else {
                     let mut sz = size;
                     let mut index = 0;
                     while sz > 8 {
-                        ret.push(Inst::VarSet(0, 8, vals.0 + index));
+                        ret.push(Inst::VarSet(index/8, 8, vals.0 - index));
                         index += 8;
                         sz -= 8;
                     }
-                    ret.push(Inst::VarSet(0, sz, vals.0 + index));
+                    ret.push(Inst::VarSet(index/8, sz, vals.0 - index));
                 }
             } else {
                 let len = globals.get(name).unwrap();
                 if *len < 8 {
                     ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                } else if let Type::Struct(_, fields) = tp {
+/*                } else if let Type::Struct(_, fields) = tp {
                     let mut offset = 0;
                     for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                         offset += sz;
                     }
-                } else {
+*/                } else {
                     let mut sz = *len;
                     let mut index = 0;
                     while sz > 8 {
@@ -390,42 +415,42 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
                 ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
             }
         },
-        ASTNodeR::VarInit(ref name, expr, tp) => {
+        ASTNodeR::VarInit(ref name, expr, _) => {
             ret.append(&mut gen_expr(expr, 0, offsets, globals, &aliases, false));
             if offsets.contains_key(name) {
                 let vals = offsets.get(name).unwrap();
                 let size = vals.1;
                 if size < 8 {
-                    ret.push(Inst::VarSet(0, vals.1, vals.0))
-                } else if let Some(Type::Struct(_, fields)) = tp {
+                    ret.push(Inst::VarSet(0, vals.1, vals.0));
+/*                } else if let Some(Type::Struct(_, fields)) = tp {
                     let mut offset = vals.0;
                     for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::VarSet(index, sz, offset));
                         offset -= sz;
                     }
-                } else {
+*/                } else {
                     let mut sz = size;
                     let mut index = 0;
                     while sz > 8 {
-                        ret.push(Inst::VarSet(0, 8, vals.0 + index));
+                        ret.push(Inst::VarSet(index/8, 8, vals.0 - index));
                         index += 8;
                         sz -= 8;
                     }
-                    ret.push(Inst::VarSet(0, sz, vals.0 + index));
+                    ret.push(Inst::VarSet(index/8, sz, vals.0 - index));
                 }
             } else {
                 let len = globals.get(name).unwrap();
                 if *len < 8 {
                     ret.push(Inst::GlobalSet(0, name.clone(), *len, 0))
-                } else if let Some(Type::Struct(_, fields)) = tp {
+/*                } else if let Some(Type::Struct(_, fields)) = tp {
                     let mut offset = 0;
                     for (index, (_, vals)) in fields.iter().enumerate() {
                         let sz = vals.0.size(&aliases);
                         ret.push(Inst::GlobalSet(index, name.clone(), sz, offset));
                         offset += sz;
                     }
-                } else {
+*/                } else {
                     let mut sz = *len;
                     let mut index = 0;
                     while sz > 8 {
@@ -438,18 +463,25 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             }
         },
         ASTNodeR::FunctionCall(expr, args) => {
+            let mut ind = 0;
             for a in args.clone() {
-                ret.append(&mut gen_expr(a, 0, offsets, globals, &aliases, false));
-                ret.push(Inst::Push(0));
+                let sz = a.2.as_ref().unwrap().size(&aliases);
+                ret.append(&mut gen_expr(a, ind, offsets, globals, &aliases, false));
+                for _ in 0 .. ceil!(sz as f32 / 8.0) {
+                    ret.push(Inst::Push(ind, 8));
+                    ind += 1;
+                }
             }
 
-            let mut index = args.len();
-            let findex = index;
+            let findex = ind;
             ret.append(&mut gen_expr(*expr, findex, offsets, globals, &aliases, false));
             
-            for _ in args.iter().rev() {
-                index -= 1;
-                ret.push(Inst::Pop(index));
+            for a in args.iter().rev() {
+                let sz = a.2.as_ref().unwrap().size(&aliases);
+                for _ in 0 .. ceil!(sz as f32 / 8.0) {
+                    ind -= 1;
+                    ret.push(Inst::Pop(ind, 8));
+                }
             }
 //            if offsets.contains_key(&name) {
             ret.push(Inst::CallReg(findex/*offsets[&name].0*/));
@@ -462,13 +494,13 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
             let mut ind = 1;
             for a in args.clone() {
                 ret.append(&mut gen_expr(a, ind, offsets, globals, &aliases, false));
-                ret.push(Inst::Push(ind));
+                ret.push(Inst::Push(ind, 8));
                 ind += 1;
             }
 
             for _ in args.iter().rev() {
                 ind -= 1;
-                ret.push(Inst::Pop(ind));
+                ret.push(Inst::Pop(ind, 8));
             }
             
             ret.push(Inst::Call(tp.to_label() + &name));
@@ -551,8 +583,8 @@ pub fn gen(ast: ASTNodeR, offsets: &mut HashMap<String, (usize, usize)>, globals
         ASTNodeR::Instance(..) => {},
         ASTNodeR::DerefSet(l, r) =>{
             ret.append(&mut gen_expr(l, 0, offsets, globals, &aliases, false));
-            ret.append(&mut gen_expr(r, 1, offsets, globals, &aliases, false));
-            ret.push(Inst::DerefSet(0, 1));
+            ret.append(&mut gen_expr(r.clone(), 1, offsets, globals, &aliases, false));
+            ret.push(Inst::DerefSet(0, 1, r.2.unwrap().size(&aliases)));
         },
         ASTNodeR::Extern(ename, name, _, _) => {
             externs.push((ename.clone(), name.clone()));

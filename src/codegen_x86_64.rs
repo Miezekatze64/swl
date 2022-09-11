@@ -3,14 +3,26 @@ use {crate::{intermediate::Inst,
      std::{fmt::Write, collections::HashMap}
 };
 
+macro_rules! min {
+    ($a:expr, $b:expr) => {
+        (if $a < $b {$a} else {$b})
+    };
+}
+
+macro_rules! ceil {
+    ($val:expr) => {
+        if $val > ($val as i64) as f32 {($val as i64)+1} else {$val as i64}
+    };
+}
+
 pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs: &Vec<(String, String)>, start: &'static str, exit: &'static str, extern_: fn(String, String) -> String) -> String {
 
     let datatype = |a: usize| match a {
         0|1 => "byte",
         2 => "word",
         4 => "dword",
-        8 => "qword",
-        _ => "__invalid__"
+        5..=8 => "qword",
+        a => panic!("__invalid__({a})")
     };
 
     let register = |reg| match reg {
@@ -31,32 +43,32 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
             0|1 => "al",
             2 => "ax",
             4 => "eax",
-            8 => "rax",
+            5..=8 => "rax",
             _ => "__invalid__"
         },
         "rbx" => match sz {
             0|1 => "bl",
             2 => "bx",
             4 => "ebx",
-            8 => "rbx",
+            5..=8 => "rbx",
             _ => "__invalid__"
         },
         "rcx" => match sz {
             0|1 => "cl",
             2 => "cx",
             4 => "ecx",
-            8 => "rcx",
+            5..=8 => "rcx",
             _ => "__invalid__"
         },
         "rdx" => match sz {
             0|1 => "dl",
             2 => "dx",
             4 => "edx",
-            8 => "rdx",
+            5..=8 => "rdx",
             _ => "__invalid__"
         },
         a => match sz {
-            8 => a,
+            5..=8 => a,
             _ => "__invalid__",
         }
     };
@@ -92,20 +104,22 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                 for (index, a) in (0..offsets.len()).enumerate() {
                     let mut sz = offsets[&vec[a].1].1;
                     let mut add_off = 0;
+                    let mut rind = index;
                     while sz > 8 {
-                        let _ = write!(string, "\tsub rsp, {ind_aligned}\n\tmov\
+                        let _ = write!(string, "\tsub rsp, {ind_aligned}\n\tmov \
                                                 [rbp-{ind}], {}\n",
-                                       register(index),
-                                       ind         = offsets[&vec[a].1].0 + add_off,
+                                       register(rind),
+                                       ind         = offsets[&vec[a].1].0 - add_off,
                                        ind_aligned = ((offsets[&vec[a].1].0 + add_off) / 16 + 1) * 16,
                         );
                         sz -= 8;
-                        add_off += 8;
+                        rind += 1;
+                        add_off += min!(8, sz);
                     }
                     let _ = write!(string, "\tsub rsp, {ind_aligned}\n\tmov \
                                             [rbp-{ind}], {}\n",
-                                   register_sz(index, sz),
-                                   ind         = offsets[&vec[a].1].0 + add_off,
+                                   register_sz(rind, sz),
+                                   ind         = offsets[&vec[a].1].0 - add_off,
                                    ind_aligned = ((offsets[&vec[a].1].0 + add_off)  / 16 + 1) * 16
                     );
                 }
@@ -139,11 +153,22 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
             Inst::Break(id) => {
                 format!(";; BREAK {id}\n\tjmp .loop_{id}_end\n")
             },
-            Inst::Push(reg) => {
-                format!(";; PUSH\n\tpush {}\n", register(reg))
+            Inst::Push(reg, sz) => {
+                if sz == 8 {
+                    format!(";; PUSH\n\tpush {}\n", register(reg))
+                } else {
+                    format!(";; PUSH \n\tsub rsp, {sz}\n\tmov {} [rsp], {}\n",
+                            datatype(sz),
+                            register_sz(reg, sz))
+                }
             },
-            Inst::Pop(reg) => {
+            Inst::Pop(reg, sz) => {
+                if sz == 8 {
                 format!(";; POP\n\tpop {}\n", register(reg))
+                } else {
+                    format!(";; POP \n\tmov {}, [rsp]\n\tadd rsp, {sz}\n",
+                            register_sz(reg, sz))
+                }
             },
             Inst::Val(reg, tp, val) => {
                 let str_val = match tp {
@@ -272,7 +297,8 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                     set_indicies.push(index);
                     format!(";; SET VAR {index}\n\tsub rsp, {ind_aligned}\n\tmov {tp} \
                              [rbp-{ind}], {}\n",
-                            register_sz(reg, sz), ind_aligned = (index / 16 + 1) * 16, ind = index, tp = datatype(sz))
+                            register_sz(reg, sz),
+                            ind_aligned = (index / 16 + 1) * 16, ind = index, tp = datatype(sz))
                 } else {
                     format!(";; SET VAR {index}\n\tmov {tp} \
                              [rbp-{ind}], {}\n",
@@ -289,12 +315,12 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                     let mut i = 0;
                     while size > 8 {
                         let _ = writeln!(string, "\tmov {}, [rbp-{}]",
-                                         register(reg+i/8), index+i);
+                                         register(reg + ceil!(i as f32 / 8.0) as usize), index-i);
                         size -= 8;
                         i += 8;
                     }
                     format!(";; GET VAR {index}\n{string}\tmov {}, [rbp-{}]\n",
-                            register_sz(reg+i/8, size), index+i)
+                            register_sz(reg + ceil!(i as f32 / 8.0) as usize, size), index-i)
                 }
             },
             Inst::CallReg(reg) => {
@@ -409,17 +435,49 @@ pub fn generate_x86(insts: Vec<Inst>, globals: &HashMap<String, usize>, externs:
                 format!(";; SET STRUCT FIELD\n\tadd {r0}, \
                          {off}\n\tmov [{r0}], {r1}\n")
             }
-            Inst::Deref(reg) => {
-                format!(";; DEREFERENCE\n\tmov {r}, [{r}]\n", r = register(reg))
+            Inst::Deref(reg, sz) => {
+                let index = 0;
+                let mut size = sz;
+                let mut string = String::new();
+                let mut i = 0;
+
+                let r = register(reg + size / 8 + 1);
+                writeln!(string, "\tmov {r}, {}", register(reg)).unwrap();
+                
+                while size > 8 {
+                    writeln!(string, "\tmov {}, [{r}+{}]",
+                             register(reg+i/8),
+                             index+i)
+                        .unwrap();
+                    size -= 8;
+                    i += 8;
+                }
+                format!(";; DEREFERENCE\n{string}\tmov {}, [{r}+{}]\n",
+                        register_sz(reg+i/8, size),
+                        index+i)
+//                format!(";; DEREFERENCE\n\tmov {r}, [{r}]\n", r = register(reg))
             },
             Inst::FuncPtr(reg, func) => {
                 format!(";; FUNCTION ADRESS\n\tmov {r}, f_{func}\n",
                         r = register(reg))
             },
-            Inst::DerefSet(r1, r2) => {
+            Inst::DerefSet(r1, r2, sz) => {
+                let mut size = sz;
+                let mut string = String::new();
+                let mut i = 0;
+
                 let reg1 = register(r1);
-                let reg2 = register(r2);
-                format!(";; DEREF SET\n\tmov [{reg1}], {reg2}\n")
+                
+                while size > 8 {
+                    writeln!(string, "\tmov [{reg1}+{i}], {}",
+                             register(r2 + i/8))
+                        .unwrap();
+                    size -= 8;
+                    i += 8;
+                }
+
+                format!(";; DEREF SET\n{string}\tmov [{reg1}+{i}], {}\n",
+                        register(r2 + i / 8))
             },
             Inst::Extern(ename, name) => {
                 extern_(ename, name)

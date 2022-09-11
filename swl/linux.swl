@@ -115,11 +115,11 @@ func _sbrk(int inc) -> long {
     <- curbrk;
 }
 
-#link_lib "c"
+// #link_lib "c"
 extern func malloc(int size) -> long;
 extern func free(long ptr);
-
 /*
+
 //              --- OLD MALLOC CODE ---
 // this was replaced by the libc malloc implementation
 
@@ -152,7 +152,7 @@ struct m_struct {
 // args:
 //   size <- the number of bytes to allocate
 // returns: the address of the allocated space
-func __old__malloc(int size) -> long {
+func malloc(int size) -> long {
     if (_m_heap_start == 0l) {
         _m_heap_start = _sbrk(0);
         _m_tcache     = ptr2arr(_sbrk(1000 * (8 + 8 + 1)));
@@ -186,11 +186,11 @@ func __old__malloc(int size) -> long {
 // ------
 // args:
 //   ptr <- the address of the block to free
-func __old_free(long ptr) -> int {
+func free(long ptr) -> int {
     int i = 0;
     while (i < _m_location) {
         m_struct index = _m_tcache[i];
-        if (ptr == index.ptr /*&& index.is_block*\/) {
+        if (ptr == index.ptr && index.is_block) {
             // free it
             _m_tcache[i].is_block = false;
             // test for merge left
@@ -316,6 +316,7 @@ func env() -> [char*] {
     <- envp;
 }
 
+#link_lib "c"
 extern system as func system_(char *ptr);
     
 // runs a given command

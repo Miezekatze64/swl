@@ -660,12 +660,20 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
                 var_offset = stack.pop().unwrap() as usize;
                 ip = stack.pop().unwrap() as usize;
             },
-            Inst::Push(reg) => {
+            Inst::Push(reg, size) => {
+                if *size != 8 {
+                    eprintln!("[warning] size {size} != 8 {{not implemented}}");
+                }
+                
                 let v = &registers[*reg];
                 stack.push(*v);
                 ip += 1;
             },
-            Inst::Pop(reg) => {
+            Inst::Pop(reg, size) => {
+                if *size != 8 {
+                    eprintln!("[warning] size {size} != 8 {{not implemented}}");
+                }
+                
                 let v = &mut registers[*reg];
                 *v = stack.pop().unwrap();
                 ip += 1;
@@ -809,8 +817,11 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
                 };
                 ip += 1;
             },
-            Inst::Deref(regid) => {
+            Inst::Deref(regid, size) => {
                 registers[*regid] = deref!(registers[*regid], globals, heap, vars);
+                if *size > 8 {
+                    eprintln!("[warning] size {size} > 8 {{not implemented}}");
+                }
                 ip += 1;
             },
             Inst::SetField(reg0, reg1, off, _) => {
@@ -856,7 +867,11 @@ pub fn interpret(intermediate: &[Inst]) -> ! {
             Inst::Else(id) => {
                 ip = find_if_else_end(intermediate, *id).1;
             },
-            Inst::DerefSet(r1, r2) => {
+            Inst::DerefSet(r1, r2, size) => {
+                if *size > 8 {
+                    eprintln!("[warning] size {size} > 8 {{not implemented}}");
+                }
+                
                 let val  = registers[*r1];
                 let val2 = registers[*r2];
                 match val & SEGMENT {

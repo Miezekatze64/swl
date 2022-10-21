@@ -1,23 +1,6 @@
 include "std.swl";
 
-struct S {
-    
-}
-
-instance Showable long {
-    func to_string(long l) -> string {
-        <- "<long>";
-    }
-}
-
-instance Showable S {
-    func to_string(S s) -> string {
-        <- "struct S {}";
-    }
-}
-
 func main() -> int {
-    println(42l);
-    println(S {});
-    <- 0;
+    println("Hello, World!");
+    <- 69;
 }

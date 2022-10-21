@@ -77,7 +77,7 @@ func main() -> int {
     while (true) {
         dump(state);
         step(state);
-        sleep(20l);
+//        sleep(20l);
     }
     
     <- 0;

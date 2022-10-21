@@ -11,7 +11,7 @@ intrinsic convert      as ptr2arr(long ptr)                                -> [u
 alias HANDLE  = void*;
 alias DWORD   = int;
 alias LPVOID  = void*;
-alias LPDWORD = DWORD*;
+alias LPDWORD = int*;
 alias BOOL    = bool;
 
 LPVOID NULL   = as[void*, 0];

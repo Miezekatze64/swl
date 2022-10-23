@@ -86,8 +86,10 @@ state of development, do not expect anything to work as you want it to....</b>
     ```swl
     if (1 == 1) {
         println("is true");
-    } else {
+    } else if (0 == 1) {
         println("THIS IS NOT POSSIBLE");
+    } else {
+        println("WTF!?");
     }
     ```
 

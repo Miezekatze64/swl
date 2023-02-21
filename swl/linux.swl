@@ -6,6 +6,8 @@ intrinsic convert      as __unsafe_convert(_a i)                           -> un
 intrinsic dereference  as arrlen([unchecked] str)                          -> int;
 intrinsic str_to_ptr   as arr2addr([unchecked] str)                        -> long;
 intrinsic convert      as ptr2arr(long ptr)                                -> [unchecked];
+
+
 intrinsic syscall      as syscall0(int index)                              -> long;
 intrinsic syscall      as syscall1(int index, long val)                    -> long;
 intrinsic syscall      as syscall2(int index, long val, long val2)         -> long;
@@ -115,7 +117,7 @@ func _sbrk(int inc) -> long {
     <- curbrk;
 }
 
-// #link_lib "c"
+// #link_lib "glfw"
 extern func malloc(int size) -> long;
 extern func free(long ptr);
 /*

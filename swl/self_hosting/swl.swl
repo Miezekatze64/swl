@@ -1,0 +1,201 @@
+include "../std.swl";
+
+int SEEK_SET = 0;
+
+struct Lexer {
+    int pos;
+    [char] src;
+}
+
+int TOKEN_IDENT   = 0;
+int TOKEN_STRING  = 1;
+int TOKEN_SPECIAL = 2;
+int TOKEN_NUM = 3;
+func type_to_str(int type) -> string {
+    if (type == TOKEN_IDENT) {
+        <- "TOKEN_IDENT";
+    } else if (type == TOKEN_STRING) {
+        <- "TOKEN_STRING";
+    } else if (type == TOKEN_SPECIAL) {
+        <- "TOKEN_SPECIAL";
+    } else if (type == TOKEN_NUM) {
+        <- "TOKEN_NUM";
+    } else {
+        <- "TOKEN_INVALID";
+    }
+}
+
+struct Token {
+    int type;
+    [char] value;
+}
+
+instance Showable Token* {
+    func to_string(Token* tk) -> string {
+        string tp = type_to_str(tk->type);
+        string val = alloc_array(6 + arrlen(tp) + 3 + arrlen(tk->value) + 2);
+        strcpy(val, "Token(");
+        strcpy_off(val, 6, tp, 0);
+        strcpy_off(val, 6+arrlen(tp), ", '", 0);
+        strcpy_off(val, 6+arrlen(tp)+3, tk->value, 0);
+        strcpy_off(val, 6+arrlen(tp)+3+arrlen(tk->value), "')", 0);
+        <- val;
+    }
+}
+
+func is_special(char c) -> bool {
+    <- c == ';' || c == '=' || c == '{' || c == '(';
+}
+
+func next_token(Lexer* self)  -> Token* from Lexer* {
+    assert(self->pos < arrlen(self->src ), "Bounds check");
+
+    int init_pos = self->pos;
+    while ((self->src) [init_pos] == ' ' ||
+        (self->src) [init_pos] == '\n') {
+            init_pos += 1;
+    }
+
+    if ((self->src) [init_pos] == '"') {
+        // search for end quotes
+        init_pos += 1;
+        int end_pos = init_pos;
+        while (end_pos < arrlen( self->src )) {
+            end_pos += 1;
+            self->pos = end_pos + 1;
+            if ((self->src) [end_pos] == '"') {
+                string str = alloc_array(end_pos - init_pos);
+                for (int i = init_pos; i < end_pos; i+= 1) {
+                    str[i - init_pos] = (self->src) [i];
+                }
+
+                Token *tk = as[Token*, malloc(12)];
+                Token new = Token {
+                    type:  TOKEN_STRING;
+                    value: str;
+                };
+                deref tk = new;
+                <- tk;
+            }
+        }
+        eprintln("Parse error: unterminated string literal.");
+        exit(1);
+        <- as[Token*, 0];
+    } else if (
+        (((self->src) [init_pos] >= 'a' && (self->src) [init_pos] <= 'z') ||
+        ((self->src) [init_pos] >= 'A' && (self->src) [init_pos] <= 'Z') ||
+        ((self->src) [init_pos] >= '_'))
+     ) {
+        int end_pos = init_pos;
+        for (int i = init_pos;
+            (((self->src) [i] >= 'a' && (self->src)[i] <= 'z') ||
+            ((self->src) [i] >= 'A' && (self->src)[i] <= 'Z') ||
+            ((self->src) [i] >= '0' && (self->src)[i] <= '9') ||
+            ((self->src) [i] == '_'))
+            ; i += 1) {
+                end_pos += 1;
+        }
+        self->pos = end_pos;
+
+        string str = alloc_array(end_pos - init_pos);
+        for (int i = init_pos; i < end_pos; i += 1) {
+            str[i - init_pos] = (self->src) [i];
+        }
+
+        Token *tk = as[Token*, malloc(12)];
+        Token new = Token {
+            type: TOKEN_IDENT;
+            value: str;
+        };
+        deref tk = new;
+        <- tk;
+    } else if (is_special((self -> src) [init_pos])) {
+        string str = alloc_array(1);
+        str[0] = (self->src) [init_pos];
+        self->pos = init_pos + 1;
+
+        Token *tk = as[Token*, malloc(12)];
+        Token new = Token {
+            type: TOKEN_SPECIAL;
+            value: str;
+        };
+        deref tk = new;
+        <- tk;
+    } else if (((self->src) [init_pos] >= '0' && (self->src) [init_pos] <= '9'))
+    {
+        int end_pos = init_pos;
+        for (int i = init_pos;
+            ((self->src) [i] >= '0' && (self->src)[i] <= '9')
+            ; i += 1) {
+                end_pos += 1;
+        }
+        self->pos = end_pos;
+
+        string str = alloc_array(end_pos - init_pos);
+        for (int i = init_pos; i < end_pos; i += 1) {
+            str[i - init_pos] = (self->src) [i];
+        }
+
+        Token *tk = as[Token*, malloc(12)];
+        Token new = Token {
+            type: TOKEN_NUM;
+            value: str;
+        };
+        deref tk = new;
+        <- tk;
+    }
+
+    <- as[Token*, 0];
+}
+
+func main() -> int {
+    if (arrlen(args()) < 2) {
+        eprintln("Not enough arguments.");
+        exit(1);
+    }
+    char* ptr = args()[1];
+    string filename = cstr_to_str(ptr);
+
+    int fd = as[int, open(filename, 0l, 0l)];
+
+    int len = 0;
+    while (true) {
+        char c = 'F';
+        int bytes = read(fd, as[long, ref c], 1);
+        if (bytes == 0) {
+            break;
+        }
+        len += 1;
+    }
+
+    lseek(fd, 0, SEEK_SET);
+
+    // remove null byte
+    if (len > 0) {
+        len -= 1;
+    }
+
+    string contents = alloc_array(len);
+    read(fd, as[long, arr2addr(contents)], len);
+
+    Lexer lexer_ = Lexer {
+        src: contents;
+        pos: 0;
+    };
+    Lexer* lexer = ref lexer_;
+
+    Token *tk = lexer.next_token();
+
+    println(tk);
+
+    while (true) {
+        tk = lexer.next_token();
+        if (tk == as[Token*, 0]) {
+            break;
+        }
+        println(tk);
+        free(as[long, tk]);
+    }
+
+    <- 0;
+}

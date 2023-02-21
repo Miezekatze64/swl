@@ -1,4 +1,4 @@
-/** SYSCALL WRAPPER FUNCTIONS (LINUX x86_64) **/
+/** WINAPI WRAPPER FUNCTIONS (WINDOWS x86_64) **/
 
 alias string = [char];
 
@@ -6,6 +6,8 @@ intrinsic convert      as __unsafe_convert(unchecked i)                    -> un
 intrinsic dereference  as arrlen([unchecked] str)                          -> int;
 intrinsic str_to_ptr   as arr2addr([unchecked] str)                        -> long;
 intrinsic convert      as ptr2arr(long ptr)                                -> [unchecked];
+
+
 
 #link_lib "kernel32"
 alias HANDLE  = void*;
